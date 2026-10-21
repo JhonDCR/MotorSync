@@ -75,8 +75,13 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+    # Ephemeral CI database: these passwords protect nothing outside the runner (research R2).
     env:
-      DATABASE_URL: postgresql://motorsync:motorsync_ci@localhost:5432/motorsync_test
+      DATABASE_ADMIN_URL: postgresql://motorsync:motorsync_ci@localhost:5432/motorsync_test
+      DATABASE_MIGRATOR_URL: postgresql://motorsync_migrator:migrator_ci@localhost:5432/motorsync_test
+      DATABASE_URL: postgresql://motorsync_app:app_ci@localhost:5432/motorsync_test
+      DB_MIGRATOR_PASSWORD: migrator_ci
+      DB_APP_PASSWORD: app_ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -84,11 +89,15 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
+      - name: Generate JWT secret for this run
+        run: echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
       - run: npm ci
       - run: npm run lint
       - run: npm test
-      - run: npm run test:e2e
       - run: npm run build
+      - run: npm run db:bootstrap
+      - run: npm run db:migrate
+      - run: npm run test:e2e
 
   frontend:
     needs: changes

@@ -12,8 +12,11 @@ const PACKAGES = {
     ['npx', '--no-install', 'oxlint', '--type-aware', file],
     ['npx', '--no-install', 'vitest', 'related', file, '--run', '--passWithNoTests'],
   ],
-  // The Angular test runner depends on the scaffold version: add the related-tests command here when it exists.
-  frontend: (file) => [['npx', '--no-install', 'eslint', file]],
+  // Angular runs Vitest through its own builder, so `vitest related` is not available: only edited specs are run.
+  frontend: (file) => [
+    ['npx', '--no-install', 'eslint', file],
+    ...(file.endsWith('.spec.ts') ? [['npx', '--no-install', 'ng', 'test', `--include=${file}`, '--watch=false']] : []),
+  ],
 };
 
 async function readStdin() {

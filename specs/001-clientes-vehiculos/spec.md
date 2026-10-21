@@ -22,6 +22,7 @@ Esta feature es la base de datos maestra del taller: sin clientes y vehículos r
 ## Clarifications
 
 ### Session 2026-10-21
+- Q: Si el administrador informa un motivo, ¿aplica también el largo de 10 a 500 caracteres? → A: Sí, la misma regla que para el asesor; solo cambia que para el administrador el motivo es opcional.
 
 - Q: ¿Qué formato de placa se acepta? (FR-007) → A: Solo el formato oficial ecuatoriano: autos con 3 letras + 3 o 4 dígitos; motos con 2 letras + 3 dígitos + 1 letra. El formato de moto se exige cuando la carrocería es "moto" y el de auto para el resto. Cualquier otro formato se rechaza con un mensaje claro. La normalización no cambia (mayúsculas, sin espacios ni guiones).
 - Q: ¿Quién puede transferir un vehículo de propietario y cambiar placa, VIN o documento? (FR-019) → A: Asesor y administrador. El asesor debe informar un motivo obligatorio, que queda en la auditoría; para el administrador el motivo es opcional y, si lo da, también se audita.
@@ -129,7 +130,7 @@ El asesor busca clientes por documento o por nombre, ve la lista de vehículos d
 13. **US4-AC13 (multi-tenant)**: **Given** un cliente o vehículo pertenece al taller B, **When** un usuario del taller A intenta editarlo, transferirlo o transferir un vehículo propio a un cliente del taller B, **Then** el sistema responde "no encontrado", no modifica nada y no crea registros de auditoría en ninguno de los dos talleres.
 14. **US4-AC14 (multi-tenant)**: **Given** el taller A y el taller B tienen registros de auditoría, **When** un usuario del taller A consulta el historial de propietarios de sus vehículos, **Then** solo ve registros de su taller.
 15. **US4-AC15 (motivo obligatorio para el asesor)**: **Given** un usuario con rol asesor, **When** intenta transferir un vehículo o cambiar la placa, el VIN o el documento sin motivo, o con un motivo de menos de 10 o más de 500 caracteres (sin contar espacios al inicio y al final), **Then** el sistema rechaza la operación indicando "El motivo es obligatorio (entre 10 y 500 caracteres)", no modifica nada y no crea registro de auditoría.
-16. **US4-AC16 (motivo opcional para el administrador)**: **Given** un usuario con rol administrador, **When** transfiere un vehículo o cambia la placa, el VIN o el documento sin motivo, **Then** la operación se completa y el registro de auditoría queda con el motivo vacío. **When** sí informa un motivo, **Then** el motivo queda en el registro de auditoría.
+16. **US4-AC16 (motivo opcional para el administrador)**: **Given** un usuario con rol administrador, **When** transfiere un vehículo o cambia la placa, el VIN o el documento sin motivo, **Then** la operación se completa y el registro de auditoría queda con el motivo vacío. **When** sí informa un motivo de 10 a 500 caracteres, **Then** el motivo queda en el registro de auditoría. **When** informa un motivo de menos de 10 o más de 500 caracteres, **Then** la operación se rechaza con el mismo mensaje que para el asesor y no se crea registro de auditoría.
 17. **US4-AC17 (sin eliminación)**: **Given** la ficha de un cliente o de un vehículo, **When** el usuario la consulta o la edita, cualquiera que sea su rol, **Then** no existe ninguna acción para eliminarlo ni desactivarlo, y cualquier intento de borrado por otra vía es rechazado sin modificar datos.
 
 ---
@@ -180,7 +181,7 @@ El asesor busca clientes por documento o por nombre, ve la lista de vehículos d
 - **FR-016**: El sistema MUST detectar ediciones concurrentes sobre el mismo registro y rechazar la que se basa en una versión desactualizada.
 - **FR-017**: El sistema MUST registrar en cada cliente y vehículo quién lo creó, quién lo modificó por última vez y cuándo (UTC).
 - **FR-018**: El sistema MUST permitir transferir un vehículo a otro cliente del mismo taller, con confirmación explícita del usuario.
-- **FR-019**: La transferencia de propietario y la modificación de identificadores (placa, VIN, documento) MUST estar permitidas a asesores y administradores. Para el asesor, un motivo de 10 a 500 caracteres (sin contar espacios al inicio y al final) es obligatorio. Para el administrador el motivo es opcional. El rol se toma siempre de la sesión del usuario.
+- **FR-019**: La transferencia de propietario y la modificación de identificadores (placa, VIN, documento) MUST estar permitidas a asesores y administradores. Para el asesor, un motivo de 10 a 500 caracteres (sin contar espacios al inicio y al final) es obligatorio. Para el administrador el motivo es opcional, pero si lo informa debe cumplir la misma regla de 10 a 500 caracteres. El rol se toma siempre de la sesión del usuario.
 - **FR-021**: El sistema MUST NOT ofrecer ninguna operación de eliminación ni de desactivación de clientes o vehículos en esta feature (fuera de alcance).
 
 **Auditoría**

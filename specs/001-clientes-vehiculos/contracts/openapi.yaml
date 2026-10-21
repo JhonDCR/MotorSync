@@ -340,7 +340,7 @@ components:
       type: string
       minLength: 10
       maxLength: 500
-      description: Motivo. Obligatorio para `asesor` en transferencias y cambios de placa, VIN o documento (FR-019).
+      description: Motivo. Obligatorio para `asesor` y opcional para `administrador` en transferencias y cambios de placa, VIN o documento; si se informa, siempre de 10 a 500 caracteres (FR-019).
 
     AuditStamp:
       type: object

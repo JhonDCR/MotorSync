@@ -19,7 +19,7 @@ Reglas no negociables del proyecto. Todo `plan.md` debe pasar el "Constitution C
 - No se escribe código de producción sin una prueba que falle primero (Red → Green → Refactor).
 - Las pruebas se derivan de los criterios de aceptación de `spec.md`. Cada criterio tiene al menos una prueba que lo referencia por su ID.
 - Una prueba en rojo se arregla cambiando el código de producción, no la prueba. Modificar una prueba requiere justificarlo en el PR y que un humano lo apruebe.
-- Backend: unitarias con Jest y e2e contra PostgreSQL real (contenedor), no contra mocks de la base. Frontend: unitarias de componentes y servicios en modo headless.
+- Backend: unitarias y e2e con Vitest; los e2e corren contra PostgreSQL real (contenedor), no contra mocks de la base. Frontend: unitarias de componentes y servicios con Vitest (jsdom), sin navegador ni modo watch.
 
 **Razón:** las pruebas son la especificación ejecutable y el principal mecanismo de retroalimentación para los agentes de IA. Si se pueden editar para que pasen, dejan de proteger.
 
@@ -72,4 +72,4 @@ Reglas no negociables del proyecto. Todo `plan.md` debe pasar el "Constitution C
 - Una enmienda requiere un PR propio (`docs: amend constitution …`) aprobado por ambos integrantes, con la versión incrementada según SemVer: MAJOR si elimina o redefine un principio, MINOR si agrega uno o lo amplía, PATCH si solo aclara redacción.
 - Todo PR se revisa contra esta constitución. Una violación se justifica en el plan ("Complexity Tracking") o bloquea el merge.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-21 | **Last Amended**: 2026-10-21
+**Version**: 1.0.1 | **Ratified**: 2026-10-21 | **Last Amended**: 2026-10-21

@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # Detects which packages changed. Jobs are skipped instead of not triggered (on.paths),
+  # because a required check that never runs leaves the PR stuck as "pending";
+  # a skipped job counts as passed.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend == 'true' && steps.scaffold.outputs.backend == 'true' }}
+      frontend: ${{ steps.filter.outputs.frontend == 'true' && steps.scaffold.outputs.frontend == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      # Until the Angular/NestJS scaffolds exist there is nothing to build: skip those jobs.
+      - id: scaffold
+        run: |
+          echo "backend=$([ -f backend/package-lock.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "frontend=$([ -f frontend/package-lock.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+
+  # The agent harness is code too: its guards have tests and must stay green.
+  harness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Hook tests
+        run: node --test ".claude/hooks/*.test.mjs"
+      - name: Validate settings.json
+        run: node -e "JSON.parse(require('fs').readFileSync('.claude/settings.json','utf8'))"
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: motorsync
+          POSTGRES_PASSWORD: motorsync_ci
+          POSTGRES_DB: motorsync_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U motorsync -d motorsync_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://motorsync:motorsync_ci@localhost:5432/motorsync_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test -- --ci
+      - run: npm run test:e2e -- --ci
+      - run: npm run build
+
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      # Non-interactive run; adjust the flags to the runner the Angular scaffold generates (Karma or Vitest).
+      - run: npm test -- --watch=false
+      - run: npm run build

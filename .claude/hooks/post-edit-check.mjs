@@ -9,8 +9,8 @@ import { spawnSync } from 'node:child_process';
 
 const PACKAGES = {
   backend: (file) => [
-    ['npx', '--no-install', 'eslint', file],
-    ['npx', '--no-install', 'jest', '--findRelatedTests', file, '--passWithNoTests'],
+    ['npx', '--no-install', 'oxlint', '--type-aware', file],
+    ['npx', '--no-install', 'vitest', 'related', file, '--run', '--passWithNoTests'],
   ],
   // The Angular test runner depends on the scaffold version: add the related-tests command here when it exists.
   frontend: (file) => [['npx', '--no-install', 'eslint', file]],
@@ -34,11 +34,14 @@ if (!PACKAGES[pkg] || !existsSync(path.join(pkgDir, 'node_modules'))) process.ex
 
 const fileInPkg = rel.slice(pkg.length + 1);
 const failures = [];
-for (const [cmd, ...args] of PACKAGES[pkg](fileInPkg)) {
-  const result = spawnSync(cmd, args, { cwd: pkgDir, encoding: 'utf8', shell: process.platform === 'win32', timeout: 120_000 });
+for (const argv of PACKAGES[pkg](fileInPkg)) {
+  // A single quoted command string: npx is a .cmd on Windows and needs a shell to run.
+  const [cmd, ...args] = argv;
+  const command = [cmd, ...args.map((arg) => `"${arg}"`)].join(' ');
+  const result = spawnSync(command, { cwd: pkgDir, encoding: 'utf8', shell: true, timeout: 120_000 });
   if (result.status !== 0) {
     const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim().split('\n').slice(-40).join('\n');
-    failures.push(`$ ${[cmd, ...args].join(' ')}\n${output}`);
+    failures.push(`$ ${argv.join(' ')}\n${output}`);
   }
 }
 

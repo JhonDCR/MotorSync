@@ -13,7 +13,7 @@ SaaS multi-tenant para talleres automotrices (check-in 360°, presupuestos, OT, 
 | `.claude/skills/speckit-*` | Skills de Spec Kit (`/speckit-specify`, `/speckit-plan`, …) |
 | `.claude/agents/` | Subagentes del arnés (ver "Flujo de agentes") |
 | `.claude/hooks/` | Controles deterministas (guardia de rutas y checks post-edición) |
-| `backend/` | NestJS (aún no existe el scaffold) |
+| `backend/` | NestJS 12: `src/` (módulos), `test/` (e2e con `*.e2e-spec.ts`) |
 | `frontend/` | Angular (aún no existe el scaffold) |
 | `.github/workflows/ci.yml` | Pipeline: harness, backend y frontend |
 
@@ -24,7 +24,8 @@ docker compose up -d          # PostgreSQL local (requiere .env, copiar de .env.
 node --test ".claude/hooks/*.test.mjs"   # pruebas del arnés
 ```
 
-Backend (`cd backend`), TODO al crear el scaffold: `npm run lint`, `npm test`, `npm run test:e2e`, `npm run build`.
+Backend (`cd backend`, NestJS 12 con Vitest y oxlint): `npm run lint`, `npm test`, `npm run test:e2e`, `npm run build`, `npm run start:dev`.
+Una sola prueba: `npx vitest run src/ruta/archivo.spec.ts`. Pruebas relacionadas con un archivo: `npx vitest related src/ruta/archivo.ts --run`.
 Frontend (`cd frontend`), TODO al crear el scaffold: `npm run lint`, `npm test -- --watch=false`, `npm run build`.
 
 ## Convenciones

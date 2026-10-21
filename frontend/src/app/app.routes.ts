@@ -1,3 +1,15 @@
+import { isDevMode } from '@angular/core';
 import { Routes } from '@angular/router';
 
-export const routes: Routes = [];
+// /dev-token solo existe en desarrollo (research.md R2).
+const devRoutes: Routes = isDevMode()
+  ? [
+      {
+        path: 'dev-token',
+        title: 'Token de desarrollo',
+        loadComponent: () => import('./core/auth/dev-token.page').then((m) => m.DevTokenPage),
+      },
+    ]
+  : [];
+
+export const routes: Routes = [...devRoutes];

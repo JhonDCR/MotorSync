@@ -1,0 +1,7 @@
+// Objetivo táctil mínimo para las pantallas de bahía (constitución: >= 44 px).
+$touch-target: 44px;
+
+@mixin touch-target {
+  min-height: $touch-target;
+  min-width: $touch-target;
+}

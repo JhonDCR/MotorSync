@@ -1,0 +1,49 @@
+@use '../../shared/styles/touch' as touch;
+
+.dev-token {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1rem;
+  color: #1a1a1a;
+  background: #ffffff;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+textarea {
+  box-sizing: border-box;
+  width: 100%;
+  font-family: monospace;
+  font-size: 1rem;
+  border: 1px solid #595959;
+  border-radius: 4px;
+  padding: 0.5rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+button {
+  @include touch.touch-target;
+  padding: 0 1rem;
+  font-size: 1rem;
+  color: #ffffff;
+  background: #0b5394;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #f1c232;
+  outline-offset: 2px;
+}

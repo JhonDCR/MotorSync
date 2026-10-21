@@ -4,6 +4,8 @@
 
 **Input**: Feature specification from `specs/001-clientes-vehiculos/spec.md`
 
+**Aprobación**: Aprobado por el humano el 2026-10-21 (spec y plan).
+
 ## Summary
 
 Alta, búsqueda y edición de clientes (persona natural o empresa, con cédula, RUC o pasaporte de Ecuador) y de sus vehículos, con búsqueda por placa mientras se escribe en la recepción, transferencia auditada de propietario y aislamiento estricto entre talleres.
@@ -60,7 +62,7 @@ No quedan `NEEDS CLARIFICATION`: todo se resolvió en [research.md](./research.m
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Evaluado antes de la fase 0 y **reevaluado después del diseño** (data-model, contrato). Resultado: **PASA con 2 observaciones que requieren decisión humana** (IV-a y II-a). Ninguna bloquea la implementación.
+Evaluado antes de la fase 0 y **reevaluado después del diseño** (data-model, contrato). Resultado: **PASA**. Las observaciones II-a e IV-a están resueltas por enmienda (constitución 1.1.0), que aprobó el humano el 2026-10-21. El leader la aplica en un PR propio.
 
 ### I. Aislamiento multi-tenant (NON-NEGOTIABLE)
 
@@ -77,12 +79,12 @@ Evaluado antes de la fase 0 y **reevaluado después del diseño** (data-model, c
 
 | Regla | Cómo se cumple | Estado |
 |---|---|---|
-| Prueba roja antes del código | `tasks.md` ordenará pares `tester` → `implementer-*`. Los hooks impiden que los implementers toquen las pruebas. | Cumple |
+| Prueba roja antes del código | `tasks.md` ordena pares `tester` → `implementer-*`. Los hooks impiden que los implementers toquen las pruebas. | Cumple |
 | Cada criterio tiene al menos una prueba que cita su ID | Convención: el nombre del `it()` empieza por el ID (`US3-AC12 rechaza placa de auto con formato inválido`). La trazabilidad se verifica en `/speckit-analyze`. | Cumple |
 | Una prueba roja se arregla en producción, no en la prueba | Lo imponen los hooks y el `reviewer`. | Cumple |
-| Backend: unitarias con **Jest** y e2e contra PostgreSQL real | e2e contra PostgreSQL real: cumple. **Jest → Vitest**: el scaffold aprobado en el PR #2 usa Vitest. Ver **II-a**. | Observación |
+| Backend: unitarias (Vitest según la enmienda 1.0.1) y e2e contra PostgreSQL real | e2e contra PostgreSQL real: cumple. Runner Vitest (ver **II-a**). | Cumple |
 
-**II-a (observación)**: la constitución nombra Jest; el repo usa Vitest desde el scaffold (#2, ya en `main`). El espíritu del principio (unitarias + e2e contra BD real, headless) se cumple igual. Se recomienda una **enmienda PATCH (1.0.1)** que diga "Vitest" o "el runner del scaffold". Queda registrado en Complexity Tracking.
+**II-a (resuelta por enmienda, constitución 1.1.0)**: la constitución 1.0.0 nombraba Jest y el repo usa Vitest desde el scaffold (#2). La enmienda 1.0.1, incluida en 1.1.0, sustituye Jest por Vitest.
 
 ### III. Especificación y contratos primero
 
@@ -101,9 +103,9 @@ Evaluado antes de la fase 0 y **reevaluado después del diseño** (data-model, c
 | Campos: `tenant_id`, actor, acción, entidad, id, antes y después (JSON), fecha UTC, IP o canal | Todos están en `audit_log`. Además se guardan `actor_name`, `actor_role` y `reason`. | Cumple |
 | Append-only: el rol app solo tiene `INSERT` y `SELECT`; sin endpoints de edición ni borrado | `GRANT SELECT, INSERT`, más un trigger que rechaza `UPDATE`/`DELETE`. El contrato no expone escritura sobre la auditoría. | Cumple |
 | Misma transacción que el cambio | `AuditService` usa el `EntityManager` de la transacción del request. Lo prueba US4-AC9. | Cumple |
-| **Eventos nuevos de esta feature** | `vehicle.owner_changed`, `vehicle.plate_changed`, `vehicle.vin_changed` y `client.document_changed` **no están en la lista** del principio IV. Ver **IV-a**. | Observación |
+| **Eventos nuevos de esta feature** | `vehicle.owner_changed`, `vehicle.plate_changed`, `vehicle.vin_changed` y `client.document_changed` quedan en la lista del principio IV con la enmienda 1.1.0. Ver **IV-a**. | Cumple |
 
-**IV-a (observación)**: la spec (FR-020, US4-AC8, US4-AC11) exige auditar el cambio de propietario y el cambio de identificadores. La constitución no lo prohíbe: auditar más no viola "estos eventos se registran". Pero la lista es la referencia del `reviewer`, y conviene que sea completa. Se recomienda una **enmienda MINOR (1.1.0)** que agregue "cambio de propietario de un vehículo" y "modificación de placa, VIN o documento de identidad", y que mencione el campo opcional `reason` (motivo). **Decide el humano**; mientras tanto el plan implementa la auditoría tal como pide la spec.
+**IV-a (resuelta por enmienda, constitución 1.1.0)**: la spec (FR-020, US4-AC8, US4-AC11) exige auditar el cambio de propietario y la modificación de identificadores. La enmienda MINOR 1.1.0, aprobada por el humano el 2026-10-21, agrega al principio IV el cambio de propietario de un vehículo y la modificación de placa, VIN o documento, junto con el motivo (`reason`). El leader la aplica en un PR propio; este plan no edita la constitución.
 
 ### V. Simplicidad y tipado estricto
 
@@ -218,6 +220,7 @@ frontend/
     │   │   └── mock-api.interceptor.ts     # USE_MOCK_API
     │   └── auth/
     │       ├── auth-token.interceptor.ts
+    │       ├── current-session.ts          # role/name del JWT, solo para la UI
     │       └── dev-token.page.ts
     ├── shared/
     │   ├── identifiers/                    # mismas reglas y vectores que el backend
@@ -239,20 +242,19 @@ frontend/
 
 ## Entrega por cortes verticales
 
-La feature cabe en un solo `tasks.md`, pero se propone integrarla en **3 PRs** para revisar cambios pequeños:
+Decisión del humano (P3, 2026-10-21): un solo `tasks.md` y **3 PRs** dentro de `001`.
 
 1. **PR 1, base + US2**: bootstrap de roles, migraciones de `tenants` y `clients`, contexto de tenant, guard JWT, filtro de errores y prueba RLS de BD. Alta, consulta y búsqueda de clientes en API y frontend.
 2. **PR 2, US3 + US1**: migración de `vehicles`, alta de vehículo, búsqueda por placa y VIN, pantalla inicial de búsqueda y prueba de rendimiento.
 3. **PR 3, US4**: edición con `version`, migración de `audit_log`, transferencia con motivo, historial de propietarios y prohibición de borrado.
 
-Si el humano prefiere features separadas, el PR 3 puede convertirse en `002-transferencia-propietario` sin cambiar el contrato.
-
 ## Cambios fuera de `specs/` que requieren las tareas
 
 | Archivo | Cambio | Responsable sugerido |
 |---|---|---|
-| `.env.example` | Añadir `DATABASE_ADMIN_URL`, `DATABASE_MIGRATOR_URL`, `DATABASE_URL`, `DB_APP_PASSWORD`, `DB_MIGRATOR_PASSWORD`, `JWT_SECRET` (de ejemplo) | implementer-backend |
-| `.github/workflows/ci.yml` | Variables de los 3 roles; pasos `db:bootstrap`, `build`, `db:migrate` antes de `test:e2e`; `JWT_SECRET` generado; paso `test:perf` | leader / implementer-backend |
+| `.env.example` | Añadir `DATABASE_ADMIN_URL`, `DATABASE_MIGRATOR_URL`, `DATABASE_URL`, `DB_APP_PASSWORD`, `DB_MIGRATOR_PASSWORD`, `JWT_SECRET` (de ejemplo) | leader |
+| `.github/workflows/ci.yml` | Variables de los 3 roles; pasos `db:bootstrap`, `build`, `db:migrate` antes de `test:e2e`; `JWT_SECRET` generado; paso `test:perf` | leader |
+| `CLAUDE.md` | Comandos nuevos (`db:bootstrap`, `db:migrate`, `db:seed:dev`, `token:dev`, `test:perf`) | leader |
 | `backend/package.json` | Dependencias nuevas y scripts `db:bootstrap`, `db:migrate`, `db:seed:dev`, `token:dev`, `test:perf` | implementer-backend |
 | `frontend/angular.json` | Configuración `mock` y `proxyConfig` | implementer-frontend |
 
@@ -263,19 +265,17 @@ Si el humano prefiere features separadas, el PR 3 puede convertirse en `002-tran
 | TypeORM 0.3 (CJS) en un backend ESM con Vitest: carga de entidades y metadatos de decoradores | Entidades y migraciones registradas por referencia; `type` explícito en cada `@Column`. La primera tarea del PR 1 es una prueba e2e "humo" de conexión + transacción + `set_config`, que valida la integración antes de construir encima. |
 | Un servicio usa el `DataSource` global en lugar del manager del contexto y se salta `set_config` | Con RLS, una consulta sin tenant devuelve 0 filas y falla de forma visible, no filtra datos. Además el `reviewer` lo revisa (la regla es que solo `tenant-context.ts` toca el `DataSource`). |
 | El p95 de la búsqueda de 2 caracteres por "contiene" | GIN compuesto con `tenant_id` acota a ≤ 50 000 filas. Si `test:perf` falla, plan B: para 2 caracteres, solo prefijo. Esto cambiaría el comportamiento de US1-AC3 y habría que volver a la spec. |
-| RUC de sociedades que no cumplen el módulo 11 | Se valida solo la estructura (R7). Ver la pregunta P1. |
+| RUC de sociedades que no cumplen el módulo 11 | Se valida solo la estructura (R7), como decidió el humano (P1). |
 | Pool de conexiones: una transacción por request retiene la conexión durante todo el request | Los requests son cortos y sin E/S externa. Pool por defecto de 10 conexiones; se mide en `test:perf`. |
 
-## Preguntas abiertas para el humano
+## Decisiones del humano (2026-10-21)
 
-- **P1**: ¿Aceptan validar el RUC de sociedades (tercer dígito 9 o 6) solo por estructura, sin dígito verificador módulo 11, para no rechazar RUC reales emitidos por el SRI? Es la opción por defecto del plan. La alternativa es exigir el módulo 11 y aceptar falsos rechazos.
-- **P2**: ¿Aprueban las enmiendas recomendadas de la constitución: **MINOR 1.1.0** (eventos auditables nuevos y campo `reason`, IV-a) y **PATCH 1.0.1** (Vitest en lugar de Jest, II-a)? Las enmiendas van en un PR propio aprobado por ambos integrantes.
-- **P3**: ¿Prefieren entregar la feature en 3 PRs dentro de `001` (recomendado) o separar US4 como `002-transferencia-propietario`?
+- **P1**: el RUC de sociedades (tercer dígito 9 o 6) se valida solo por estructura, sin módulo 11.
+- **P2**: se aprueba la enmienda MINOR 1.1.0 (principio IV: cambio de propietario, modificación de placa, VIN o documento, y motivo). Incluye la 1.0.1 (Vitest en lugar de Jest). El leader la aplica en un PR propio.
+- **P3**: 3 PRs dentro de `001`: PR1 base técnica + US2; PR2 US3 + US1 con la prueba de rendimiento; PR3 US4.
 
 ## Complexity Tracking
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |---|---|---|
-| Vitest en lugar de Jest (principio II) | Es el runner del scaffold ya aprobado y fusionado (#2); el frontend de Angular 22 también usa Vitest. Un solo runner en todo el monorepo. | Volver a Jest obligaría a rehacer el scaffold y a mantener dos runners. Se propone la enmienda PATCH 1.0.1 en lugar de cambiar el código. |
-| Eventos auditables no listados en el principio IV | Los exige la spec (FR-020) y el humano lo confirmó en clarify. | No auditarlos incumpliría la spec. Se propone la enmienda MINOR 1.1.0 para que la lista de la constitución quede completa. |
 | Tres extensiones de PostgreSQL (`pg_trgm`, `unaccent`, `btree_gin`) | "Contiene" sobre placa y documento, nombre sin tildes, y GIN compuesto con `tenant_id` para cumplir los 200 ms. | Un B-tree de prefijo no cubre "contiene" (US1-AC3); normalizar tildes en la app duplica reglas. Las tres vienen con PostgreSQL y son *trusted*. |

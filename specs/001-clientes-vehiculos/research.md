@@ -133,7 +133,7 @@ Fase 0 del plan. Cada decisión sigue el formato Decision / Rationale / Alternat
 - **Cédula**: `^\d{10}$`; provincia 01–24 o 30; tercer dígito 0–5; dígito verificador módulo 10 (coeficientes 2,1,2,1,2,1,2,1,2, restando 9 a los productos mayores que 9).
 - **RUC**: `^\d{13}$`, terminado en `001`, provincia 01–24 o 30, y según el tercer dígito:
   - 0–5 (persona natural): los 10 primeros dígitos son una cédula válida.
-  - 9 (sociedad privada) o 6 (entidad pública): se valida la estructura (provincia, tercer dígito y sufijo) **sin** dígito verificador módulo 11. El SRI ha emitido RUC de sociedades válidos que no cumplen el módulo 11, y rechazarlos bloquearía clientes reales. Ver la pregunta abierta P1 en el plan.
+  - 9 (sociedad privada) o 6 (entidad pública): se valida la estructura (provincia, tercer dígito y sufijo) **sin** dígito verificador módulo 11. El SRI ha emitido RUC de sociedades válidos que no cumplen el módulo 11, y rechazarlos bloquearía clientes reales. Aprobado por el humano el 2026-10-21 (P1 del plan).
 - **Pasaporte**: `^[A-Z0-9]{5,20}$`.
 - **Teléfono**: se quitan espacios, guiones y paréntesis; `^\+?\d{7,15}$`.
 - **Correo**: validador estándar de `class-validator` (`IsEmail`) en el backend y `Validators.email` en el frontend.

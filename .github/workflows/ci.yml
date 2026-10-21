@@ -106,6 +106,6 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
-      # Non-interactive run; adjust the flags to the runner the Angular scaffold generates (Karma or Vitest).
+      # Angular 22 runs Vitest with jsdom: no browser needed, --watch=false makes it a single run.
       - run: npm test -- --watch=false
       - run: npm run build

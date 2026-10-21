@@ -14,7 +14,7 @@ SaaS multi-tenant para talleres automotrices (check-in 360°, presupuestos, OT, 
 | `.claude/agents/` | Subagentes del arnés (ver "Flujo de agentes") |
 | `.claude/hooks/` | Controles deterministas (guardia de rutas y checks post-edición) |
 | `backend/` | NestJS 12: `src/` (módulos), `test/` (e2e con `*.e2e-spec.ts`) |
-| `frontend/` | Angular (aún no existe el scaffold) |
+| `frontend/` | Angular 22 standalone: `src/app/` (componentes, rutas, servicios) |
 | `.github/workflows/ci.yml` | Pipeline: harness, backend y frontend |
 
 ## Comandos
@@ -26,7 +26,9 @@ node --test ".claude/hooks/*.test.mjs"   # pruebas del arnés
 
 Backend (`cd backend`, NestJS 12 con Vitest y oxlint): `npm run lint`, `npm test`, `npm run test:e2e`, `npm run build`, `npm run start:dev`.
 Una sola prueba: `npx vitest run src/ruta/archivo.spec.ts`. Pruebas relacionadas con un archivo: `npx vitest related src/ruta/archivo.ts --run`.
-Frontend (`cd frontend`), TODO al crear el scaffold: `npm run lint`, `npm test -- --watch=false`, `npm run build`.
+
+Frontend (`cd frontend`, Angular 22 con Vitest + jsdom y angular-eslint): `npm run lint`, `npm test -- --watch=false`, `npm run build`, `npm start`.
+Una sola prueba: `npx ng test --include=src/app/ruta/archivo.spec.ts --watch=false`.
 
 ## Convenciones
 

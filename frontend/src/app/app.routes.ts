@@ -30,5 +30,16 @@ export const routes: Routes = [
     title: 'Ficha del cliente',
     loadComponent: () => import('./features/clients/client-detail.page').then((m) => m.ClientDetailPage),
   },
+  // vehicles/new va antes de vehicles/:id para que "new" no se lea como un id.
+  {
+    path: 'vehicles/new',
+    title: 'Nuevo vehículo',
+    loadComponent: () => import('./features/vehicles/vehicle-form.page').then((m) => m.VehicleFormPage),
+  },
+  {
+    path: 'vehicles/:id',
+    title: 'Ficha del vehículo',
+    loadComponent: () => import('./features/vehicles/vehicle-detail.page').then((m) => m.VehicleDetailPage),
+  },
   ...devRoutes,
 ];

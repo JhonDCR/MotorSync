@@ -1,22 +1,10 @@
-import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { catchError, Observable, throwError } from 'rxjs';
+import type { Observable } from 'rxjs';
 import type { ClientCreate, ClientDetail, ClientSearchResponse } from './api.models';
-import { isProblem } from './problem';
+import { toProblem } from './problem-operator';
 
 const CLIENTS_URL = '/api/v1/clients';
-
-/**
- * Errors with a Problem body (application/problem+json) fail with that Problem. Any other error
- * (for example a network failure with status 0) fails with the original HttpErrorResponse.
- */
-function toProblem<T>(source: Observable<T>): Observable<T> {
-  return source.pipe(
-    catchError((error: unknown) =>
-      throwError(() => (error instanceof HttpErrorResponse && isProblem(error.error) ? error.error : error)),
-    ),
-  );
-}
 
 /** Clients endpoints of contracts/openapi.yaml. */
 @Injectable({ providedIn: 'root' })

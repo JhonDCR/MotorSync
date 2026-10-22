@@ -24,10 +24,15 @@
 // Posible duplicado: al perder el foco (blur) document-number con una cédula o un RUC válidos, el formulario
 // llama a search(<10 primeros dígitos normalizados>). Si algún resultado es la contraparte (cédula X ↔ RUC X001),
 // muestra possible-duplicate-warning con el displayName del cliente encontrado. Guardar sigue permitido.
+// T049 (US3-AC9, "Registrar cliente nuevo" desde el formulario de vehículo; cambio en T050):
+//   ?returnTo= se acepta solo si es una ruta interna (empieza por "/" y no por "//"). Tras crear, navega a
+//   {returnTo}?clientId={id} en lugar de a /clients/{id}. Con returnTo válido se muestra cancel-return, un <a>
+//   con href {returnTo} para volver sin crear. Un returnTo no válido se ignora.
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import { of, throwError } from 'rxjs';
 import type { ClientCreate, ClientDetail, ClientSearchResponse, ClientSummary, Problem } from '../../core/api/api.models';
 import { ClientsApiService } from '../../core/api/clients-api.service';
@@ -531,5 +536,117 @@ describe('ClientFormPage (T027)', () => {
     expect(text('duplicate-message')).toMatch(/documento ya está registrado/i);
     expect(get<HTMLAnchorElement>('open-existing-client').getAttribute('href')).toBe(`/clients/${EXISTING_ID}`);
     expect(query('network-error')).toBeNull();
+  });
+});
+
+describe('ClientFormPage con ?returnTo= (T049, US3-AC9)', () => {
+  let harness: RouterTestingHarness;
+  let api: {
+    create: ReturnType<typeof vi.fn<ClientsApiService['create']>>;
+    getById: ReturnType<typeof vi.fn<ClientsApiService['getById']>>;
+    search: ReturnType<typeof vi.fn<ClientsApiService['search']>>;
+  };
+
+  beforeEach(async () => {
+    api = {
+      create: vi.fn<ClientsApiService['create']>(() => of(DETAIL)),
+      getById: vi.fn<ClientsApiService['getById']>(() => of(DETAIL)),
+      search: vi.fn<ClientsApiService['search']>(() => of(EMPTY_SEARCH)),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          { path: 'clients/new', component: ClientFormPage },
+          { path: 'clients/:clientId', component: ClientDetailStubPage },
+          { path: 'vehicles/new', component: ClientDetailStubPage },
+        ]),
+        { provide: ClientsApiService, useValue: api },
+      ],
+    });
+    harness = await RouterTestingHarness.create();
+  });
+
+  async function settle(): Promise<void> {
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+  }
+
+  async function open(url: string): Promise<void> {
+    await harness.navigateByUrl(url);
+    await settle();
+  }
+
+  function root(): HTMLElement {
+    return harness.routeNativeElement ?? (harness.fixture.nativeElement as HTMLElement);
+  }
+
+  function get<T extends HTMLElement = HTMLElement>(testId: string): T {
+    const element = root().querySelector<T>(`[data-testid="${testId}"]`);
+    if (element === null) {
+      throw new Error(`No existe [data-testid="${testId}"]`);
+    }
+    return element;
+  }
+
+  async function type(testId: string, value: string): Promise<void> {
+    const input = get<HTMLInputElement>(testId);
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+    await settle();
+  }
+
+  async function createValidNatural(): Promise<void> {
+    await type('document-number', '1710034065');
+    await type('first-names', 'Ana María');
+    await type('last-names', 'Pérez');
+    await type('phone', '0991234567');
+    get('save').click();
+    await settle();
+  }
+
+  function currentUrl(): string {
+    return TestBed.inject(Router).url;
+  }
+
+  it('[US3-AC9] tras crear el cliente vuelve a returnTo con clientId del cliente creado', async () => {
+    await open('/clients/new?returnTo=%2Fvehicles%2Fnew');
+    await createValidNatural();
+
+    expect(api.create).toHaveBeenCalledTimes(1);
+    const url = TestBed.inject(Router).parseUrl(currentUrl());
+    expect(url.root.children['primary']?.segments.map((s) => s.path)).toEqual(['vehicles', 'new']);
+    expect(url.queryParams['clientId']).toBe(CLIENT_ID);
+  });
+
+  it('[US3-AC9] con returnTo ofrece volver sin crear el cliente', async () => {
+    await open('/clients/new?returnTo=%2Fvehicles%2Fnew');
+
+    const back = get<HTMLAnchorElement>('cancel-return');
+    expect(back.getAttribute('href')).toBe('/vehicles/new');
+
+    back.click();
+    await settle();
+    expect(api.create).not.toHaveBeenCalled();
+    expect(currentUrl()).toBe('/vehicles/new');
+  });
+
+  it.each(['https://evil.example/x', '//evil.example/x', 'vehicles/new'])(
+    '[US3-AC9] un returnTo que no es una ruta interna (%s) se ignora y se navega a la ficha del cliente',
+    async (returnTo) => {
+      await open(`/clients/new?returnTo=${encodeURIComponent(returnTo)}`);
+
+      expect(root().querySelector('[data-testid="cancel-return"]')).toBeNull();
+      await createValidNatural();
+      expect(currentUrl()).toBe(`/clients/${CLIENT_ID}`);
+    },
+  );
+
+  it('[US3-AC9] sin returnTo se mantiene el comportamiento de US2-AC1 (navega a la ficha)', async () => {
+    await open('/clients/new');
+
+    expect(root().querySelector('[data-testid="cancel-return"]')).toBeNull();
+    await createValidNatural();
+    expect(currentUrl()).toBe(`/clients/${CLIENT_ID}`);
   });
 });

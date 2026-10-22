@@ -200,6 +200,9 @@
       <button type="submit" class="primary" data-testid="save" [disabled]="saving()" [attr.aria-busy]="saving()">
         {{ saving() ? 'Guardando…' : 'Guardar' }}
       </button>
+      @if (returnTo) {
+        <a class="action" data-testid="cancel-return" [routerLink]="returnTo">Volver sin crear el cliente</a>
+      }
     </div>
     <p class="sr-only" role="status" aria-live="polite">{{ saving() ? 'Guardando cliente' : '' }}</p>
   </form>

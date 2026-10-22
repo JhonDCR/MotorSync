@@ -3,7 +3,11 @@ import { isValidCedula, isValidPassport, isValidRuc } from '../../shared/identif
 import { isValidEmail, normalizeEmail } from '../../shared/identifiers/email';
 import { normalizeDocument } from '../../shared/identifiers/normalize';
 import { isValidPhone, normalizePhone } from '../../shared/identifiers/phone';
+import { isBodyType, isValidPlate, normalizePlateForWrite } from '../../shared/identifiers/plate';
+import { isValidVin, normalizeVin } from '../../shared/identifiers/vin';
+import { MAX_MILEAGE, maxVehicleYear, MIN_VEHICLE_YEAR } from '../../shared/validators/vehicle.validators';
 import type {
+  BodyType,
   ClientDetail,
   ClientSearchResponse,
   ClientSummary,
@@ -12,11 +16,14 @@ import type {
   FieldError,
   Problem,
   ProblemCode,
+  VehicleDetail,
+  VehicleSummary,
 } from './api.models';
 
 // In-memory data of the mock API (research R8). It lives in the root injector, so every TestBed
 // (and every page load in `ng serve --configuration mock`) starts with its own store.
-// Validation mirrors backend/src/clients/dto/create-client.dto.ts and the contract FieldError codes.
+// Validation mirrors backend/src/clients/dto/create-client.dto.ts, backend/src/vehicles/dto/create-vehicle.dto.ts
+// and the contract FieldError codes.
 
 export type MockResult<T> = { ok: true; status: number; body: T } | { ok: false; problem: Problem };
 
@@ -262,6 +269,187 @@ function validateClientCreate(raw: unknown): { client: ValidClient } | { errors:
   };
 }
 
+const VEHICLE_CREATE_FIELDS = [
+  'ownerClientId',
+  'plate',
+  'vin',
+  'brand',
+  'model',
+  'year',
+  'color',
+  'bodyType',
+  'initialMileage',
+] as const;
+
+const VEHICLE_TEXT_MAX_LENGTH = 60;
+const CAR_PLATE_MESSAGE = 'Placa inválida: para autos use 3 letras y 3 o 4 dígitos (ej. PBA1234)';
+const MOTORCYCLE_PLATE_MESSAGE = 'Placa inválida: para motos use 2 letras, 3 dígitos y 1 letra (ej. AB123C)';
+const MILEAGE_MESSAGE = `Kilometraje inválido: entero entre 0 y ${MAX_MILEAGE}`;
+
+/** Validated and normalized VehicleCreate. */
+interface ValidVehicle {
+  ownerClientId: string;
+  plate: string;
+  vin: string | null;
+  brand: string;
+  model: string;
+  year: number;
+  color: string;
+  bodyType: BodyType;
+  initialMileage: number;
+}
+
+/** Stored vehicle: the detail without the owner snapshot, which is read from the clients map. */
+type VehicleRecord = Omit<VehicleDetail, 'owner'> & { ownerClientId: string };
+
+function readVehicleText(body: Record<string, unknown>, field: string, label: string, errors: FieldErrors): string | null {
+  const value = readText(body, field, errors);
+  if (value === null) return null;
+  const trimmed = value.trim();
+  if (trimmed === '') {
+    errors.add(field, REQUIRED.code, REQUIRED.message);
+    return null;
+  }
+  if (trimmed.length > VEHICLE_TEXT_MAX_LENGTH) {
+    errors.add(field, 'VALIDATION_ERROR', `${label} admite como máximo ${VEHICLE_TEXT_MAX_LENGTH} caracteres`);
+    return null;
+  }
+  return trimmed;
+}
+
+interface IntegerRule {
+  min: number;
+  max: number;
+  code: string;
+  message: string;
+}
+
+/** As the backend: only a JSON integer is accepted, never a numeric string. */
+function readInteger(body: Record<string, unknown>, field: string, rule: IntegerRule, errors: FieldErrors): number | null {
+  const value = body[field];
+  if (value === undefined || value === null) {
+    errors.add(field, REQUIRED.code, REQUIRED.message);
+    return null;
+  }
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < rule.min || value > rule.max) {
+    errors.add(field, rule.code, rule.message);
+    return null;
+  }
+  return value;
+}
+
+function readOwnerClientId(body: Record<string, unknown>, errors: FieldErrors): string | null {
+  const value = body['ownerClientId'];
+  if (value === undefined || value === null) {
+    errors.add('ownerClientId', REQUIRED.code, REQUIRED.message);
+    return null;
+  }
+  if (typeof value !== 'string' || !UUID_PATTERN.test(value)) {
+    errors.add('ownerClientId', 'VALIDATION_ERROR', 'Identificador de cliente inválido');
+    return null;
+  }
+  return value.toLowerCase();
+}
+
+function readBodyType(body: Record<string, unknown>, errors: FieldErrors): BodyType | null {
+  const value = body['bodyType'];
+  if (value === undefined || value === null) {
+    errors.add('bodyType', REQUIRED.code, REQUIRED.message);
+    return null;
+  }
+  if (!isBodyType(value)) {
+    errors.add('bodyType', 'VALIDATION_ERROR', 'Carrocería inválida: sedan, suv, pickup, motorcycle u other');
+    return null;
+  }
+  return value;
+}
+
+/** The format depends on the body type (FR-007); symbols are rejected, never cleaned (US3-AC14). */
+function readPlate(body: Record<string, unknown>, bodyType: BodyType | null, errors: FieldErrors): string | null {
+  const value = readText(body, 'plate', errors, 'INVALID_PLATE');
+  if (value === null) return null;
+  const normalized = normalizePlateForWrite(value);
+  // An unknown body type is reported on bodyType only, as the backend.
+  const effectiveType = bodyType ?? 'sedan';
+  if (normalized === null || (bodyType !== null && !isValidPlate(normalized, effectiveType))) {
+    errors.add('plate', 'INVALID_PLATE', effectiveType === 'motorcycle' ? MOTORCYCLE_PLATE_MESSAGE : CAR_PLATE_MESSAGE);
+    return null;
+  }
+  return normalized;
+}
+
+function readVin(body: Record<string, unknown>, errors: FieldErrors): string | null {
+  const value = body['vin'];
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') {
+    errors.add('vin', 'INVALID_VIN', MUST_BE_TEXT);
+    return null;
+  }
+  const normalized = normalizeVin(value);
+  if (normalized === null || !isValidVin(normalized)) {
+    errors.add('vin', 'INVALID_VIN', 'VIN inválido: 17 letras o dígitos, sin I, O ni Q');
+    return null;
+  }
+  return normalized;
+}
+
+function validateVehicleCreate(raw: unknown): { vehicle: ValidVehicle } | { errors: FieldError[] } {
+  const errors = new FieldErrors();
+  if (!isRecord(raw)) {
+    errors.add('body', 'VALIDATION_ERROR', 'El cuerpo debe ser un objeto JSON');
+    return { errors: errors.list };
+  }
+  // Undefined values are dropped by JSON serialization: they count as absent.
+  const body = Object.fromEntries(Object.entries(raw).filter(([, value]) => value !== undefined));
+
+  for (const key of Object.keys(body)) {
+    if (!(VEHICLE_CREATE_FIELDS as readonly string[]).includes(key)) {
+      errors.add(key, 'UNKNOWN_FIELD', 'Campo no permitido');
+    }
+  }
+
+  const ownerClientId = readOwnerClientId(body, errors);
+  const bodyType = readBodyType(body, errors);
+  const plate = readPlate(body, bodyType, errors);
+  const vin = readVin(body, errors);
+  const brand = readVehicleText(body, 'brand', 'La marca', errors);
+  const model = readVehicleText(body, 'model', 'El modelo', errors);
+  const color = readVehicleText(body, 'color', 'El color', errors);
+  const maxYear = maxVehicleYear();
+  const year = readInteger(
+    body,
+    'year',
+    {
+      min: MIN_VEHICLE_YEAR,
+      max: maxYear,
+      code: 'INVALID_YEAR',
+      message: `Año inválido: entero entre ${MIN_VEHICLE_YEAR} y ${maxYear}`,
+    },
+    errors,
+  );
+  const initialMileage = readInteger(
+    body,
+    'initialMileage',
+    { min: 0, max: MAX_MILEAGE, code: 'INVALID_MILEAGE', message: MILEAGE_MESSAGE },
+    errors,
+  );
+
+  if (
+    errors.list.length > 0 ||
+    ownerClientId === null ||
+    bodyType === null ||
+    plate === null ||
+    brand === null ||
+    model === null ||
+    color === null ||
+    year === null ||
+    initialMileage === null
+  ) {
+    return { errors: errors.list };
+  }
+  return { vehicle: { ownerClientId, plate, vin, brand, model, year, color, bodyType, initialMileage } };
+}
+
 function displayNameOf(client: ValidClient): string {
   if (client.clientType === 'company') return client.businessName ?? '';
   return [client.firstNames, client.lastNames].filter((part) => part !== null && part !== '').join(' ');
@@ -302,13 +490,41 @@ const SEED: ValidClient[] = [
   },
 ];
 
+// Seed vehicles, owned by SEED[owner]. Plates and VINs are not the ones of the tests.
+const SEED_VEHICLES: (Omit<ValidVehicle, 'ownerClientId'> & { owner: number })[] = [
+  {
+    owner: 0,
+    plate: 'PCD4521',
+    vin: '3VWFE21C04M000123',
+    brand: 'Chevrolet',
+    model: 'Aveo',
+    year: 2018,
+    color: 'Gris',
+    bodyType: 'sedan',
+    initialMileage: 98000,
+  },
+  {
+    owner: 1,
+    plate: 'IB482K',
+    vin: null,
+    brand: 'Yamaha',
+    model: 'FZ25',
+    year: 2023,
+    color: 'Azul',
+    bodyType: 'motorcycle',
+    initialMileage: 3500,
+  },
+];
+
 @Injectable({ providedIn: 'root' })
 export class MockApiStore {
   private readonly clients = new Map<string, ClientDetail>();
+  private readonly vehicles = new Map<string, VehicleRecord>();
 
   constructor() {
-    for (const client of SEED) {
-      this.insert(client);
+    const seeded = SEED.map((client) => this.insert(client));
+    for (const { owner, ...vehicle } of SEED_VEHICLES) {
+      this.insertVehicle({ ...vehicle, ownerClientId: seeded[owner].id });
     }
   }
 
@@ -327,7 +543,35 @@ export class MockApiStore {
   getClient(clientId: string): MockResult<ClientDetail> {
     const client = UUID_PATTERN.test(clientId) ? this.clients.get(clientId.toLowerCase()) : undefined;
     if (!client) return fail(404, 'NOT_FOUND');
-    return { ok: true, status: 200, body: structuredClone(client) };
+    return { ok: true, status: 200, body: { ...structuredClone(client), vehicles: this.vehiclesOf(client.id) } };
+  }
+
+  createVehicle(raw: unknown): MockResult<VehicleDetail> {
+    const result = validateVehicleCreate(raw);
+    if ('errors' in result) {
+      return fail(400, 'VALIDATION_ERROR', { errors: result.errors });
+    }
+    const { vehicle } = result;
+    // US3-AC11: the owner must exist (a client of another tenant is indistinguishable from a missing one).
+    if (!this.clients.has(vehicle.ownerClientId)) {
+      return fail(404, 'CLIENT_NOT_FOUND');
+    }
+    const all = [...this.vehicles.values()];
+    const samePlate = all.find((v) => v.plate === vehicle.plate);
+    if (samePlate) {
+      return fail(409, 'PLATE_ALREADY_EXISTS', { existingId: samePlate.id });
+    }
+    const sameVin = vehicle.vin === null ? undefined : all.find((v) => v.vin === vehicle.vin);
+    if (sameVin) {
+      return fail(409, 'VIN_ALREADY_EXISTS', { existingId: sameVin.id });
+    }
+    return { ok: true, status: 201, body: this.toVehicleDetail(this.insertVehicle(vehicle)) };
+  }
+
+  getVehicle(vehicleId: string): MockResult<VehicleDetail> {
+    const vehicle = UUID_PATTERN.test(vehicleId) ? this.vehicles.get(vehicleId.toLowerCase()) : undefined;
+    if (!vehicle) return fail(404, 'NOT_FOUND');
+    return { ok: true, status: 200, body: this.toVehicleDetail(vehicle) };
   }
 
   searchClients(q: string | null): MockResult<ClientSearchResponse> {
@@ -381,5 +625,37 @@ export class MockApiStore {
     };
     this.clients.set(detail.id, detail);
     return detail;
+  }
+
+  private insertVehicle(vehicle: ValidVehicle): VehicleRecord {
+    const now = new Date().toISOString();
+    const record: VehicleRecord = {
+      id: newId(),
+      ...vehicle,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+      updatedBy: MOCK_USER.id,
+      updatedByName: MOCK_USER.name,
+    };
+    this.vehicles.set(record.id, record);
+    return record;
+  }
+
+  private toVehicleDetail(record: VehicleRecord): VehicleDetail {
+    const { ownerClientId, ...vehicle } = structuredClone(record);
+    const owner = this.clients.get(ownerClientId);
+    if (!owner) {
+      throw new Error(`Mock vehicle ${record.id} without owner`);
+    }
+    return { ...vehicle, owner: toSummary(owner) };
+  }
+
+  /** Vehicles whose current owner is the client, ordered by plate (as the backend). */
+  private vehiclesOf(clientId: string): VehicleSummary[] {
+    return [...this.vehicles.values()]
+      .filter((vehicle) => vehicle.ownerClientId === clientId)
+      .sort((a, b) => a.plate.localeCompare(b.plate) || a.id.localeCompare(b.id))
+      .map(({ id, plate, brand, model, year }) => ({ id, plate, brand, model, year }));
   }
 }

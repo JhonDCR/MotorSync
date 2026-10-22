@@ -5,7 +5,7 @@ import {
 } from 'class-validator';
 import { isValidCedula, isValidPassport, isValidRuc } from '../identifiers/ec-document.js';
 
-type DocumentKind = 'cedula' | 'ruc' | 'passport';
+export type DocumentKind = 'cedula' | 'ruc' | 'passport';
 
 interface DocumentRule {
   name: string;
@@ -36,6 +36,18 @@ const DOCUMENT_RULES: Record<DocumentKind, DocumentRule> = {
   },
 };
 
+/**
+ * Error of an already normalized document number for its type (INVALID_CEDULA, INVALID_RUC or
+ * INVALID_PASSPORT), or null if valid. Used where the type is not in the same DTO (PATCH).
+ */
+export function documentNumberError(
+  kind: DocumentKind,
+  value: string,
+): { code: string; message: string } | null {
+  const rule = DOCUMENT_RULES[kind];
+  return rule.isValid(value) ? null : { code: rule.code, message: rule.message };
+}
+
 function siblingValue(args: ValidationArguments, property: string): unknown {
   return (args.object as Record<string, unknown>)[property];
 }
@@ -65,6 +77,8 @@ export function IsEcDocument(typeProperty: string): PropertyDecorator {
   };
 }
 
+export const DOCUMENT_TYPE_NOT_ALLOWED_MESSAGE = 'Una empresa solo puede registrarse con RUC';
+
 /** Document types allowed for each client type: a company only with RUC (US2-AC2). */
 const ALLOWED_DOCUMENT_TYPES: Record<string, readonly DocumentKind[]> = {
   natural: ['cedula', 'ruc', 'passport'],
@@ -75,6 +89,12 @@ const ALLOWED_DOCUMENT_TYPES: Record<string, readonly DocumentKind[]> = {
  * Checks the document type against the client type found in `clientTypeProperty`
  * (INVALID_DOCUMENT_TYPE). An unknown or missing client type is left to its own validators.
  */
+/** Whether `documentType` is allowed for `clientType` (a company only with RUC). */
+export function isDocumentTypeAllowed(clientType: string, documentType: string): boolean {
+  const allowed = ALLOWED_DOCUMENT_TYPES[clientType];
+  return allowed === undefined || (allowed as readonly string[]).includes(documentType);
+}
+
 export function IsDocumentTypeAllowedFor(
   clientTypeProperty: string,
   options: ValidationOptions = {},
@@ -86,7 +106,7 @@ export function IsDocumentTypeAllowedFor(
       propertyName: String(propertyName),
       constraints: [clientTypeProperty],
       options: {
-        message: 'Una empresa solo puede registrarse con RUC',
+        message: DOCUMENT_TYPE_NOT_ALLOWED_MESSAGE,
         context: { code: 'INVALID_DOCUMENT_TYPE' },
         ...options,
       },

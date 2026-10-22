@@ -1,4 +1,4 @@
-import { Transform, type TransformFnParams } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   IsDefined,
   IsIn,
@@ -16,28 +16,22 @@ import { normalizeVin } from '../../common/identifiers/vin.js';
 import { IsEcPlate } from '../../common/validation/is-ec-plate.js';
 import { IsVehicleYear } from '../../common/validation/is-vehicle-year.js';
 import { IsVin } from '../../common/validation/is-vin.js';
+import { onString, trim } from '../../common/validation/transforms.js';
 
 export const MAX_INITIAL_MILEAGE = 9_999_999;
 
-const REQUIRED = 'Campo obligatorio';
-const MUST_BE_TEXT = 'Debe ser texto';
+export const REQUIRED = 'Campo obligatorio';
+export const MUST_BE_TEXT = 'Debe ser texto';
 const MILEAGE_MESSAGE = `Kilometraje inválido: entero entre 0 y ${MAX_INITIAL_MILEAGE}`;
-const MILEAGE = { message: MILEAGE_MESSAGE, context: { code: 'INVALID_MILEAGE' } };
-
-/** Applies `fn` to strings only; other values reach the validators untouched. */
-function onString(fn: (value: string) => string): (params: TransformFnParams) => unknown {
-  return ({ value }: TransformFnParams): unknown => (typeof value === 'string' ? fn(value) : value);
-}
-
-const trim = (value: string): string => value.trim();
+export const MILEAGE = { message: MILEAGE_MESSAGE, context: { code: 'INVALID_MILEAGE' } };
 
 /**
  * Plate and VIN are normalized before validation (FR-002). When a character other than letters,
  * digits, whitespace or hyphens remains, the raw value is kept so that the format validator
  * rejects it (INVALID_PLATE / INVALID_VIN) instead of cleaning it silently (US3-AC14).
  */
-const plateForWrite = (value: string): string => normalizePlateForWrite(value) ?? value;
-const vinForWrite = (value: string): string => normalizeVin(value) ?? value;
+export const plateForWrite = (value: string): string => normalizePlateForWrite(value) ?? value;
+export const vinForWrite = (value: string): string => normalizeVin(value) ?? value;
 
 /** Contract `VehicleCreate` (additionalProperties: false, enforced by forbidNonWhitelisted). */
 export class CreateVehicleDto {

@@ -1,7 +1,21 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { API_PREFIX } from '../app.setup.js';
 import { CreateVehicleDto } from './dto/create-vehicle.dto.js';
+import { OwnershipTransferDto } from './dto/ownership-transfer.dto.js';
+import { UpdateVehicleDto } from './dto/update-vehicle.dto.js';
+import { OwnershipService, type OwnershipHistoryResponse } from './ownership.service.js';
 import {
   VehiclesService,
   type VehicleDetail,
@@ -10,7 +24,10 @@ import {
 
 @Controller('vehicles')
 export class VehiclesController {
-  constructor(@Inject(VehiclesService) private readonly vehicles: VehiclesService) {}
+  constructor(
+    @Inject(VehiclesService) private readonly vehicles: VehiclesService,
+    @Inject(OwnershipService) private readonly ownership: OwnershipService,
+  ) {}
 
   /** POST /api/v1/vehicles (US3): 201 with Location /api/v1/vehicles/{id}. */
   @Post()
@@ -33,9 +50,40 @@ export class VehiclesController {
     return this.vehicles.searchVehicles(q);
   }
 
+  /**
+   * POST /api/v1/vehicles/{vehicleId}/ownership-transfers (US4-AC7 to AC9): 200 VehicleDetail
+   * with the new owner. Declared before the bare :vehicleId routes.
+   */
+  @Post(':vehicleId/ownership-transfers')
+  @HttpCode(200)
+  transfer(
+    @Param('vehicleId') vehicleId: string,
+    @Body() dto: OwnershipTransferDto,
+  ): Promise<VehicleDetail> {
+    return this.ownership.transfer(vehicleId, dto);
+  }
+
+  /** GET /api/v1/vehicles/{vehicleId}/ownership-history (US4-AC10): newest first, read-only. */
+  @Get(':vehicleId/ownership-history')
+  history(@Param('vehicleId') vehicleId: string): Promise<OwnershipHistoryResponse> {
+    return this.ownership.history(vehicleId);
+  }
+
   /** GET /api/v1/vehicles/{vehicleId}: 404 NOT_FOUND for missing, foreign or malformed ids. */
   @Get(':vehicleId')
   getById(@Param('vehicleId') vehicleId: string): Promise<VehicleDetail> {
     return this.vehicles.getById(vehicleId);
+  }
+
+  /**
+   * PATCH /api/v1/vehicles/{vehicleId} (US4-AC5, AC6, AC11, AC12; US3-AC14): 200 VehicleDetail
+   * with version + 1; the owner only changes through ownership-transfers.
+   */
+  @Patch(':vehicleId')
+  update(
+    @Param('vehicleId') vehicleId: string,
+    @Body() dto: UpdateVehicleDto,
+  ): Promise<VehicleDetail> {
+    return this.vehicles.update(vehicleId, dto);
   }
 }

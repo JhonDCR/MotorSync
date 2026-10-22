@@ -8,7 +8,8 @@ import {
 } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { mergeMap, Observable, throwError, timer, of } from 'rxjs';
-import { MockApiStore, mockProblem, type MockResult } from './mock-api.store';
+import { decodeSessionToken } from '../auth/current-session';
+import { MockApiStore, mockActor, mockProblem, type MockActor, type MockResult } from './mock-api.store';
 import { USE_MOCK_API } from './use-mock-api';
 
 // API simulada en memoria (research R8). Solo actúa con USE_MOCK_API en true y en rutas /api/.
@@ -22,6 +23,15 @@ const CLIENTS_PATH = '/api/v1/clients';
 const CLIENT_BY_ID = /^\/api\/v1\/clients\/([^/]+)$/;
 const VEHICLES_PATH = '/api/v1/vehicles';
 const VEHICLE_BY_ID = /^\/api\/v1\/vehicles\/([^/]+)$/;
+const VEHICLE_TRANSFERS = /^\/api\/v1\/vehicles\/([^/]+)\/ownership-transfers$/;
+const VEHICLE_HISTORY = /^\/api\/v1\/vehicles\/([^/]+)\/ownership-history$/;
+const BEARER = /^Bearer\s+(\S+)$/i;
+
+/** Role and name of the request token (signature not verified); without a readable token, an asesor. */
+function actorOf(req: HttpRequest<unknown>): MockActor {
+  const token = BEARER.exec(req.headers.get('Authorization')?.trim() ?? '')?.[1] ?? null;
+  return mockActor(decodeSessionToken(token));
+}
 
 /** Path of the request URL, without origin, query or fragment. */
 function pathOf(url: string): string {
@@ -63,6 +73,9 @@ function route(req: HttpRequest<unknown>, store: MockApiStore): Observable<HttpE
   if (byId !== null && req.method === 'GET') {
     return respond(req, store.getClient(decodeURIComponent(byId[1])));
   }
+  if (byId !== null && req.method === 'PATCH') {
+    return respond(req, store.updateClient(decodeURIComponent(byId[1]), req.body, actorOf(req)));
+  }
   if (path === VEHICLES_PATH && req.method === 'POST') {
     const result = store.createVehicle(req.body);
     return respond(req, result, result.ok ? `${VEHICLES_PATH}/${result.body.id}` : undefined);
@@ -74,6 +87,17 @@ function route(req: HttpRequest<unknown>, store: MockApiStore): Observable<HttpE
   const vehicleById = VEHICLE_BY_ID.exec(path);
   if (vehicleById !== null && req.method === 'GET') {
     return respond(req, store.getVehicle(decodeURIComponent(vehicleById[1])));
+  }
+  if (vehicleById !== null && req.method === 'PATCH') {
+    return respond(req, store.updateVehicle(decodeURIComponent(vehicleById[1]), req.body, actorOf(req)));
+  }
+  const transfers = VEHICLE_TRANSFERS.exec(path);
+  if (transfers !== null && req.method === 'POST') {
+    return respond(req, store.transferOwnership(decodeURIComponent(transfers[1]), req.body, actorOf(req)));
+  }
+  const history = VEHICLE_HISTORY.exec(path);
+  if (history !== null && req.method === 'GET') {
+    return respond(req, store.getOwnershipHistory(decodeURIComponent(history[1])));
   }
   return respond(req, { ok: false, problem: mockProblem(404, 'NOT_FOUND') });
 }

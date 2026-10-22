@@ -1,251 +1,309 @@
 <main class="vehicle-form">
-  <h1>Nuevo vehículo</h1>
+  <h1>{{ editing ? 'Editar vehículo' : 'Nuevo vehículo' }}</h1>
 
-  <form [formGroup]="form" (ngSubmit)="save()" novalidate>
-    <fieldset class="owner" aria-describedby="owner-help">
-      <legend>Propietario <span class="required">(obligatorio)</span></legend>
-      <p id="owner-help" class="help">Busque al cliente por documento o nombre.</p>
-
-      @if (owner(); as current) {
-        <div class="owner-selected">
-          <p data-testid="owner-selected">
-            <strong>{{ current.displayName }}</strong>
-            <span class="document">{{ current.documentNumber }}</span>
-          </p>
-          <button type="button" class="action" data-testid="owner-change" (click)="changeOwner()">Cambiar</button>
-        </div>
+  @let state = loadState();
+  @if (state.kind === 'loading') {
+    <p class="status" role="status">Cargando vehículo…</p>
+  } @else if (state.kind === 'error') {
+    <div class="notice notice-error" role="alert" data-testid="load-error">
+      <p>{{ state.message }}</p>
+      @if (state.canRetry) {
+        <button type="button" class="action" data-testid="retry-load" (click)="retryLoad()">Reintentar</button>
       } @else {
-        @if (ownerLoading()) {
-          <p class="status" role="status">Cargando cliente…</p>
-        }
-        <div class="owner-search">
-          <label for="owner-search">Documento o nombre del cliente</label>
-          <div class="search-row">
-            <input
-              id="owner-search"
-              type="search"
-              data-testid="owner-search"
-              autocomplete="off"
-              enterkeyhint="search"
-              maxlength="100"
-              [formControl]="ownerTerm"
-              [attr.aria-invalid]="ownerErrorMessage() ? 'true' : null"
-              [attr.aria-describedby]="ownerErrorMessage() ? 'error-ownerClientId' : null"
-              (keydown.enter)="searchOwner($event)"
-            />
-            <button
-              type="button"
-              class="action"
-              data-testid="owner-search-button"
-              [disabled]="ownerSearching()"
-              [attr.aria-busy]="ownerSearching()"
-              (click)="searchOwner()"
-            >
-              {{ ownerSearching() ? 'Buscando…' : 'Buscar' }}
-            </button>
-          </div>
-        </div>
+        <a class="action" routerLink="/">Volver a la búsqueda de vehículos</a>
+      }
+    </div>
+  } @else {
+    @if (versionConflict()) {
+      <div class="notice notice-warning" role="alert" data-testid="version-conflict">
+        <p>
+          <strong>El registro cambió</strong> mientras lo editaba. El formulario muestra ahora los datos actuales:
+          revíselos y vuelva a aplicar sus cambios antes de guardar.
+        </p>
+      </div>
+    }
 
-        <div aria-live="polite">
-          @if (ownerSearchError(); as message) {
-            <p class="field-error" role="alert">{{ message }}</p>
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <fieldset class="owner" aria-describedby="owner-help">
+        @if (editing) {
+          <legend>Propietario</legend>
+          <p id="owner-help" class="help">
+            El propietario no se cambia aquí: use «Transferir propietario» en la ficha del vehículo.
+          </p>
+        } @else {
+          <legend>Propietario <span class="required">(obligatorio)</span></legend>
+          <p id="owner-help" class="help">Busque al cliente por documento o nombre.</p>
+        }
+
+        @if (owner(); as current) {
+          <div class="owner-selected">
+            <p data-testid="owner-selected">
+              <strong>{{ current.displayName }}</strong>
+              <span class="document">{{ current.documentNumber }}</span>
+            </p>
+            @if (!editing) {
+              <button type="button" class="action" data-testid="owner-change" (click)="changeOwner()">Cambiar</button>
+            }
+          </div>
+        } @else if (!editing) {
+          @if (ownerLoading()) {
+            <p class="status" role="status">Cargando cliente…</p>
           }
-          @if (ownerResults(); as results) {
-            @if (results.items.length === 0) {
-              <p data-testid="owner-no-results">No se encontró ningún cliente</p>
-            } @else {
-              <ul class="owner-options" aria-label="Clientes encontrados">
-                @for (client of results.items; track client.id) {
-                  <li>
-                    <button type="button" class="owner-option" data-testid="owner-option" (click)="chooseOwner(client)">
-                      <span class="name">{{ client.displayName }}</span>
-                      <span class="document">{{ client.documentNumber }}</span>
-                    </button>
-                  </li>
+          <div class="owner-search">
+            <label for="owner-search">Documento o nombre del cliente</label>
+            <div class="search-row">
+              <input
+                id="owner-search"
+                type="search"
+                data-testid="owner-search"
+                autocomplete="off"
+                enterkeyhint="search"
+                maxlength="100"
+                [formControl]="ownerTerm"
+                [attr.aria-invalid]="ownerErrorMessage() ? 'true' : null"
+                [attr.aria-describedby]="ownerErrorMessage() ? 'error-ownerClientId' : null"
+                (keydown.enter)="searchOwner($event)"
+              />
+              <button
+                type="button"
+                class="action"
+                data-testid="owner-search-button"
+                [disabled]="ownerSearching()"
+                [attr.aria-busy]="ownerSearching()"
+                (click)="searchOwner()"
+              >
+                {{ ownerSearching() ? 'Buscando…' : 'Buscar' }}
+              </button>
+            </div>
+          </div>
+
+          <div aria-live="polite">
+            @if (ownerSearchError(); as message) {
+              <p class="field-error" role="alert">{{ message }}</p>
+            }
+            @if (ownerResults(); as results) {
+              @if (results.items.length === 0) {
+                <p data-testid="owner-no-results">No se encontró ningún cliente</p>
+              } @else {
+                <ul class="owner-options" aria-label="Clientes encontrados">
+                  @for (client of results.items; track client.id) {
+                    <li>
+                      <button type="button" class="owner-option" data-testid="owner-option" (click)="chooseOwner(client)">
+                        <span class="name">{{ client.displayName }}</span>
+                        <span class="document">{{ client.documentNumber }}</span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+                @if (results.hasMore) {
+                  <p class="help">Hay más resultados: afine la búsqueda.</p>
                 }
-              </ul>
-              @if (results.hasMore) {
-                <p class="help">Hay más resultados: afine la búsqueda.</p>
               }
             }
+          </div>
+
+          <button type="button" class="action" data-testid="register-new-client" (click)="registerNewClient()">
+            Registrar cliente nuevo
+          </button>
+        }
+
+        @if (ownerErrorMessage(); as message) {
+          <p class="field-error" id="error-ownerClientId" data-testid="error-ownerClientId" role="alert">{{ message }}</p>
+        }
+      </fieldset>
+
+      <div class="field">
+        <label for="body-type">Carrocería <span class="required">(obligatorio)</span></label>
+        <select
+          id="body-type"
+          formControlName="bodyType"
+          data-testid="body-type"
+          [attr.aria-invalid]="errorFor('bodyType') ? 'true' : null"
+          [attr.aria-describedby]="errorFor('bodyType') ? 'error-bodyType' : null"
+        >
+          @for (option of bodyTypeOptions; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+        @if (errorFor('bodyType'); as message) {
+          <p class="field-error" id="error-bodyType" data-testid="error-bodyType">{{ message }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="plate">Placa <span class="required">(obligatorio)</span></label>
+        <input
+          id="plate"
+          type="text"
+          formControlName="plate"
+          data-testid="plate"
+          autocapitalize="characters"
+          autocomplete="off"
+          spellcheck="false"
+          [attr.aria-invalid]="errorFor('plate') ? 'true' : null"
+          [attr.aria-describedby]="errorFor('plate') ? 'error-plate' : 'plate-help'"
+          (blur)="normalizeOnBlur('plate')"
+        />
+        @if (errorFor('plate'); as message) {
+          <p class="field-error" id="error-plate" data-testid="error-plate">{{ message }}</p>
+        } @else {
+          <p class="help" id="plate-help">Autos: 3 letras y 3 o 4 dígitos (PBA1234). Motos: AB123C.</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="vin">VIN <span class="optional">(opcional)</span></label>
+        <input
+          id="vin"
+          type="text"
+          formControlName="vin"
+          data-testid="vin"
+          autocapitalize="characters"
+          autocomplete="off"
+          spellcheck="false"
+          [attr.aria-invalid]="errorFor('vin') ? 'true' : null"
+          [attr.aria-describedby]="errorFor('vin') ? 'error-vin' : null"
+          (blur)="normalizeOnBlur('vin')"
+        />
+        @if (errorFor('vin'); as message) {
+          <p class="field-error" id="error-vin" data-testid="error-vin">{{ message }}</p>
+        }
+      </div>
+
+      @if (editing && identifiersChanged()) {
+        <div class="field">
+          <label for="reason">
+            Motivo del cambio de placa o VIN
+            <span [class]="reasonRequired ? 'required' : 'optional'">{{ reasonRequired ? '(obligatorio)' : '(opcional)' }}</span>
+          </label>
+          <p class="help" id="reason-hint">Entre 10 y 500 caracteres. Queda registrado en la auditoría.</p>
+          <textarea
+            id="reason"
+            data-testid="reason"
+            rows="3"
+            [formControl]="reason"
+            [attr.maxlength]="reasonMaxLength"
+            [attr.aria-required]="reasonRequired"
+            [attr.aria-invalid]="reasonError() ? 'true' : null"
+            [attr.aria-describedby]="reasonError() ? 'reason-hint error-reason' : 'reason-hint'"
+          ></textarea>
+          @if (reasonError(); as message) {
+            <p class="field-error" id="error-reason" data-testid="error-reason">{{ message }}</p>
           }
         </div>
+      }
 
-        <button type="button" class="action" data-testid="register-new-client" (click)="registerNewClient()">
-          Registrar cliente nuevo
+      <div class="field">
+        <label for="brand">Marca <span class="required">(obligatorio)</span></label>
+        <input
+          id="brand"
+          type="text"
+          formControlName="brand"
+          data-testid="brand"
+          autocapitalize="words"
+          [attr.aria-invalid]="errorFor('brand') ? 'true' : null"
+          [attr.aria-describedby]="errorFor('brand') ? 'error-brand' : null"
+        />
+        @if (errorFor('brand'); as message) {
+          <p class="field-error" id="error-brand" data-testid="error-brand">{{ message }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="model">Modelo <span class="required">(obligatorio)</span></label>
+        <input
+          id="model"
+          type="text"
+          formControlName="model"
+          data-testid="model"
+          [attr.aria-invalid]="errorFor('model') ? 'true' : null"
+          [attr.aria-describedby]="errorFor('model') ? 'error-model' : null"
+        />
+        @if (errorFor('model'); as message) {
+          <p class="field-error" id="error-model" data-testid="error-model">{{ message }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="year">Año <span class="required">(obligatorio)</span></label>
+        <input
+          id="year"
+          type="text"
+          inputmode="numeric"
+          formControlName="year"
+          data-testid="year"
+          autocomplete="off"
+          [attr.aria-invalid]="errorFor('year') ? 'true' : null"
+          [attr.aria-describedby]="errorFor('year') ? 'error-year' : null"
+        />
+        @if (errorFor('year'); as message) {
+          <p class="field-error" id="error-year" data-testid="error-year">{{ message }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="color">Color <span class="required">(obligatorio)</span></label>
+        <input
+          id="color"
+          type="text"
+          formControlName="color"
+          data-testid="color"
+          [attr.aria-invalid]="errorFor('color') ? 'true' : null"
+          [attr.aria-describedby]="errorFor('color') ? 'error-color' : null"
+        />
+        @if (errorFor('color'); as message) {
+          <p class="field-error" id="error-color" data-testid="error-color">{{ message }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="initial-mileage">Kilometraje inicial (km) <span class="required">(obligatorio)</span></label>
+        <input
+          id="initial-mileage"
+          type="text"
+          inputmode="numeric"
+          formControlName="initialMileage"
+          data-testid="initial-mileage"
+          autocomplete="off"
+          [attr.aria-invalid]="errorFor('initialMileage') ? 'true' : null"
+          [attr.aria-describedby]="errorFor('initialMileage') ? 'error-initialMileage' : null"
+        />
+        @if (errorFor('initialMileage'); as message) {
+          <p class="field-error" id="error-initialMileage" data-testid="error-initialMileage">{{ message }}</p>
+        }
+      </div>
+
+      @if (duplicate(); as dup) {
+        <div class="notice notice-error" role="alert">
+          <p data-testid="duplicate-message">{{ dup.message }}</p>
+          @if (dup.existingId) {
+            <a class="action" data-testid="open-existing-vehicle" [routerLink]="['/vehicles', dup.existingId]">
+              Abrir vehículo existente
+            </a>
+          }
+        </div>
+      }
+
+      @if (networkError()) {
+        <div class="notice notice-error" role="alert" data-testid="network-error">
+          <p>No se pudo conectar con el servidor. Sus datos siguen en el formulario.</p>
+          <button type="button" class="action" data-testid="retry" [disabled]="saving()" (click)="retry()">Reintentar</button>
+        </div>
+      }
+
+      @if (generalError(); as message) {
+        <p class="notice notice-error" role="alert">{{ message }}</p>
+      }
+
+      <div class="actions">
+        <button type="submit" class="primary" data-testid="save" [disabled]="saving()" [attr.aria-busy]="saving()">
+          {{ saving() ? 'Guardando…' : 'Guardar' }}
         </button>
-      }
-
-      @if (ownerErrorMessage(); as message) {
-        <p class="field-error" id="error-ownerClientId" data-testid="error-ownerClientId" role="alert">{{ message }}</p>
-      }
-    </fieldset>
-
-    <div class="field">
-      <label for="body-type">Carrocería <span class="required">(obligatorio)</span></label>
-      <select
-        id="body-type"
-        formControlName="bodyType"
-        data-testid="body-type"
-        [attr.aria-invalid]="errorFor('bodyType') ? 'true' : null"
-        [attr.aria-describedby]="errorFor('bodyType') ? 'error-bodyType' : null"
-      >
-        @for (option of bodyTypeOptions; track option.value) {
-          <option [value]="option.value">{{ option.label }}</option>
-        }
-      </select>
-      @if (errorFor('bodyType'); as message) {
-        <p class="field-error" id="error-bodyType" data-testid="error-bodyType">{{ message }}</p>
-      }
-    </div>
-
-    <div class="field">
-      <label for="plate">Placa <span class="required">(obligatorio)</span></label>
-      <input
-        id="plate"
-        type="text"
-        formControlName="plate"
-        data-testid="plate"
-        autocapitalize="characters"
-        autocomplete="off"
-        spellcheck="false"
-        [attr.aria-invalid]="errorFor('plate') ? 'true' : null"
-        [attr.aria-describedby]="errorFor('plate') ? 'error-plate' : 'plate-help'"
-        (blur)="normalizeOnBlur('plate')"
-      />
-      @if (errorFor('plate'); as message) {
-        <p class="field-error" id="error-plate" data-testid="error-plate">{{ message }}</p>
-      } @else {
-        <p class="help" id="plate-help">Autos: 3 letras y 3 o 4 dígitos (PBA1234). Motos: AB123C.</p>
-      }
-    </div>
-
-    <div class="field">
-      <label for="vin">VIN <span class="optional">(opcional)</span></label>
-      <input
-        id="vin"
-        type="text"
-        formControlName="vin"
-        data-testid="vin"
-        autocapitalize="characters"
-        autocomplete="off"
-        spellcheck="false"
-        [attr.aria-invalid]="errorFor('vin') ? 'true' : null"
-        [attr.aria-describedby]="errorFor('vin') ? 'error-vin' : null"
-        (blur)="normalizeOnBlur('vin')"
-      />
-      @if (errorFor('vin'); as message) {
-        <p class="field-error" id="error-vin" data-testid="error-vin">{{ message }}</p>
-      }
-    </div>
-
-    <div class="field">
-      <label for="brand">Marca <span class="required">(obligatorio)</span></label>
-      <input
-        id="brand"
-        type="text"
-        formControlName="brand"
-        data-testid="brand"
-        autocapitalize="words"
-        [attr.aria-invalid]="errorFor('brand') ? 'true' : null"
-        [attr.aria-describedby]="errorFor('brand') ? 'error-brand' : null"
-      />
-      @if (errorFor('brand'); as message) {
-        <p class="field-error" id="error-brand" data-testid="error-brand">{{ message }}</p>
-      }
-    </div>
-
-    <div class="field">
-      <label for="model">Modelo <span class="required">(obligatorio)</span></label>
-      <input
-        id="model"
-        type="text"
-        formControlName="model"
-        data-testid="model"
-        [attr.aria-invalid]="errorFor('model') ? 'true' : null"
-        [attr.aria-describedby]="errorFor('model') ? 'error-model' : null"
-      />
-      @if (errorFor('model'); as message) {
-        <p class="field-error" id="error-model" data-testid="error-model">{{ message }}</p>
-      }
-    </div>
-
-    <div class="field">
-      <label for="year">Año <span class="required">(obligatorio)</span></label>
-      <input
-        id="year"
-        type="text"
-        inputmode="numeric"
-        formControlName="year"
-        data-testid="year"
-        autocomplete="off"
-        [attr.aria-invalid]="errorFor('year') ? 'true' : null"
-        [attr.aria-describedby]="errorFor('year') ? 'error-year' : null"
-      />
-      @if (errorFor('year'); as message) {
-        <p class="field-error" id="error-year" data-testid="error-year">{{ message }}</p>
-      }
-    </div>
-
-    <div class="field">
-      <label for="color">Color <span class="required">(obligatorio)</span></label>
-      <input
-        id="color"
-        type="text"
-        formControlName="color"
-        data-testid="color"
-        [attr.aria-invalid]="errorFor('color') ? 'true' : null"
-        [attr.aria-describedby]="errorFor('color') ? 'error-color' : null"
-      />
-      @if (errorFor('color'); as message) {
-        <p class="field-error" id="error-color" data-testid="error-color">{{ message }}</p>
-      }
-    </div>
-
-    <div class="field">
-      <label for="initial-mileage">Kilometraje inicial (km) <span class="required">(obligatorio)</span></label>
-      <input
-        id="initial-mileage"
-        type="text"
-        inputmode="numeric"
-        formControlName="initialMileage"
-        data-testid="initial-mileage"
-        autocomplete="off"
-        [attr.aria-invalid]="errorFor('initialMileage') ? 'true' : null"
-        [attr.aria-describedby]="errorFor('initialMileage') ? 'error-initialMileage' : null"
-      />
-      @if (errorFor('initialMileage'); as message) {
-        <p class="field-error" id="error-initialMileage" data-testid="error-initialMileage">{{ message }}</p>
-      }
-    </div>
-
-    @if (duplicate(); as dup) {
-      <div class="notice notice-error" role="alert">
-        <p data-testid="duplicate-message">{{ dup.message }}</p>
-        @if (dup.existingId) {
-          <a class="action" data-testid="open-existing-vehicle" [routerLink]="['/vehicles', dup.existingId]">
-            Abrir vehículo existente
-          </a>
+        @if (editing) {
+          <a class="action" data-testid="cancel-edit" [routerLink]="['/vehicles', vehicleId]">Volver a la ficha sin guardar</a>
         }
       </div>
-    }
-
-    @if (networkError()) {
-      <div class="notice notice-error" role="alert" data-testid="network-error">
-        <p>No se pudo conectar con el servidor. Sus datos siguen en el formulario.</p>
-        <button type="button" class="action" data-testid="retry" [disabled]="saving()" (click)="retry()">Reintentar</button>
-      </div>
-    }
-
-    @if (generalError(); as message) {
-      <p class="notice notice-error" role="alert">{{ message }}</p>
-    }
-
-    <div class="actions">
-      <button type="submit" class="primary" data-testid="save" [disabled]="saving()" [attr.aria-busy]="saving()">
-        {{ saving() ? 'Guardando…' : 'Guardar' }}
-      </button>
-    </div>
-    <p class="sr-only" role="status" aria-live="polite">{{ saving() ? 'Guardando vehículo' : '' }}</p>
-  </form>
+      <p class="sr-only" role="status" aria-live="polite">{{ saving() ? 'Guardando vehículo' : '' }}</p>
+    </form>
+  }
 </main>

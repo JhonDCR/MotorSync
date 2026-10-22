@@ -5,7 +5,9 @@ import { normalizeDocument } from '../../shared/identifiers/normalize';
 import { isValidPhone, normalizePhone } from '../../shared/identifiers/phone';
 import { isBodyType, isValidPlate, normalizePlateForSearch, normalizePlateForWrite } from '../../shared/identifiers/plate';
 import { isValidVin, normalizeVin } from '../../shared/identifiers/vin';
+import { isReasonAcceptable, normalizeReason, REASON_REQUIRED_MESSAGE } from '../../shared/validators/reason';
 import { MAX_MILEAGE, maxVehicleYear, MIN_VEHICLE_YEAR } from '../../shared/validators/vehicle.validators';
+import type { CurrentSession } from '../auth/current-session';
 import type {
   BodyType,
   ClientDetail,
@@ -14,8 +16,12 @@ import type {
   ClientType,
   DocumentType,
   FieldError,
+  OwnerSnapshot,
+  OwnershipChange,
+  OwnershipHistoryResponse,
   Problem,
   ProblemCode,
+  Role,
   VehicleDetail,
   VehicleSearchItem,
   VehicleSearchResponse,
@@ -30,6 +36,24 @@ import type {
 export type MockResult<T> = { ok: true; status: number; body: T } | { ok: false; problem: Problem };
 
 const MOCK_USER = { id: '11111111-1111-4111-8111-111111111111', name: 'Asesor de prueba' };
+
+/** User of a write request, read from the token of the request (the mock never verifies the signature). */
+export interface MockActor {
+  id: string;
+  name: string;
+  role: Role;
+}
+
+const MOCK_ACTORS: Record<Role, MockActor> = {
+  asesor: { ...MOCK_USER, role: 'asesor' },
+  admin: { id: '22222222-2222-4222-8222-222222222222', name: 'Administrador de prueba', role: 'admin' },
+};
+
+/** Without a (readable) token the request is treated as an asesor, the strictest rule of FR-019. */
+export function mockActor(session: CurrentSession | null): MockActor {
+  const base = MOCK_ACTORS[session?.role ?? 'asesor'];
+  return session !== null && session.name !== '' ? { ...base, name: session.name } : base;
+}
 const SEARCH_LIMIT = 20;
 const MIN_SEARCH_LENGTH = 2;
 const MAX_SEARCH_LENGTH = 100;
@@ -72,6 +96,7 @@ const STATUS_TITLES: Record<number, string> = {
   400: 'Bad Request',
   404: 'Not Found',
   409: 'Conflict',
+  422: 'Unprocessable Content',
 };
 
 export function mockProblem(status: number, code: ProblemCode, extra: Partial<Problem> = {}): Problem {
@@ -454,6 +479,106 @@ function validateVehicleCreate(raw: unknown): { vehicle: ValidVehicle } | { erro
   return { vehicle: { ownerClientId, plate, vin, brand, model, year, color, bodyType, initialMileage } };
 }
 
+// --- Edition and ownership transfer (US4), as backend/src/clients/dto/update-client.dto.ts,
+// backend/src/vehicles/dto/update-vehicle.dto.ts, ownership-transfer.dto.ts and common/reason-policy.ts ---
+
+const CLIENT_UPDATE_FIELDS = [
+  'version',
+  'documentType',
+  'documentNumber',
+  'firstNames',
+  'lastNames',
+  'businessName',
+  'phone',
+  'email',
+  'reason',
+] as const;
+
+const VEHICLE_UPDATE_FIELDS = [
+  'version',
+  'plate',
+  'vin',
+  'brand',
+  'model',
+  'year',
+  'color',
+  'bodyType',
+  'initialMileage',
+  'reason',
+] as const;
+
+const TRANSFER_FIELDS = ['newOwnerClientId', 'version', 'reason'] as const;
+
+/** Request body shape checks shared by the PATCH and the transfer: unknown keys, version and reason type. */
+interface WriteRequest {
+  body: Record<string, unknown>;
+  version: number;
+  reason: string | null;
+}
+
+function readWriteRequest(raw: unknown, allowed: readonly string[], errors: FieldErrors): WriteRequest | null {
+  if (!isRecord(raw)) {
+    errors.add('body', 'VALIDATION_ERROR', 'El cuerpo debe ser un objeto JSON');
+    return null;
+  }
+  // Undefined values are dropped by JSON serialization: they count as absent.
+  const body = Object.fromEntries(Object.entries(raw).filter(([, value]) => value !== undefined));
+  for (const key of Object.keys(body)) {
+    if (!allowed.includes(key)) {
+      errors.add(key, 'UNKNOWN_FIELD', 'Campo no permitido');
+    }
+  }
+  const version = body['version'];
+  let validVersion: number | null = null;
+  if (version === undefined || version === null) {
+    errors.add('version', REQUIRED.code, REQUIRED.message);
+  } else if (typeof version !== 'number' || !Number.isInteger(version) || version < 1) {
+    errors.add('version', 'VALIDATION_ERROR', 'La versión debe ser un entero mayor o igual a 1');
+  } else {
+    validVersion = version;
+  }
+  const reason = body['reason'];
+  if (reason !== undefined && reason !== null && typeof reason !== 'string') {
+    errors.add('reason', 'VALIDATION_ERROR', MUST_BE_TEXT);
+  }
+  if (validVersion === null) return null;
+  return { body, version: validVersion, reason: typeof reason === 'string' ? reason : null };
+}
+
+/** FR-019: asesor needs a reason; any given reason has 10 to 500 characters after trim. */
+function reasonProblem<T>(actor: MockActor, reason: string | null): MockResult<T> | null {
+  if (isReasonAcceptable(reason, actor.role !== 'admin')) return null;
+  return fail(400, 'VALIDATION_ERROR', {
+    errors: [{ field: 'reason', code: 'REASON_REQUIRED', message: REASON_REQUIRED_MESSAGE }],
+  });
+}
+
+/** Stored value merged with the requested one; null stored values are left out (absent for the validators). */
+function merge(
+  stored: Record<string, unknown>,
+  body: Record<string, unknown>,
+  fields: readonly string[],
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+  for (const field of fields) {
+    const value = field in body ? body[field] : stored[field];
+    if (value !== undefined && (value !== null || field in body)) {
+      merged[field] = value;
+    }
+  }
+  return merged;
+}
+
+function snapshotOf(client: ClientDetail): OwnerSnapshot {
+  return { clientId: client.id, displayName: client.displayName, documentNumber: client.documentNumber };
+}
+
+/** audit_log row of vehicle.owner_changed, as the mock keeps it. */
+interface OwnershipRecord extends OwnershipChange {
+  vehicleId: string;
+  sequence: number;
+}
+
 function displayNameOf(client: ValidClient): string {
   if (client.clientType === 'company') return client.businessName ?? '';
   return [client.firstNames, client.lastNames].filter((part) => part !== null && part !== '').join(' ');
@@ -524,6 +649,9 @@ const SEED_VEHICLES: (Omit<ValidVehicle, 'ownerClientId'> & { owner: number })[]
 export class MockApiStore {
   private readonly clients = new Map<string, ClientDetail>();
   private readonly vehicles = new Map<string, VehicleRecord>();
+  /** Append-only ownership history (audit_log vehicle.owner_changed). */
+  private readonly ownership: OwnershipRecord[] = [];
+  private ownershipSequence = 0;
 
   constructor() {
     const seeded = SEED.map((client) => this.insert(client));
@@ -576,6 +704,153 @@ export class MockApiStore {
     const vehicle = UUID_PATTERN.test(vehicleId) ? this.vehicles.get(vehicleId.toLowerCase()) : undefined;
     if (!vehicle) return fail(404, 'NOT_FOUND');
     return { ok: true, status: 200, body: this.toVehicleDetail(vehicle) };
+  }
+
+  /**
+   * PATCH /clients/{id} (US4-AC4, AC5, AC11, AC12, AC15, AC16). Order as the API: body shape (400), existence
+   * (404), resulting client (400), version (409), reason (400), duplicate document (409). A 4xx changes nothing.
+   */
+  updateClient(clientId: string, raw: unknown, actor: MockActor): MockResult<ClientDetail> {
+    const errors = new FieldErrors();
+    const request = readWriteRequest(raw, CLIENT_UPDATE_FIELDS, errors);
+    if (request === null || errors.list.length > 0) {
+      return fail(400, 'VALIDATION_ERROR', { errors: errors.list });
+    }
+    const stored = UUID_PATTERN.test(clientId) ? this.clients.get(clientId.toLowerCase()) : undefined;
+    if (!stored) return fail(404, 'NOT_FOUND');
+
+    const merged = merge({ ...stored }, request.body, CLIENT_CREATE_FIELDS);
+    merged['clientType'] = stored.clientType;
+    const result = validateClientCreate(merged);
+    if ('errors' in result) {
+      return fail(400, 'VALIDATION_ERROR', { errors: result.errors });
+    }
+    if (request.version !== stored.version) {
+      return this.clientConflict(stored.id);
+    }
+    const next = result.client;
+    const documentChanged = next.documentType !== stored.documentType || next.documentNumber !== stored.documentNumber;
+    const invalidReason = documentChanged ? reasonProblem<ClientDetail>(actor, request.reason) : null;
+    if (invalidReason !== null) return invalidReason;
+    const existing = [...this.clients.values()].find(
+      (client) => client.id !== stored.id && client.documentNumber === next.documentNumber,
+    );
+    if (existing) {
+      return fail(409, 'DOCUMENT_ALREADY_EXISTS', { existingId: existing.id });
+    }
+
+    Object.assign(stored, next, { displayName: displayNameOf(next) });
+    this.touch(stored, actor);
+    return this.getClient(stored.id);
+  }
+
+  /**
+   * PATCH /vehicles/{id} (US4-AC5, AC6, AC11, AC12, AC15, AC16; US3-AC14). The owner is not editable here
+   * (ownerClientId → 400 UNKNOWN_FIELD) and plate or VIN changes never enter the ownership history.
+   */
+  updateVehicle(vehicleId: string, raw: unknown, actor: MockActor): MockResult<VehicleDetail> {
+    const errors = new FieldErrors();
+    const request = readWriteRequest(raw, VEHICLE_UPDATE_FIELDS, errors);
+    if (request === null || errors.list.length > 0) {
+      return fail(400, 'VALIDATION_ERROR', { errors: errors.list });
+    }
+    const stored = UUID_PATTERN.test(vehicleId) ? this.vehicles.get(vehicleId.toLowerCase()) : undefined;
+    if (!stored) return fail(404, 'NOT_FOUND');
+
+    const merged = merge({ ...stored }, request.body, VEHICLE_CREATE_FIELDS);
+    merged['ownerClientId'] = stored.ownerClientId;
+    const result = validateVehicleCreate(merged);
+    if ('errors' in result) {
+      return fail(400, 'VALIDATION_ERROR', { errors: result.errors });
+    }
+    if (request.version !== stored.version) {
+      return { ok: false, problem: mockProblem(409, 'VERSION_CONFLICT', { current: this.toVehicleDetail(stored) }) };
+    }
+    const next = result.vehicle;
+    const identifiersChanged = next.plate !== stored.plate || next.vin !== stored.vin;
+    const invalidReason = identifiersChanged ? reasonProblem<VehicleDetail>(actor, request.reason) : null;
+    if (invalidReason !== null) return invalidReason;
+    const others = [...this.vehicles.values()].filter((vehicle) => vehicle.id !== stored.id);
+    const samePlate = others.find((vehicle) => vehicle.plate === next.plate);
+    if (samePlate) {
+      return fail(409, 'PLATE_ALREADY_EXISTS', { existingId: samePlate.id });
+    }
+    const sameVin = next.vin === null ? undefined : others.find((vehicle) => vehicle.vin === next.vin);
+    if (sameVin) {
+      return fail(409, 'VIN_ALREADY_EXISTS', { existingId: sameVin.id });
+    }
+
+    Object.assign(stored, next);
+    this.touch(stored, actor);
+    return { ok: true, status: 200, body: this.toVehicleDetail(stored) };
+  }
+
+  /**
+   * POST /vehicles/{id}/ownership-transfers (US4-AC7 to AC9, AC12, AC15, AC16). Order as the API: body shape
+   * (400), vehicle (404), destination (404 CLIENT_NOT_FOUND), version (409), SAME_OWNER (422), reason (400).
+   */
+  transferOwnership(vehicleId: string, raw: unknown, actor: MockActor): MockResult<VehicleDetail> {
+    const errors = new FieldErrors();
+    const request = readWriteRequest(raw, TRANSFER_FIELDS, errors);
+    const target = request?.body['newOwnerClientId'];
+    if (target === undefined || target === null) {
+      errors.add('newOwnerClientId', REQUIRED.code, REQUIRED.message);
+    } else if (typeof target !== 'string' || !UUID_PATTERN.test(target)) {
+      errors.add('newOwnerClientId', 'VALIDATION_ERROR', 'Identificador de cliente inválido');
+    }
+    if (request === null || errors.list.length > 0 || typeof target !== 'string') {
+      return fail(400, 'VALIDATION_ERROR', { errors: errors.list });
+    }
+    const stored = UUID_PATTERN.test(vehicleId) ? this.vehicles.get(vehicleId.toLowerCase()) : undefined;
+    if (!stored) return fail(404, 'NOT_FOUND');
+    const newOwner = this.clients.get(target.toLowerCase());
+    if (!newOwner) return fail(404, 'CLIENT_NOT_FOUND');
+    if (request.version !== stored.version) {
+      return { ok: false, problem: mockProblem(409, 'VERSION_CONFLICT', { current: this.toVehicleDetail(stored) }) };
+    }
+    if (newOwner.id === stored.ownerClientId) return fail(422, 'SAME_OWNER');
+    const invalidReason = reasonProblem<VehicleDetail>(actor, request.reason);
+    if (invalidReason !== null) return invalidReason;
+
+    const previousOwner = this.clients.get(stored.ownerClientId);
+    if (!previousOwner) {
+      throw new Error(`Mock vehicle ${stored.id} without owner`);
+    }
+    stored.ownerClientId = newOwner.id;
+    this.touch(stored, actor);
+    this.ownership.push({
+      id: newId(),
+      vehicleId: stored.id,
+      sequence: ++this.ownershipSequence,
+      occurredAt: stored.updatedAt,
+      previousOwner: snapshotOf(previousOwner),
+      newOwner: snapshotOf(newOwner),
+      actorUserId: actor.id,
+      actorName: actor.name,
+      actorRole: actor.role,
+      reason: normalizeReason(request.reason),
+    });
+    return { ok: true, status: 200, body: this.toVehicleDetail(stored) };
+  }
+
+  /** GET /vehicles/{id}/ownership-history: newest first (same instant: the last registered first). */
+  getOwnershipHistory(vehicleId: string): MockResult<OwnershipHistoryResponse> {
+    const vehicle = UUID_PATTERN.test(vehicleId) ? this.vehicles.get(vehicleId.toLowerCase()) : undefined;
+    if (!vehicle) return fail(404, 'NOT_FOUND');
+    const items = this.ownership
+      .filter((record) => record.vehicleId === vehicle.id)
+      .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt) || b.sequence - a.sequence)
+      .map((record): OwnershipChange => ({
+        id: record.id,
+        occurredAt: record.occurredAt,
+        previousOwner: { ...record.previousOwner },
+        newOwner: { ...record.newOwner },
+        actorUserId: record.actorUserId,
+        actorName: record.actorName,
+        actorRole: record.actorRole,
+        reason: record.reason,
+      }));
+    return { ok: true, status: 200, body: { items } };
   }
 
   searchClients(q: string | null): MockResult<ClientSearchResponse> {
@@ -654,6 +929,20 @@ export class MockApiStore {
         hasMore: ranked.length > SEARCH_LIMIT,
       },
     };
+  }
+
+  /** 409 with the client as GET returns it (with its vehicles). */
+  private clientConflict(clientId: string): MockResult<ClientDetail> {
+    const current = this.getClient(clientId);
+    return { ok: false, problem: mockProblem(409, 'VERSION_CONFLICT', current.ok ? { current: current.body } : {}) };
+  }
+
+  /** Optimistic lock and last modification stamp of a successful write. */
+  private touch(record: { version: number; updatedAt: string; updatedBy: string; updatedByName: string }, actor: MockActor): void {
+    record.version += 1;
+    record.updatedAt = new Date().toISOString();
+    record.updatedBy = actor.id;
+    record.updatedByName = actor.name;
   }
 
   private insert(client: ValidClient): ClientDetail {

@@ -182,3 +182,37 @@ a:focus-visible {
     min-width: 10rem;
   }
 }
+
+// Edit mode (US4).
+.status,
+.hint {
+  margin: 0 0 0.5rem;
+  color: #4a4a4a;
+}
+
+.field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 6rem;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  color: $text;
+  border: 1px solid $border;
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.field textarea[aria-invalid='true'] {
+  border: 2px solid $error;
+}
+
+textarea:focus-visible {
+  outline: 3px solid $focus;
+  outline-offset: 2px;
+}
+
+.notice-warning {
+  color: #4d3200;
+  background: #fff4ce;
+  border: 1px solid #8a5a00;
+}

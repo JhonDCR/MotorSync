@@ -9,10 +9,28 @@
 // falla con ESE Problem (tipado, no con el HttpErrorResponse). Si no hay Problem (por ejemplo, fallo de red con
 // status 0), falla con el HttpErrorResponse original para que la pantalla pueda ofrecer "Reintentar".
 // (El operador toProblem de clients-api.service.ts puede extraerse a un módulo común y reutilizarse.)
+//
+// T076 (PR3, US4), métodos nuevos para el implementer (T077):
+//     update(vehicleId: string, body: VehicleUpdate): Observable<VehicleDetail>
+//         // PATCH /api/v1/vehicles/{vehicleId}
+//     transferOwnership(vehicleId: string, body: OwnershipTransferRequest): Observable<VehicleDetail>
+//         // POST  /api/v1/vehicles/{vehicleId}/ownership-transfers
+//     getOwnershipHistory(vehicleId: string): Observable<OwnershipHistoryResponse>
+//         // GET   /api/v1/vehicles/{vehicleId}/ownership-history  ({ items: OwnershipChange[] }, sin reordenar)
+//   Cuerpos tal cual, id con encodeURIComponent, errores Problem como arriba (409 VERSION_CONFLICT con current,
+//   422 SAME_OWNER, 404 CLIENT_NOT_FOUND, 400 REASON_REQUIRED).
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import type { Problem, VehicleCreate, VehicleDetail, VehicleSearchResponse } from './api.models';
+import type {
+  OwnershipHistoryResponse,
+  OwnershipTransferRequest,
+  Problem,
+  VehicleCreate,
+  VehicleDetail,
+  VehicleSearchResponse,
+  VehicleUpdate,
+} from './api.models';
 import { VehiclesApiService } from './vehicles-api.service';
 
 const VEHICLE_ID = 'b2222222-2222-4222-8222-222222222222';
@@ -268,6 +286,237 @@ describe('VehiclesApiService (T047)', () => {
       httpMock
         .expectOne((r) => r.url === '/api/v1/vehicles/search')
         .flush(body, { status: 400, statusText: 'Bad Request', headers: PROBLEM_HEADERS });
+
+      expect(received).toEqual(body);
+    });
+  });
+});
+
+describe('VehiclesApiService: edición, transferencia e historial (T076)', () => {
+  const NEW_OWNER_ID = '9f8e7d6c-5b4a-4321-8fed-cba987654321';
+  const REASON = 'Venta del vehículo con contrato notariado';
+
+  let service: VehiclesApiService;
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    service = TestBed.inject(VehiclesApiService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  describe('update', () => {
+    const UPDATE_BODY: VehicleUpdate = { version: 1, color: 'Rojo', initialMileage: 46000 };
+
+    it('[US4-AC6] hace PATCH /api/v1/vehicles/{vehicleId} con el cuerpo VehicleUpdate y devuelve el VehicleDetail', () => {
+      const updated: VehicleDetail = { ...DETAIL, color: 'Rojo', initialMileage: 46000, version: 2 };
+      let result: VehicleDetail | undefined;
+      service.update(VEHICLE_ID, UPDATE_BODY).subscribe((detail: VehicleDetail) => (result = detail));
+
+      const req = httpMock.expectOne(`/api/v1/vehicles/${VEHICLE_ID}`);
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual(UPDATE_BODY);
+      req.flush(updated);
+
+      expect(result).toEqual(updated);
+    });
+
+    it('[US4-AC11][US4-AC15] envía plate, vin y reason cuando cambian los identificadores', () => {
+      const body: VehicleUpdate = { version: 2, plate: 'PBB4321', vin: '1HGCM82633A004352', reason: REASON };
+      service.update(VEHICLE_ID, body).subscribe();
+
+      const req = httpMock.expectOne(`/api/v1/vehicles/${VEHICLE_ID}`);
+      expect(req.request.body).toEqual(body);
+      req.flush({ ...DETAIL, plate: 'PBB4321', vin: '1HGCM82633A004352', version: 3 });
+    });
+
+    it('[US4-AC13] codifica el id en la URL y no añade tenantId ni X-Tenant-Id', () => {
+      service.update('a/b c', UPDATE_BODY).subscribe();
+
+      const req = httpMock.expectOne('/api/v1/vehicles/a%2Fb%20c');
+      expect(Object.keys(req.request.body as object)).not.toContain('tenantId');
+      expect(req.request.headers.has('X-Tenant-Id')).toBe(false);
+      req.flush(DETAIL);
+    });
+
+    it('[US4-AC12] un 409 VERSION_CONFLICT se propaga como Problem con current', () => {
+      const current: VehicleDetail = { ...DETAIL, color: 'Negro', version: 2 };
+      let received: Problem | undefined;
+      service.update(VEHICLE_ID, UPDATE_BODY).subscribe({ error: (err: Problem) => (received = err) });
+
+      httpMock
+        .expectOne(`/api/v1/vehicles/${VEHICLE_ID}`)
+        .flush(problem(409, 'VERSION_CONFLICT', { current }), {
+          status: 409,
+          statusText: 'Conflict',
+          headers: PROBLEM_HEADERS,
+        });
+
+      expect(received?.code).toBe('VERSION_CONFLICT');
+      expect(received?.current).toEqual(current);
+      expect(received).not.toBeInstanceOf(HttpErrorResponse);
+    });
+
+    it('[US4-AC5] un 409 PLATE_ALREADY_EXISTS se propaga como Problem con existingId', () => {
+      let received: Problem | undefined;
+      service.update(VEHICLE_ID, { version: 1, plate: 'GYE0123', reason: REASON }).subscribe({
+        error: (err: Problem) => (received = err),
+      });
+
+      httpMock
+        .expectOne(`/api/v1/vehicles/${VEHICLE_ID}`)
+        .flush(problem(409, 'PLATE_ALREADY_EXISTS', { existingId: EXISTING_ID }), {
+          status: 409,
+          statusText: 'Conflict',
+          headers: PROBLEM_HEADERS,
+        });
+
+      expect(received?.code).toBe('PLATE_ALREADY_EXISTS');
+      expect(received?.existingId).toBe(EXISTING_ID);
+    });
+
+    it('[US4-AC15] un 400 REASON_REQUIRED se propaga como el Problem tipado', () => {
+      const body = problem(400, 'VALIDATION_ERROR', { errors: [{ field: 'reason', code: 'REASON_REQUIRED', message: 'x' }] });
+      let received: unknown;
+      service.update(VEHICLE_ID, { version: 1, plate: 'GYE0123' }).subscribe({ error: (err: unknown) => (received = err) });
+
+      httpMock
+        .expectOne(`/api/v1/vehicles/${VEHICLE_ID}`)
+        .flush(body, { status: 400, statusText: 'Bad Request', headers: PROBLEM_HEADERS });
+
+      expect(received).toEqual(body);
+    });
+  });
+
+  describe('transferOwnership', () => {
+    const TRANSFER: OwnershipTransferRequest = { newOwnerClientId: NEW_OWNER_ID, version: 1, reason: REASON };
+
+    it('[US4-AC7] hace POST /api/v1/vehicles/{vehicleId}/ownership-transfers y devuelve el vehículo con el nuevo propietario', () => {
+      const transferred: VehicleDetail = {
+        ...DETAIL,
+        version: 2,
+        owner: { ...OWNER, id: NEW_OWNER_ID, displayName: 'Carlos Ruiz', documentNumber: '0912345675' },
+      };
+      let result: VehicleDetail | undefined;
+      service.transferOwnership(VEHICLE_ID, TRANSFER).subscribe((detail: VehicleDetail) => (result = detail));
+
+      const req = httpMock.expectOne(`/api/v1/vehicles/${VEHICLE_ID}/ownership-transfers`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual(TRANSFER);
+      req.flush(transferred);
+
+      expect(result?.owner.id).toBe(NEW_OWNER_ID);
+    });
+
+    it('[US4-AC16] sin motivo (admin) envía el cuerpo sin reason', () => {
+      service.transferOwnership(VEHICLE_ID, { newOwnerClientId: NEW_OWNER_ID, version: 1 }).subscribe();
+
+      const req = httpMock.expectOne(`/api/v1/vehicles/${VEHICLE_ID}/ownership-transfers`);
+      expect(req.request.body).toEqual({ newOwnerClientId: NEW_OWNER_ID, version: 1 });
+      expect(Object.keys(req.request.body as object)).not.toContain('tenantId');
+      req.flush(DETAIL);
+    });
+
+    it('[US4-AC13] codifica el id del vehículo en la URL', () => {
+      service.transferOwnership('a/b', TRANSFER).subscribe();
+
+      httpMock.expectOne('/api/v1/vehicles/a%2Fb/ownership-transfers').flush(DETAIL);
+    });
+
+    it.each<[number, Problem['code']]>([
+      [422, 'SAME_OWNER'],
+      [404, 'CLIENT_NOT_FOUND'],
+      [404, 'NOT_FOUND'],
+      [409, 'VERSION_CONFLICT'],
+    ])('[US4-AC7][US4-AC9][US4-AC12] un %i %s se propaga como el Problem tipado', (status, code) => {
+      const body = problem(status, code);
+      let received: unknown;
+      service.transferOwnership(VEHICLE_ID, TRANSFER).subscribe({ error: (err: unknown) => (received = err) });
+
+      httpMock
+        .expectOne(`/api/v1/vehicles/${VEHICLE_ID}/ownership-transfers`)
+        .flush(body, { status, statusText: 'Error', headers: PROBLEM_HEADERS });
+
+      expect(received).toEqual(body);
+      expect(received).not.toBeInstanceOf(HttpErrorResponse);
+    });
+
+    it('[US4-AC15] un 400 REASON_REQUIRED se propaga como el Problem tipado', () => {
+      const body = problem(400, 'VALIDATION_ERROR', { errors: [{ field: 'reason', code: 'REASON_REQUIRED', message: 'x' }] });
+      let received: unknown;
+      service.transferOwnership(VEHICLE_ID, { newOwnerClientId: NEW_OWNER_ID, version: 1 }).subscribe({
+        error: (err: unknown) => (received = err),
+      });
+
+      httpMock
+        .expectOne(`/api/v1/vehicles/${VEHICLE_ID}/ownership-transfers`)
+        .flush(body, { status: 400, statusText: 'Bad Request', headers: PROBLEM_HEADERS });
+
+      expect(received).toEqual(body);
+    });
+  });
+
+  describe('getOwnershipHistory', () => {
+    const HISTORY: OwnershipHistoryResponse = {
+      items: [
+        {
+          id: 'd4444444-4444-4444-8444-444444444444',
+          occurredAt: '2026-10-21T18:00:00.000Z',
+          previousOwner: { clientId: NEW_OWNER_ID, displayName: 'Carlos Ruiz', documentNumber: '0912345675' },
+          newOwner: { clientId: OWNER_ID, displayName: 'Ana Pérez', documentNumber: '1710034065' },
+          actorUserId: '22222222-2222-4222-8222-222222222222',
+          actorName: 'Admin Uno',
+          actorRole: 'admin',
+          reason: null,
+        },
+        {
+          id: 'e5555555-5555-4555-8555-555555555555',
+          occurredAt: '2026-10-20T15:00:00.000Z',
+          previousOwner: { clientId: OWNER_ID, displayName: 'Ana Pérez', documentNumber: '1710034065' },
+          newOwner: { clientId: NEW_OWNER_ID, displayName: 'Carlos Ruiz', documentNumber: '0912345675' },
+          actorUserId: '11111111-1111-4111-8111-111111111111',
+          actorName: 'Asesor Uno',
+          actorRole: 'asesor',
+          reason: REASON,
+        },
+      ],
+    };
+
+    it('[US4-AC10] hace GET /api/v1/vehicles/{vehicleId}/ownership-history y devuelve los items en el orden recibido', () => {
+      let result: OwnershipHistoryResponse | undefined;
+      service.getOwnershipHistory(VEHICLE_ID).subscribe((response: OwnershipHistoryResponse) => (result = response));
+
+      const req = httpMock.expectOne(`/api/v1/vehicles/${VEHICLE_ID}/ownership-history`);
+      expect(req.request.method).toBe('GET');
+      req.flush(HISTORY);
+
+      expect(result).toEqual(HISTORY);
+      expect(result?.items.map((item) => item.id)).toEqual(HISTORY.items.map((item) => item.id));
+    });
+
+    it('[US4-AC10] un historial vacío llega como items vacío', () => {
+      let result: OwnershipHistoryResponse | undefined;
+      service.getOwnershipHistory(VEHICLE_ID).subscribe((response: OwnershipHistoryResponse) => (result = response));
+
+      httpMock.expectOne(`/api/v1/vehicles/${VEHICLE_ID}/ownership-history`).flush({ items: [] });
+
+      expect(result).toEqual({ items: [] });
+    });
+
+    it('[US4-AC14] un 404 NOT_FOUND (vehículo de otro taller) se propaga como el Problem tipado', () => {
+      const body = problem(404, 'NOT_FOUND');
+      let received: unknown;
+      service.getOwnershipHistory(VEHICLE_ID).subscribe({ error: (err: unknown) => (received = err) });
+
+      httpMock
+        .expectOne(`/api/v1/vehicles/${VEHICLE_ID}/ownership-history`)
+        .flush(body, { status: 404, statusText: 'Not Found', headers: PROBLEM_HEADERS });
 
       expect(received).toEqual(body);
     });

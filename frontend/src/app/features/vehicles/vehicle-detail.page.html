@@ -29,6 +29,21 @@
         <span class="subtitle">{{ vehicle.brand }} {{ vehicle.model }}</span>
       </h1>
 
+      <div class="toolbar">
+        <a class="action" [routerLink]="['/vehicles', vehicle.id, 'edit']" data-testid="edit-vehicle">
+          Editar<span class="sr-only"> vehículo</span>
+        </a>
+        <button
+          type="button"
+          class="action"
+          data-testid="transfer-ownership"
+          aria-haspopup="dialog"
+          (click)="openTransfer()"
+        >
+          Transferir propietario
+        </button>
+      </div>
+
       <section class="card" aria-labelledby="vehicle-heading">
         <h2 id="vehicle-heading">Datos del vehículo</h2>
         <dl class="facts">
@@ -89,12 +104,75 @@
         </dl>
       </section>
 
+      <section class="card" aria-labelledby="ownership-heading" data-testid="ownership-history">
+        <h2 id="ownership-heading">Historial de propietarios</h2>
+        @switch (history().kind) {
+          @case ('loading') {
+            <p class="status" role="status">Cargando historial…</p>
+          }
+          @case ('error') {
+            <p class="notice notice-error" role="alert" data-testid="ownership-history-error">
+              No se pudo cargar el historial de propietarios. Vuelva a abrir la ficha para intentarlo de nuevo.
+            </p>
+          }
+        }
+        @if (history(); as current) {
+          @if (current.kind === 'loaded') {
+            @if (current.items.length === 0) {
+              <p data-testid="ownership-history-empty">Sin cambios de propietario</p>
+            } @else {
+              <ol class="ownership-list">
+                @for (item of current.items; track item.id) {
+                  <li class="ownership-change" data-testid="ownership-change">
+                    <p class="ownership-date" data-testid="ownership-date">
+                      <time [attr.datetime]="item.occurredAt">{{ item.occurredAt | date: 'dd/MM/yyyy HH:mm' }}</time>
+                    </p>
+                    <dl class="facts">
+                      <div>
+                        <dt>Propietario anterior</dt>
+                        <dd data-testid="ownership-previous">
+                          {{ item.previousOwner.displayName }}
+                          <span class="document">{{ item.previousOwner.documentNumber }}</span>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Nuevo propietario</dt>
+                        <dd data-testid="ownership-new">
+                          {{ item.newOwner.displayName }}
+                          <span class="document">{{ item.newOwner.documentNumber }}</span>
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Registrado por</dt>
+                        <dd data-testid="ownership-actor">{{ item.actorName }}</dd>
+                      </div>
+                      <div>
+                        <dt>Motivo</dt>
+                        <dd data-testid="ownership-reason">{{ item.reason ?? 'Sin motivo' }}</dd>
+                      </div>
+                    </dl>
+                  </li>
+                }
+              </ol>
+            }
+          }
+        }
+      </section>
+
       <p class="stamp" data-testid="last-modified">
         Última modificación por {{ vehicle.updatedByName }} el
         <time [attr.datetime]="vehicle.updatedAt">{{ vehicle.updatedAt | date: 'dd/MM/yyyy HH:mm' }}</time>
       </p>
 
       <a class="action" routerLink="/" data-testid="back-to-search">Volver a la búsqueda</a>
+
+      @if (transferOpen()) {
+        <app-transfer-ownership-dialog
+          [vehicle]="vehicle"
+          (transferred)="onTransferred($event)"
+          (cancelled)="closeTransfer()"
+        />
+      }
     }
   }
 </main>

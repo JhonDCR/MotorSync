@@ -22,6 +22,27 @@
 //       Orden: exacta (placa o VIN) → prefijo de placa → contiene; empate por placa. Máximo 20 + hasMore.
 //       Cada item: VehicleSummary + vin, color, bodyType, initialMileage, owner (ClientSummary).
 //   - Los vehículos semilla no usan las placas ni los VIN de estas pruebas ni contienen "BA12" ni "ABC10".
+//
+// T082 (PR3, US4): edición, transferencia e historial (contrato para el implementer, T083):
+//   - Rol y nombre del actor: del payload del header `Authorization: Bearer <jwt>` de la petición (sin verificar la
+//     firma; decodeSessionToken de core/auth/current-session.ts sirve). Sin token o con token ilegible → asesor.
+//   - PATCH /api/v1/clients/{id} y PATCH /api/v1/vehicles/{id} como la API:
+//       version obligatoria (sin ella → 400 VALIDATION_ERROR con REQUIRED en version); distinta de la guardada →
+//       409 VERSION_CONFLICT con `current` (el recurso tal como lo devuelve GET). Éxito: 200 con el recurso, version+1.
+//       Mismas validaciones y normalización que el alta (400 con errors[], 409 *_ALREADY_EXISTS con existingId, que
+//       excluye al propio registro). Campos fuera de ClientUpdate/VehicleUpdate (tenantId, clientType,
+//       ownerClientId) → 400 UNKNOWN_FIELD. Placa revalidada contra la carrocería resultante (US3-AC14).
+//       Motivo (FR-019): si documento/tipo (clientes) o placa/VIN (vehículos) cambian comparados ya normalizados:
+//       asesor sin motivo, o cualquier rol con motivo (recortado) fuera de 10..500 → 400 VALIDATION_ERROR con
+//       { field: 'reason', code: 'REASON_REQUIRED' }; admin sin motivo → 200. Un 4xx no modifica nada.
+//   - POST /api/v1/vehicles/{id}/ownership-transfers: 200 con el VehicleDetail (nuevo owner, version+1); 404
+//     NOT_FOUND (vehículo) o CLIENT_NOT_FOUND (destino); 409 VERSION_CONFLICT con current; 422 SAME_OWNER; 400
+//     REASON_REQUIRED con las reglas de arriba. El vehículo pasa de la ficha del cliente anterior a la del nuevo.
+//     Solo una transferencia con éxito añade un registro al historial.
+//   - GET /api/v1/vehicles/{id}/ownership-history: 200 { items: OwnershipChange[] } del más reciente al más
+//     antiguo (a igual occurredAt, el último registrado primero); actorName/actorRole del token; reason null si se
+//     omitió. 404 NOT_FOUND si el vehículo no existe. Los PATCH de placa o VIN no aparecen aquí.
+//   - Estas rutas se atienden antes del fallback 404; `ownership-*` no se confunde con /vehicles/{id}.
 import { HttpClient, HttpErrorResponse, HttpResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -30,6 +51,7 @@ import type {
   ClientCreate,
   ClientDetail,
   ClientSearchResponse,
+  OwnershipHistoryResponse,
   Problem,
   VehicleCreate,
   VehicleDetail,
@@ -38,6 +60,7 @@ import type {
 } from './api.models';
 import { mockApiInterceptor } from './mock-api.interceptor';
 import { USE_MOCK_API } from './use-mock-api';
+import { tokenFor, type FakeRole } from '../../../testing/fake-jwt';
 
 const NATURAL: ClientCreate = {
   clientType: 'natural',
@@ -615,6 +638,492 @@ describe('mockApiInterceptor: vehículos (T057)', () => {
 
       const fragment = await search(VIN.slice(0, 10));
       expect(fragment.body).toEqual({ items: [], hasMore: false });
+    });
+  });
+});
+
+describe('mockApiInterceptor: edición, transferencia e historial (T082)', () => {
+  const REASON = 'Venta del vehículo con contrato notariado';
+  const VIN = '1HGCM82633A004352';
+  const CARLOS: ClientCreate = {
+    clientType: 'natural',
+    documentType: 'cedula',
+    documentNumber: '0912345675',
+    firstNames: 'Carlos',
+    lastNames: 'Ruiz',
+    phone: '0987654321',
+    email: null,
+  };
+
+  let http: HttpClient;
+  let jose: ClientDetail;
+  let carlos: ClientDetail;
+  let car: VehicleDetail;
+
+  beforeEach(async () => {
+    http = setup(true).http;
+    jose = await firstValueFrom(http.post<ClientDetail>('/api/v1/clients', NATURAL));
+    carlos = await firstValueFrom(http.post<ClientDetail>('/api/v1/clients', CARLOS));
+    car = await firstValueFrom(
+      http.post<VehicleDetail>('/api/v1/vehicles', {
+        ownerClientId: jose.id,
+        plate: 'PBA1234',
+        vin: null,
+        brand: 'Toyota',
+        model: 'Corolla',
+        year: 2020,
+        color: 'Blanco',
+        bodyType: 'sedan',
+        initialMileage: 45200,
+      } satisfies VehicleCreate),
+    );
+  });
+
+  afterEach(() => {
+    TestBed.inject(HttpTestingController).verify();
+  });
+
+  /** Sin rol no se envía Authorization (el mock lo trata como asesor). */
+  function headers(role?: FakeRole, name?: string): Record<string, string> {
+    return role === undefined ? {} : { Authorization: `Bearer ${tokenFor(role, name)}` };
+  }
+
+  function patchClient(id: string, body: unknown, role?: FakeRole): Promise<HttpResponse<ClientDetail>> {
+    return firstValueFrom(
+      http.patch<ClientDetail>(`/api/v1/clients/${id}`, body, { headers: headers(role), observe: 'response' }),
+    );
+  }
+
+  function patchVehicle(id: string, body: unknown, role?: FakeRole): Promise<HttpResponse<VehicleDetail>> {
+    return firstValueFrom(
+      http.patch<VehicleDetail>(`/api/v1/vehicles/${id}`, body, { headers: headers(role), observe: 'response' }),
+    );
+  }
+
+  function transfer(id: string, body: unknown, role?: FakeRole, name?: string): Promise<HttpResponse<VehicleDetail>> {
+    return firstValueFrom(
+      http.post<VehicleDetail>(`/api/v1/vehicles/${id}/ownership-transfers`, body, {
+        headers: headers(role, name),
+        observe: 'response',
+      }),
+    );
+  }
+
+  function history(id: string): Promise<HttpResponse<OwnershipHistoryResponse>> {
+    return firstValueFrom(
+      http.get<OwnershipHistoryResponse>(`/api/v1/vehicles/${id}/ownership-history`, { observe: 'response' }),
+    );
+  }
+
+  function getClient(id: string): Promise<ClientDetail> {
+    return firstValueFrom(http.get<ClientDetail>(`/api/v1/clients/${id}`));
+  }
+
+  function getVehicle(id: string): Promise<VehicleDetail> {
+    return firstValueFrom(http.get<VehicleDetail>(`/api/v1/vehicles/${id}`));
+  }
+
+  function expectReasonRequired(error: HttpErrorResponse): void {
+    expect(error.status).toBe(400);
+    expect(problemOf(error).code).toBe('VALIDATION_ERROR');
+    expect(fieldCodes(error)).toContainEqual({ field: 'reason', code: 'REASON_REQUIRED' });
+  }
+
+  describe('PATCH /api/v1/clients/{clientId}', () => {
+    it('[US4-AC4] 200 con los datos editados normalizados y version incrementada', async () => {
+      const response = await patchClient(jose.id, { version: 1, phone: '098 765 4321', email: 'Nuevo@Example.com' }, 'asesor');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          id: jose.id,
+          phone: '0987654321',
+          email: 'nuevo@example.com',
+          documentNumber: '1710034065',
+          version: 2,
+        }),
+      );
+      expect(await getClient(jose.id)).toEqual(response.body);
+    });
+
+    it('[US4-AC12] 409 VERSION_CONFLICT con current si la versión está desactualizada, sin modificar nada', async () => {
+      await patchClient(jose.id, { version: 1, phone: '0987654321' }, 'asesor');
+
+      const error = await failure(patchClient(jose.id, { version: 1, phone: '0911111111' }, 'asesor'));
+
+      expect(error.status).toBe(409);
+      expect(problemOf(error).code).toBe('VERSION_CONFLICT');
+      const current = await getClient(jose.id);
+      expect(problemOf(error).current).toEqual(current);
+      expect(current.phone).toBe('0987654321');
+    });
+
+    it('[FR-016] 400 con REQUIRED en version si no se envía', async () => {
+      const error = await failure(patchClient(jose.id, { phone: '0987654321' }, 'asesor'));
+
+      expect(error.status).toBe(400);
+      expect(fieldCodes(error)).toContainEqual({ field: 'version', code: 'REQUIRED' });
+    });
+
+    it.each([['tenantId'], ['clientType']])('[US4-AC13] 400 UNKNOWN_FIELD si el body trae %s', async (field) => {
+      const error = await failure(patchClient(jose.id, { version: 1, [field]: 'company' }, 'admin'));
+
+      expect(error.status).toBe(400);
+      expect(fieldCodes(error)).toContainEqual({ field, code: 'UNKNOWN_FIELD' });
+    });
+
+    it('[US4-AC15] asesor: cambiar el documento sin motivo → 400 REASON_REQUIRED y no se modifica', async () => {
+      const error = await failure(patchClient(jose.id, { version: 1, documentNumber: '1104680135' }, 'asesor'));
+
+      expectReasonRequired(error);
+      const current = await getClient(jose.id);
+      expect(current.documentNumber).toBe('1710034065');
+      expect(current.version).toBe(1);
+    });
+
+    it('[US4-AC15] sin token se aplica la regla del asesor', async () => {
+      const error = await failure(patchClient(jose.id, { version: 1, documentNumber: '1104680135' }));
+
+      expectReasonRequired(error);
+    });
+
+    it('[US4-AC15] asesor: con motivo de 10 a 500 caracteres se cambia el documento', async () => {
+      const response = await patchClient(
+        jose.id,
+        { version: 1, documentNumber: '110468013-5', reason: `  ${REASON}  ` },
+        'asesor',
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body?.documentNumber).toBe('1104680135');
+    });
+
+    it('[US4-AC16] admin: cambiar el documento sin motivo → 200', async () => {
+      const response = await patchClient(jose.id, { version: 1, documentNumber: '1104680135' }, 'admin');
+
+      expect(response.status).toBe(200);
+      expect(response.body?.documentNumber).toBe('1104680135');
+    });
+
+    it.each([
+      ['5 caracteres', 'corto'],
+      ['9 caracteres sin contar espacios', '   123456789   '],
+      ['501 caracteres', 'x'.repeat(501)],
+    ])('[US4-AC16] admin: un motivo de %s → 400 REASON_REQUIRED', async (_label, reason) => {
+      const error = await failure(patchClient(jose.id, { version: 1, documentNumber: '1104680135', reason }, 'admin'));
+
+      expectReasonRequired(error);
+    });
+
+    it('[US4-AC11] el mismo documento escrito con guion no es un cambio: el asesor no necesita motivo', async () => {
+      const response = await patchClient(jose.id, { version: 1, documentNumber: '171003406-5', phone: '0987654321' }, 'asesor');
+
+      expect(response.status).toBe(200);
+      expect(response.body?.documentNumber).toBe('1710034065');
+    });
+
+    it('[US4-AC11] editar teléfono o correo no pide motivo', async () => {
+      const response = await patchClient(jose.id, { version: 1, phone: '0987654321', email: null }, 'asesor');
+
+      expect(response.status).toBe(200);
+    });
+
+    it('[US4-AC5] 400 INVALID_CEDULA con un documento inválido', async () => {
+      const error = await failure(patchClient(jose.id, { version: 1, documentNumber: '1710034064', reason: REASON }, 'asesor'));
+
+      expect(error.status).toBe(400);
+      expect(fieldCodes(error)).toContainEqual({ field: 'documentNumber', code: 'INVALID_CEDULA' });
+    });
+
+    it('[US4-AC5] 409 DOCUMENT_ALREADY_EXISTS con existingId del otro cliente', async () => {
+      const error = await failure(patchClient(jose.id, { version: 1, documentNumber: '0912345675', reason: REASON }, 'asesor'));
+
+      expect(error.status).toBe(409);
+      expect(problemOf(error)).toEqual(expect.objectContaining({ code: 'DOCUMENT_ALREADY_EXISTS', existingId: carlos.id }));
+    });
+
+    it('[US4-AC13] 404 NOT_FOUND para un id que no existe', async () => {
+      const error = await failure(patchClient(UNKNOWN_ID, { version: 1, phone: '0987654321' }, 'admin'));
+
+      expect(error.status).toBe(404);
+      expect(problemOf(error).code).toBe('NOT_FOUND');
+    });
+  });
+
+  describe('PATCH /api/v1/vehicles/{vehicleId}', () => {
+    it('[US4-AC6] 200 con los datos editados y version incrementada', async () => {
+      const response = await patchVehicle(
+        car.id,
+        { version: 1, color: 'Rojo', initialMileage: 46000, bodyType: 'suv', brand: ' Toyota ', model: 'Fortuner', year: 2021 },
+        'asesor',
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          id: car.id,
+          plate: 'PBA1234',
+          color: 'Rojo',
+          initialMileage: 46000,
+          bodyType: 'suv',
+          brand: 'Toyota',
+          model: 'Fortuner',
+          year: 2021,
+          version: 2,
+        }),
+      );
+      expect(response.body?.owner.id).toBe(jose.id);
+      expect(await getVehicle(car.id)).toEqual(response.body);
+    });
+
+    it('[US4-AC12] 409 VERSION_CONFLICT con current si la versión está desactualizada', async () => {
+      await patchVehicle(car.id, { version: 1, color: 'Rojo' }, 'asesor');
+
+      const error = await failure(patchVehicle(car.id, { version: 1, color: 'Negro' }, 'asesor'));
+
+      expect(error.status).toBe(409);
+      expect(problemOf(error).code).toBe('VERSION_CONFLICT');
+      expect(problemOf(error).current).toEqual(await getVehicle(car.id));
+      expect((await getVehicle(car.id)).color).toBe('Rojo');
+    });
+
+    it('[US4-AC15] asesor: cambiar la placa sin motivo → 400 REASON_REQUIRED y no se modifica', async () => {
+      const error = await failure(patchVehicle(car.id, { version: 1, plate: 'PBB4321' }, 'asesor'));
+
+      expectReasonRequired(error);
+      expect((await getVehicle(car.id)).plate).toBe('PBA1234');
+    });
+
+    it('[US4-AC15] asesor: informar un VIN sin motivo → 400 REASON_REQUIRED', async () => {
+      const error = await failure(patchVehicle(car.id, { version: 1, vin: VIN }));
+
+      expectReasonRequired(error);
+      expect((await getVehicle(car.id)).vin).toBeNull();
+    });
+
+    it('[US4-AC15] asesor: con motivo se cambia la placa (normalizada)', async () => {
+      const response = await patchVehicle(car.id, { version: 1, plate: 'pbb-4321', reason: REASON }, 'asesor');
+
+      expect(response.status).toBe(200);
+      expect(response.body?.plate).toBe('PBB4321');
+    });
+
+    it('[US4-AC16] admin: cambiar placa y VIN sin motivo → 200', async () => {
+      const response = await patchVehicle(car.id, { version: 1, plate: 'PBB4321', vin: VIN.toLowerCase() }, 'admin');
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(expect.objectContaining({ plate: 'PBB4321', vin: VIN }));
+    });
+
+    it('[US4-AC16] admin: un motivo de menos de 10 caracteres → 400 REASON_REQUIRED', async () => {
+      const error = await failure(patchVehicle(car.id, { version: 1, plate: 'PBB4321', reason: 'corto' }, 'admin'));
+
+      expectReasonRequired(error);
+    });
+
+    it('[US4-AC11] la misma placa escrita de otra forma no es un cambio: el asesor no necesita motivo', async () => {
+      const response = await patchVehicle(car.id, { version: 1, plate: 'pba 1234', color: 'Gris' }, 'asesor');
+
+      expect(response.status).toBe(200);
+      expect(response.body?.plate).toBe('PBA1234');
+    });
+
+    it('[US4-AC5] 400 INVALID_PLATE con una placa de formato inválido', async () => {
+      const error = await failure(patchVehicle(car.id, { version: 1, plate: 'PB1234', reason: REASON }, 'asesor'));
+
+      expect(error.status).toBe(400);
+      expect(fieldCodes(error)).toContainEqual({ field: 'plate', code: 'INVALID_PLATE' });
+    });
+
+    it('[US4-AC5][US3-AC14] cambiar solo la carrocería a moto revalida la placa guardada → 400 INVALID_PLATE', async () => {
+      const error = await failure(patchVehicle(car.id, { version: 1, bodyType: 'motorcycle' }, 'asesor'));
+
+      expect(error.status).toBe(400);
+      expect(fieldCodes(error)).toContainEqual({ field: 'plate', code: 'INVALID_PLATE' });
+      expect((await getVehicle(car.id)).bodyType).toBe('sedan');
+    });
+
+    it('[US4-AC5] 409 PLATE_ALREADY_EXISTS con existingId del otro vehículo', async () => {
+      const other = await firstValueFrom(
+        http.post<VehicleDetail>('/api/v1/vehicles', {
+          ownerClientId: carlos.id,
+          plate: 'GYE0123',
+          vin: null,
+          brand: 'Kia',
+          model: 'Rio',
+          year: 2019,
+          color: 'Azul',
+          bodyType: 'sedan',
+          initialMileage: 1000,
+        } satisfies VehicleCreate),
+      );
+
+      const error = await failure(patchVehicle(car.id, { version: 1, plate: 'gye-0123', reason: REASON }, 'asesor'));
+
+      expect(error.status).toBe(409);
+      expect(problemOf(error)).toEqual(expect.objectContaining({ code: 'PLATE_ALREADY_EXISTS', existingId: other.id }));
+    });
+
+    it('[US4-AC7] 400 UNKNOWN_FIELD con ownerClientId: el propietario no se cambia por PATCH', async () => {
+      const error = await failure(patchVehicle(car.id, { version: 1, ownerClientId: carlos.id }, 'admin'));
+
+      expect(error.status).toBe(400);
+      expect(fieldCodes(error)).toContainEqual({ field: 'ownerClientId', code: 'UNKNOWN_FIELD' });
+      expect((await getVehicle(car.id)).owner.id).toBe(jose.id);
+    });
+
+    it('[US4-AC13] 404 NOT_FOUND para un id que no existe', async () => {
+      const error = await failure(patchVehicle(UNKNOWN_ID, { version: 1, color: 'Rojo' }, 'admin'));
+
+      expect(error.status).toBe(404);
+      expect(problemOf(error).code).toBe('NOT_FOUND');
+    });
+  });
+
+  describe('POST /api/v1/vehicles/{vehicleId}/ownership-transfers', () => {
+    it('[US4-AC7] asesor con motivo: 200, nuevo propietario, version incrementada y fichas de clientes al día', async () => {
+      const response = await transfer(car.id, { newOwnerClientId: carlos.id, version: 1, reason: REASON }, 'asesor');
+
+      expect(response.status).toBe(200);
+      expect(response.body?.owner).toEqual(expect.objectContaining({ id: carlos.id, displayName: 'Carlos Ruiz' }));
+      expect(response.body?.version).toBe(2);
+      expect((await getVehicle(car.id)).owner.id).toBe(carlos.id);
+      expect((await getClient(jose.id)).vehicles.map((v) => v.id)).not.toContain(car.id);
+      expect((await getClient(carlos.id)).vehicles.map((v) => v.id)).toContain(car.id);
+    });
+
+    it('[US4-AC15] asesor sin motivo → 400 REASON_REQUIRED, sin cambio de propietario ni historial', async () => {
+      const error = await failure(transfer(car.id, { newOwnerClientId: carlos.id, version: 1 }, 'asesor'));
+
+      expectReasonRequired(error);
+      expect((await getVehicle(car.id)).owner.id).toBe(jose.id);
+      expect((await history(car.id)).body?.items).toEqual([]);
+    });
+
+    it('[US4-AC15] sin token se aplica la regla del asesor', async () => {
+      const error = await failure(transfer(car.id, { newOwnerClientId: carlos.id, version: 1 }));
+
+      expectReasonRequired(error);
+    });
+
+    it('[US4-AC16] admin sin motivo → 200', async () => {
+      const response = await transfer(car.id, { newOwnerClientId: carlos.id, version: 1 }, 'admin');
+
+      expect(response.status).toBe(200);
+      expect(response.body?.owner.id).toBe(carlos.id);
+    });
+
+    it('[US4-AC16] admin con motivo de más de 500 caracteres → 400 REASON_REQUIRED', async () => {
+      const error = await failure(
+        transfer(car.id, { newOwnerClientId: carlos.id, version: 1, reason: 'x'.repeat(501) }, 'admin'),
+      );
+
+      expectReasonRequired(error);
+    });
+
+    it('[US4-AC7] 422 SAME_OWNER si el destino ya es el propietario, sin historial', async () => {
+      const error = await failure(transfer(car.id, { newOwnerClientId: jose.id, version: 1, reason: REASON }, 'asesor'));
+
+      expect(error.status).toBe(422);
+      expect(problemOf(error).code).toBe('SAME_OWNER');
+      expect((await history(car.id)).body?.items).toEqual([]);
+    });
+
+    it('[US4-AC9] 404 CLIENT_NOT_FOUND si el cliente destino no existe, sin cambios ni historial', async () => {
+      const error = await failure(transfer(car.id, { newOwnerClientId: UNKNOWN_ID, version: 1, reason: REASON }, 'asesor'));
+
+      expect(error.status).toBe(404);
+      expect(problemOf(error).code).toBe('CLIENT_NOT_FOUND');
+      expect((await getVehicle(car.id)).owner.id).toBe(jose.id);
+      expect((await history(car.id)).body?.items).toEqual([]);
+    });
+
+    it('[US4-AC13] 404 NOT_FOUND si el vehículo no existe', async () => {
+      const error = await failure(transfer(UNKNOWN_ID, { newOwnerClientId: carlos.id, version: 1, reason: REASON }, 'asesor'));
+
+      expect(error.status).toBe(404);
+      expect(problemOf(error).code).toBe('NOT_FOUND');
+    });
+
+    it('[US4-AC12] 409 VERSION_CONFLICT con current si la versión está desactualizada', async () => {
+      await patchVehicle(car.id, { version: 1, color: 'Rojo' }, 'asesor');
+
+      const error = await failure(transfer(car.id, { newOwnerClientId: carlos.id, version: 1, reason: REASON }, 'asesor'));
+
+      expect(error.status).toBe(409);
+      expect(problemOf(error).code).toBe('VERSION_CONFLICT');
+      expect(problemOf(error).current).toEqual(await getVehicle(car.id));
+      expect((await getVehicle(car.id)).owner.id).toBe(jose.id);
+    });
+  });
+
+  describe('GET /api/v1/vehicles/{vehicleId}/ownership-history', () => {
+    it('[US4-AC10] 200 con items vacío si nunca cambió de propietario', async () => {
+      const response = await history(car.id);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ items: [] });
+    });
+
+    it('[US4-AC10] lista los cambios del más reciente al más antiguo con anterior, nuevo, actor, rol y motivo', async () => {
+      await transfer(car.id, { newOwnerClientId: carlos.id, version: 1, reason: REASON }, 'asesor', 'Ana Asesora');
+      await transfer(car.id, { newOwnerClientId: jose.id, version: 2 }, 'admin', 'Admin Uno');
+
+      const response = await history(car.id);
+      const items = response.body?.items ?? [];
+
+      expect(items).toHaveLength(2);
+      const [latest, oldest] = items;
+      expect(latest).toEqual(
+        expect.objectContaining({
+          previousOwner: { clientId: carlos.id, displayName: 'Carlos Ruiz', documentNumber: '0912345675' },
+          newOwner: { clientId: jose.id, displayName: 'José Andrés Núñez', documentNumber: '1710034065' },
+          actorName: 'Admin Uno',
+          actorRole: 'admin',
+          reason: null,
+        }),
+      );
+      expect(oldest).toEqual(
+        expect.objectContaining({
+          previousOwner: { clientId: jose.id, displayName: 'José Andrés Núñez', documentNumber: '1710034065' },
+          newOwner: { clientId: carlos.id, displayName: 'Carlos Ruiz', documentNumber: '0912345675' },
+          actorName: 'Ana Asesora',
+          actorRole: 'asesor',
+          reason: REASON,
+        }),
+      );
+      for (const item of items) {
+        expect(typeof item.id).toBe('string');
+        expect(typeof item.actorUserId).toBe('string');
+        expect(new Date(item.occurredAt).toISOString()).toBe(item.occurredAt);
+      }
+      expect(latest.id).not.toBe(oldest.id);
+      expect(Date.parse(latest.occurredAt)).toBeGreaterThanOrEqual(Date.parse(oldest.occurredAt));
+    });
+
+    it('[US4-AC10] los cambios de placa o VIN no aparecen en el historial de propietarios', async () => {
+      await patchVehicle(car.id, { version: 1, plate: 'PBB4321', reason: REASON }, 'asesor');
+
+      expect((await history(car.id)).body?.items).toEqual([]);
+    });
+
+    it('[US4-AC14] 404 NOT_FOUND si el vehículo no existe', async () => {
+      const error = await failure(history(UNKNOWN_ID));
+
+      expect(error.status).toBe(404);
+      expect(problemOf(error).code).toBe('NOT_FOUND');
+    });
+  });
+
+  describe('sin eliminación', () => {
+    it('[US4-AC17] DELETE sobre clientes y vehículos responde 404 y no borra nada', async () => {
+      for (const url of [`/api/v1/clients/${jose.id}`, `/api/v1/vehicles/${car.id}`]) {
+        const error = await failure(firstValueFrom(http.delete(url, { headers: headers('admin') })));
+        expect(error.status).toBe(404);
+      }
+
+      expect((await getClient(jose.id)).id).toBe(jose.id);
+      expect((await getVehicle(car.id)).id).toBe(car.id);
     });
   });
 });

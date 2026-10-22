@@ -24,7 +24,12 @@
 
     @if (current.kind === 'loaded') {
       @let client = current.client;
-      <h1 data-testid="client-name">{{ client.displayName }}</h1>
+      <div class="heading">
+        <h1 data-testid="client-name">{{ client.displayName }}</h1>
+        <a class="action" [routerLink]="['/clients', client.id, 'edit']" data-testid="edit-client">
+          Editar<span class="sr-only"> cliente</span>
+        </a>
+      </div>
 
       <section class="card" aria-labelledby="contact-heading">
         <h2 id="contact-heading">Datos de contacto</h2>

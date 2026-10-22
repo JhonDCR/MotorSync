@@ -39,9 +39,10 @@ Los uuid de los talleres los imprime `db:seed:dev`.
 | 2 | Repetir 1 con el documento con guion | 409 `DOCUMENT_ALREADY_EXISTS` + `existingId` | US2-AC6 |
 | 3 | `POST /api/v1/clients` (B) con el mismo documento | 201 | US2-AC9 |
 | 4 | `POST /api/v1/clients` con `"tenantId": "<B>"` en el body | 400 `VALIDATION_ERROR` | US2-AC10 |
-| 5 | `POST /api/v1/vehicles` (A) con `plate: "pba-1234"`, `bodyType: "sedan"` | 201, `plate: "PBA1234"` | US3-AC1, AC2 |
+| 5 | `POST /api/v1/vehicles` (A) con `plate: "pbc-5678"`, `bodyType: "sedan"` | 201, `plate: "PBC5678"` | US3-AC1, AC2 |
+| 5b | `POST /api/v1/vehicles` (A) con `plate: "pba-1234"` (ya sembrada por `db:seed:dev`) | 409 `PLATE_ALREADY_EXISTS` + `existingId` | US3-AC3 |
 | 6 | `POST /api/v1/vehicles` con `plate: "AB123C"`, `bodyType: "sedan"` | 400 `VALIDATION_ERROR` con `errors[].code = INVALID_PLATE` | US3-AC12 |
-| 7 | `POST /api/v1/vehicles` con `plate: "AB123C"`, `bodyType: "motorcycle"` | 201 | US3-AC13 |
+| 7 | `POST /api/v1/vehicles` (A) con `plate: "AB123C"`, `bodyType: "motorcycle"` (en el seed solo existe en B) | 201 | US3-AC13, US3-AC10 |
 | 8 | `GET /api/v1/vehicles/search?q=ba12` (A) | `PBA1234` en `items` | US1-AC3 |
 | 9 | `GET /api/v1/vehicles/search?q=ba12` (B) | `items: []` | US1-AC8 |
 | 10 | `GET /api/v1/vehicles/<id-de-A>` con TOKEN_B | 404 `NOT_FOUND` | US1-AC9 |

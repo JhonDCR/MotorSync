@@ -22,6 +22,7 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "db:bootstrap": "node dist/scripts/db-bootstrap.js",
     "db:migrate": "node dist/src/database/migrate.js",
+    "db:seed:dev": "node dist/scripts/seed-dev.js",
     "token:dev": "node dist/scripts/issue-dev-token.js"
   },
   "dependencies": {

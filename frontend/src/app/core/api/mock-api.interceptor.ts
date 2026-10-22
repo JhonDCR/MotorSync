@@ -20,6 +20,8 @@ const MOCK_LATENCY_MS = 150;
 const API_PREFIX = '/api/';
 const CLIENTS_PATH = '/api/v1/clients';
 const CLIENT_BY_ID = /^\/api\/v1\/clients\/([^/]+)$/;
+const VEHICLES_PATH = '/api/v1/vehicles';
+const VEHICLE_BY_ID = /^\/api\/v1\/vehicles\/([^/]+)$/;
 
 /** Path of the request URL, without origin, query or fragment. */
 function pathOf(url: string): string {
@@ -60,6 +62,14 @@ function route(req: HttpRequest<unknown>, store: MockApiStore): Observable<HttpE
   const byId = CLIENT_BY_ID.exec(path);
   if (byId !== null && req.method === 'GET') {
     return respond(req, store.getClient(decodeURIComponent(byId[1])));
+  }
+  if (path === VEHICLES_PATH && req.method === 'POST') {
+    const result = store.createVehicle(req.body);
+    return respond(req, result, result.ok ? `${VEHICLES_PATH}/${result.body.id}` : undefined);
+  }
+  const vehicleById = VEHICLE_BY_ID.exec(path);
+  if (vehicleById !== null && req.method === 'GET') {
+    return respond(req, store.getVehicle(decodeURIComponent(vehicleById[1])));
   }
   return respond(req, { ok: false, problem: mockProblem(404, 'NOT_FOUND') });
 }

@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, type AbstractControl, type ValidationErrors, type ValidatorFn } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink, type UrlTree } from '@angular/router';
 import type { Subscription } from 'rxjs';
 import type { ClientCreate, ClientType, DocumentType, FieldErrorCode } from '../../core/api/api.models';
 import { ClientsApiService } from '../../core/api/clients-api.service';
@@ -37,6 +37,14 @@ const requiredText: ValidatorFn = (control: AbstractControl): ValidationErrors |
 function validationMessage(errors: ValidationErrors): string {
   const code = Object.keys(errors)[0] as FieldErrorCode;
   return fieldErrorMessage({ field: '', code, message: 'Valor inválido' });
+}
+
+/**
+ * ?returnTo= is only honored for internal paths (US3-AC9): it starts with "/" and not with "//" or "/\"
+ * (both would be read by the browser as another origin).
+ */
+export function isInternalPath(value: string | null): value is string {
+  return value !== null && value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\');
 }
 
 /** Counterpart of a natural person's document: cedula X ↔ RUC X001 (edge case "posible duplicado"). */
@@ -86,6 +94,9 @@ export class ClientFormPage {
   protected readonly networkError = signal(false);
   protected readonly generalError = signal<string | null>(null);
   protected readonly possibleDuplicate = signal<{ displayName: string; documentNumber: string } | null>(null);
+
+  /** Internal page to come back to after creating the client (for example, the new vehicle form). */
+  protected readonly returnTo: UrlTree | null = this.readReturnTo();
 
   /** Last body sent: "Reintentar" resends exactly the same data. */
   private lastBody: ClientCreate | null = null;
@@ -157,6 +168,12 @@ export class ClientFormPage {
     this.api.create(body).subscribe({
       next: (detail) => {
         this.saving.set(false);
+        if (this.returnTo !== null) {
+          const target = this.router.parseUrl(this.router.serializeUrl(this.returnTo));
+          target.queryParams = { ...target.queryParams, clientId: detail.id };
+          void this.router.navigateByUrl(target);
+          return;
+        }
         void this.router.navigate(['/clients', detail.id]);
       },
       error: (error: unknown) => {
@@ -230,6 +247,18 @@ export class ClientFormPage {
     documentNumber.updateValueAndValidity({ emitEvent: false });
     this.clearPossibleDuplicate();
     this.clearServerError('documentNumber');
+  }
+
+  private readReturnTo(): UrlTree | null {
+    const value = inject(ActivatedRoute).snapshot.queryParamMap.get('returnTo');
+    if (!isInternalPath(value)) {
+      return null;
+    }
+    try {
+      return this.router.parseUrl(value);
+    } catch {
+      return null;
+    }
   }
 
   private clearNotices(): void {

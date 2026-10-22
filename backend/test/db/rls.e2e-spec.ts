@@ -1,7 +1,7 @@
 // T017: database-level RLS of `clients` (principle I, FR-022, FR-023; data-model.md).
 // Connects as motorsync_app (DATABASE_URL) with raw pg, exactly as the API role would, pinning
 // the tenant with set_config('app.tenant_id', ..., true) inside each transaction.
-// T040 will extend this file with `vehicles`.
+// T040 extends it with `vehicles` (US3-AC11, FR-007, FR-021 to FR-023) in a second, independent suite.
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import {
@@ -13,6 +13,7 @@ import {
 
 interface PgError {
   code?: string;
+  constraint?: string;
   message: string;
 }
 
@@ -280,5 +281,481 @@ describe('RLS de clients en la BD (T017, principio I, FR-022, FR-023)', () => {
     expect(rows[0].policyname).toBe('clients_tenant_isolation');
     expect(rows[0].qual).toMatch(/app_current_tenant\(\)/);
     expect(rows[0].with_check).toMatch(/app_current_tenant\(\)/);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// T040: database-level RLS and constraints of `vehicles` (principle I, FR-007, FR-021 to FR-023,
+// US3-AC11; data-model.md "vehicles"). Same pattern as T017, with its own data set.
+// ---------------------------------------------------------------------------------------------
+
+type BodyType = 'sedan' | 'suv' | 'pickup' | 'motorcycle' | 'other';
+
+interface VehicleInput {
+  ownerClientId: string;
+  plate?: string;
+  bodyType?: BodyType;
+  vin?: string | null;
+  tenantId?: string;
+}
+
+let plateSeq = 1000;
+function nextCarPlate(): string {
+  plateSeq += 1;
+  return `PBA${plateSeq}`;
+}
+
+/** INSERT of a vehicle; tenantId undefined lets the column DEFAULT apply. */
+function insertVehicle(
+  client: pg.PoolClient,
+  input: VehicleInput,
+): Promise<pg.QueryResult<{ id: string; tenant_id: string; plate: string }>> {
+  const columns = [
+    'owner_client_id',
+    'plate',
+    'vin',
+    'brand',
+    'model',
+    'year',
+    'color',
+    'body_type',
+    'initial_mileage',
+    'created_by',
+    'updated_by',
+    'updated_by_name',
+  ];
+  const values: unknown[] = [
+    input.ownerClientId,
+    input.plate ?? nextCarPlate(),
+    input.vin ?? null,
+    'Toyota',
+    'Corolla',
+    2020,
+    'Blanco',
+    input.bodyType ?? 'sedan',
+    45000,
+    ACTOR,
+    ACTOR,
+    'Ana Pérez',
+  ];
+  if (input.tenantId !== undefined) {
+    columns.push('tenant_id');
+    values.push(input.tenantId);
+  }
+  const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');
+  return client.query(
+    `INSERT INTO vehicles (${columns.join(', ')}) VALUES (${placeholders}) RETURNING id, tenant_id, plate`,
+    values,
+  );
+}
+
+describe('RLS y restricciones de vehicles en la BD (T040, principio I, FR-007, FR-021 a FR-023)', () => {
+  let ownerA: string;
+  let ownerB: string;
+  const vehicleIdsA: string[] = [];
+  const vehicleIdsB: string[] = [];
+
+  beforeAll(async () => {
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error('DATABASE_URL is not set in the e2e environment');
+    appPool = new pg.Pool({ connectionString: url, max: 3 });
+
+    await truncateBusinessTables();
+    tenantA = await createTenant('Taller A (rls vehicles)');
+    tenantB = await createTenant('Taller B (rls vehicles)');
+
+    // Each tenant creates one owner and two vehicles through the app role, as the API does.
+    ownerA = await asApp(
+      tenantA.id,
+      async (client) => (await insertClient(client)).rows[0].id,
+      'commit',
+    );
+    ownerB = await asApp(
+      tenantB.id,
+      async (client) => (await insertClient(client)).rows[0].id,
+      'commit',
+    );
+    for (const [tenant, owner, ids] of [
+      [tenantA, ownerA, vehicleIdsA],
+      [tenantB, ownerB, vehicleIdsB],
+    ] as const) {
+      await asApp(
+        tenant.id,
+        async (client) => {
+          for (let i = 0; i < 2; i++) {
+            const { rows } = await insertVehicle(client, {
+              ownerClientId: owner,
+            });
+            ids.push(rows[0].id);
+          }
+        },
+        'commit',
+      );
+    }
+  });
+
+  afterAll(async () => {
+    await truncateBusinessTables();
+    await appPool?.end();
+    await closeFixtures();
+  });
+
+  it('[T040][FR-023] sin set_config, SELECT count(*) FROM vehicles = 0 aunque haya filas de A y B', async () => {
+    const count = await asApp(null, async (client) => {
+      const { rows } = await client.query<{ count: string }>(
+        'SELECT count(*) FROM vehicles',
+      );
+      return Number(rows[0].count);
+    });
+    expect(count).toBe(0);
+
+    const { rows } = await appPool.query<{ count: string }>(
+      'SELECT count(*) FROM vehicles',
+    );
+    expect(Number(rows[0].count)).toBe(0);
+  });
+
+  it('[T040][FR-023] con el tenant A solo se ven los vehículos de A, nunca los de B', async () => {
+    const rows = await asApp(tenantA.id, async (client) => {
+      const result = await client.query<{ id: string; tenant_id: string }>(
+        'SELECT id, tenant_id FROM vehicles',
+      );
+      return result.rows;
+    });
+    expect(rows.map((row) => row.id).sort()).toEqual([...vehicleIdsA].sort());
+    expect(rows.every((row) => row.tenant_id === tenantA.id)).toBe(true);
+
+    const byId = await asApp(tenantA.id, async (client) => {
+      const result = await client.query(
+        'SELECT id FROM vehicles WHERE id = ANY($1::uuid[])',
+        [vehicleIdsB],
+      );
+      return result.rowCount;
+    });
+    expect(byId).toBe(0);
+  });
+
+  it('[T040][FR-023] y con el tenant B solo los de B', async () => {
+    const ids = await asApp(tenantB.id, async (client) => {
+      const result = await client.query<{ id: string }>(
+        'SELECT id FROM vehicles',
+      );
+      return result.rows.map((row) => row.id);
+    });
+    expect(ids.sort()).toEqual([...vehicleIdsB].sort());
+  });
+
+  it('[T040][FR-022] sin tenant_id explícito, el INSERT toma el tenant de la transacción (DEFAULT app_current_tenant())', async () => {
+    const tenantId = await asApp(tenantA.id, async (client) => {
+      const { rows } = await insertVehicle(client, { ownerClientId: ownerA });
+      return rows[0].tenant_id;
+    });
+    expect(tenantId).toBe(tenantA.id);
+  });
+
+  it('[T040][Principio I][FR-022] INSERT con tenant_id de B bajo el tenant A falla por WITH CHECK', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) =>
+        insertVehicle(client, { ownerClientId: ownerB, tenantId: tenantB.id }),
+      ),
+    );
+    expect(error.code).toBe('42501');
+    expect(error.message).toMatch(/row-level security/i);
+  });
+
+  it('[T040][Principio I] INSERT sin set_config falla (no hay tenant al que pertenecer)', async () => {
+    await expectPgError(
+      asApp(null, (client) => insertVehicle(client, { ownerClientId: ownerA })),
+    );
+    await expectPgError(
+      asApp(null, (client) =>
+        insertVehicle(client, { ownerClientId: ownerA, tenantId: tenantA.id }),
+      ),
+    );
+  });
+
+  it('[T040][US3-AC11] un vehículo del tenant A con owner_client_id de un cliente de B falla por vehicles_owner_same_tenant_fk', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) =>
+        insertVehicle(client, { ownerClientId: ownerB }),
+      ),
+    );
+    expect(error.code).toBe('23503');
+    expect(error.constraint).toBe('vehicles_owner_same_tenant_fk');
+
+    // And nothing was created for A.
+    const count = await asApp(tenantA.id, async (client) => {
+      const { rows } = await client.query<{ count: string }>(
+        'SELECT count(*) FROM vehicles WHERE owner_client_id = $1',
+        [ownerB],
+      );
+      return Number(rows[0].count);
+    });
+    expect(count).toBe(0);
+  });
+
+  it('[T040][US3-AC11] UPDATE que reasigna un vehículo de A a un cliente de B falla por vehicles_owner_same_tenant_fk', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) =>
+        client.query('UPDATE vehicles SET owner_client_id = $1 WHERE id = $2', [
+          ownerB,
+          vehicleIdsA[0],
+        ]),
+      ),
+    );
+    expect(error.code).toBe('23503');
+    expect(error.constraint).toBe('vehicles_owner_same_tenant_fk');
+  });
+
+  it('[T040][FR-007][US3-AC12] CHECK vehicles_plate_format rechaza AB123C con body_type = sedan', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) =>
+        insertVehicle(client, {
+          ownerClientId: ownerA,
+          plate: 'AB123C',
+          bodyType: 'sedan',
+        }),
+      ),
+    );
+    expect(error.code).toBe('23514');
+    expect(error.constraint).toBe('vehicles_plate_format');
+  });
+
+  it('[T040][FR-007][US3-AC13] CHECK vehicles_plate_format rechaza PBA1234 con body_type = motorcycle y acepta AB123C', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) =>
+        insertVehicle(client, {
+          ownerClientId: ownerA,
+          plate: 'PBA1234',
+          bodyType: 'motorcycle',
+        }),
+      ),
+    );
+    expect(error.code).toBe('23514');
+    expect(error.constraint).toBe('vehicles_plate_format');
+
+    const plate = await asApp(tenantA.id, async (client) => {
+      const { rows } = await insertVehicle(client, {
+        ownerClientId: ownerA,
+        plate: 'AB123C',
+        bodyType: 'motorcycle',
+      });
+      return rows[0].plate;
+    });
+    expect(plate).toBe('AB123C');
+  });
+
+  it('[T040][FR-007][US3-AC14] UPDATE de body_type a motorcycle con placa de auto falla por vehicles_plate_format', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) =>
+        client.query(
+          `UPDATE vehicles SET body_type = 'motorcycle' WHERE id = $1`,
+          [vehicleIdsA[0]],
+        ),
+      ),
+    );
+    expect(error.code).toBe('23514');
+    expect(error.constraint).toBe('vehicles_plate_format');
+  });
+
+  it('[T040][FR-012] la placa es única por taller (vehicles_tenant_plate_key) pero puede repetirse en otro taller', async () => {
+    const plate = nextCarPlate();
+    await asApp(
+      tenantA.id,
+      (client) => insertVehicle(client, { ownerClientId: ownerA, plate }),
+      'commit',
+    );
+
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) =>
+        insertVehicle(client, { ownerClientId: ownerA, plate }),
+      ),
+    );
+    expect(error.code).toBe('23505');
+    expect(error.constraint).toBe('vehicles_tenant_plate_key');
+
+    const inB = await asApp(tenantB.id, async (client) => {
+      const { rows } = await insertVehicle(client, {
+        ownerClientId: ownerB,
+        plate,
+      });
+      return rows[0].plate;
+    });
+    expect(inB).toBe(plate);
+  });
+
+  it('[T040][FR-013] el VIN es único por taller (vehicles_tenant_vin_key) y varios vehículos pueden no tener VIN', async () => {
+    const vin = '1HGCM82633A004352';
+    await asApp(
+      tenantA.id,
+      (client) => insertVehicle(client, { ownerClientId: ownerA, vin }),
+      'commit',
+    );
+
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) =>
+        insertVehicle(client, { ownerClientId: ownerA, vin }),
+      ),
+    );
+    expect(error.code).toBe('23505');
+    expect(error.constraint).toBe('vehicles_tenant_vin_key');
+
+    // The seeded vehicles have vin NULL: the partial index allows many of them.
+    const withoutVin = await asApp(tenantA.id, async (client) => {
+      const { rows } = await client.query<{ count: string }>(
+        'SELECT count(*) FROM vehicles WHERE vin IS NULL',
+      );
+      return Number(rows[0].count);
+    });
+    expect(withoutVin).toBeGreaterThanOrEqual(2);
+
+    const inB = await asApp(tenantB.id, async (client) => {
+      const { rowCount } = await insertVehicle(client, {
+        ownerClientId: ownerB,
+        vin,
+      });
+      return rowCount;
+    });
+    expect(inB).toBe(1);
+  });
+
+  it('[T040][FR-013][US3-AC4] el CHECK de vin rechaza un VIN con I, O o Q', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) =>
+        insertVehicle(client, {
+          ownerClientId: ownerA,
+          vin: '1HGCM82633I004352',
+        }),
+      ),
+    );
+    expect(error.code).toBe('23514');
+  });
+
+  it('[T040][FR-023] UPDATE de un vehículo de B bajo el tenant A no afecta ninguna fila', async () => {
+    const rowCount = await asApp(tenantA.id, async (client) => {
+      const result = await client.query(
+        `UPDATE vehicles SET color = 'Rojo' WHERE id = ANY($1::uuid[])`,
+        [vehicleIdsB],
+      );
+      return result.rowCount;
+    });
+    expect(rowCount).toBe(0);
+  });
+
+  it('[T040][Principio I] UPDATE que mueve un vehículo de A al tenant B falla por WITH CHECK', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) =>
+        client.query('UPDATE vehicles SET tenant_id = $1 WHERE id = $2', [
+          tenantB.id,
+          vehicleIdsA[0],
+        ]),
+      ),
+    );
+    expect(error.code).toBe('42501');
+    expect(error.message).toMatch(/row-level security/i);
+  });
+
+  it('[T040][FR-021][Principio IV] DELETE FROM vehicles → permission denied', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) => client.query('DELETE FROM vehicles')),
+    );
+    expect(error.code).toBe('42501');
+    expect(error.message).toMatch(/permission denied/i);
+  });
+
+  it('[T040][FR-021][Principio IV] TRUNCATE vehicles → permission denied', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) => client.query('TRUNCATE vehicles')),
+    );
+    expect(error.code).toBe('42501');
+    expect(error.message).toMatch(/permission denied/i);
+  });
+
+  it('[T040] motorsync_app tiene exactamente SELECT, INSERT y UPDATE sobre vehicles', async () => {
+    const { rows } = await appPool.query<Record<string, boolean>>(
+      `SELECT has_table_privilege('motorsync_app', 'public.vehicles', 'SELECT')     AS "select",
+              has_table_privilege('motorsync_app', 'public.vehicles', 'INSERT')     AS "insert",
+              has_table_privilege('motorsync_app', 'public.vehicles', 'UPDATE')     AS "update",
+              has_table_privilege('motorsync_app', 'public.vehicles', 'DELETE')     AS "delete",
+              has_table_privilege('motorsync_app', 'public.vehicles', 'TRUNCATE')   AS "truncate",
+              has_table_privilege('motorsync_app', 'public.vehicles', 'REFERENCES') AS "references",
+              has_table_privilege('motorsync_app', 'public.vehicles', 'TRIGGER')    AS "trigger"`,
+    );
+    expect(rows[0]).toEqual({
+      select: true,
+      insert: true,
+      update: true,
+      delete: false,
+      truncate: false,
+      references: false,
+      trigger: false,
+    });
+  });
+
+  it('[T040][Principio I] motorsync_app no es dueño de vehicles', async () => {
+    const { rows } = await appPool.query<{ owner: string }>(
+      `SELECT pg_get_userbyid(relowner) AS owner FROM pg_class WHERE oid = 'public.vehicles'::regclass`,
+    );
+    expect(rows[0].owner).toBe('motorsync_migrator');
+  });
+
+  it('[T040][Principio I] vehicles tiene RLS habilitada y forzada (relrowsecurity y relforcerowsecurity)', async () => {
+    const { rows } = await appPool.query<{
+      relrowsecurity: boolean;
+      relforcerowsecurity: boolean;
+    }>(
+      `SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = 'public.vehicles'::regclass`,
+    );
+    expect(rows[0]).toEqual({
+      relrowsecurity: true,
+      relforcerowsecurity: true,
+    });
+  });
+
+  it('[T040][Principio I] la política vehicles_tenant_isolation existe y filtra por app_current_tenant()', async () => {
+    const { rows } = await appPool.query<{
+      policyname: string;
+      qual: string;
+      with_check: string;
+    }>(
+      `SELECT policyname, qual, with_check FROM pg_policies
+        WHERE schemaname = 'public' AND tablename = 'vehicles'`,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].policyname).toBe('vehicles_tenant_isolation');
+    expect(rows[0].qual).toMatch(/app_current_tenant\(\)/);
+    expect(rows[0].with_check).toMatch(/app_current_tenant\(\)/);
+  });
+
+  it('[T040] existen los índices de data-model.md sobre vehicles', async () => {
+    const { rows } = await appPool.query<{
+      indexname: string;
+      indexdef: string;
+    }>(
+      `SELECT indexname, indexdef FROM pg_indexes
+        WHERE schemaname = 'public' AND tablename = 'vehicles'`,
+    );
+    const byName = new Map(rows.map((row) => [row.indexname, row.indexdef]));
+    expect([...byName.keys()]).toEqual(
+      expect.arrayContaining([
+        'vehicles_tenant_id_idx',
+        'vehicles_tenant_plate_key',
+        'vehicles_tenant_vin_key',
+        'vehicles_tenant_plate_trgm_idx',
+        'vehicles_tenant_owner_idx',
+      ]),
+    );
+    expect(byName.get('vehicles_tenant_plate_key')).toMatch(
+      /UNIQUE INDEX .*\(tenant_id, plate\)/,
+    );
+    expect(byName.get('vehicles_tenant_vin_key')).toMatch(
+      /UNIQUE INDEX .*\(tenant_id, vin\) WHERE \(vin IS NOT NULL\)/,
+    );
+    expect(byName.get('vehicles_tenant_owner_idx')).toMatch(
+      /\(tenant_id, owner_client_id\)/,
+    );
+    expect(byName.get('vehicles_tenant_plate_trgm_idx')).toMatch(
+      /USING gin .*gin_trgm_ops/,
+    );
   });
 });

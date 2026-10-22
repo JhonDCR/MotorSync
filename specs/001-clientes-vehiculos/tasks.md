@@ -143,7 +143,7 @@ Rama sugerida: `feat/001-clientes-vehiculos` (o una rama de PR por corte, según
 
 **Independent Test**: quickstart §2, filas 8 a 10, y §5; e2e `backend/test/vehicles-search.e2e-spec.ts`.
 
-- [ ] T053 [US1] E2E en `backend/test/vehicles-search.e2e-spec.ts`. Cubre:
+- [x] T053 [US1] E2E en `backend/test/vehicles-search.e2e-spec.ts`. Cubre:
   - US1-AC1: `PBA1234` es el primero, con todos los campos del vehículo y del propietario del esquema `VehicleSearchResponse`.
   - US1-AC2: `pba-1234`, `PBA 1234` y ` pba1234 ` dan el mismo resultado.
   - US1-AC3: `BA12` → `PBA1234` y `PBA1299`, sin `GYE0123`.
@@ -153,7 +153,7 @@ Rama sugerida: `feat/001-clientes-vehiculos` (o una rama de PR por corte, según
   - US1-AC7: VIN completo → el vehículo; un fragmento de VIN no coincide por VIN.
   - US1-AC8: `PBA1234` y `BA12` solo en B → `items: []` para A, con la misma respuesta que para una placa inexistente.
   - tester
-- [ ] T054 [US1] Implementar `searchVehicles` en `backend/src/vehicles/vehicles.service.ts` (consulta de referencia de data-model.md, con filtro explícito `tenant_id = app_current_tenant()`, `LIMIT 21` y `OR v.vin = $1` solo si el término tiene forma de VIN) y `GET /vehicles/search` en `backend/src/vehicles/vehicles.controller.ts` (declarado antes de `:vehicleId`); mapper tipado del resultado de `manager.query()` con el comentario que justifica el `any` del borde — implementer-backend
+- [x] T054 [US1] Implementar `searchVehicles` en `backend/src/vehicles/vehicles.service.ts` (consulta de referencia de data-model.md, con filtro explícito `tenant_id = app_current_tenant()`, `LIMIT 21` y `OR v.vin = $1` solo si el término tiene forma de VIN) y `GET /vehicles/search` en `backend/src/vehicles/vehicles.controller.ts` (declarado antes de `:vehicleId`); mapper tipado del resultado de `manager.query()` con el comentario que justifica el `any` del borde — implementer-backend
 - [ ] T055 [US1] Pruebas de `frontend/src/app/features/vehicles/vehicle-search.page.spec.ts`. Cubre US1-AC1 (tarjeta con vehículo y propietario), US1-AC2 (normaliza antes de buscar), US1-AC4 (aviso de más resultados), US1-AC5 (con menos de 2 caracteres muestra "Escriba al menos 2 caracteres" y no llama a la API), US1-AC6 ("No se encontró ningún vehículo"; si el término normalizado tiene forma de placa completa de auto o moto, además "Registrar vehículo", que navega a `vehicles/new?plate=<normalizada>`; con un fragmento solo se muestra el mensaje), US1-AC8 (para el usuario, una placa de otro taller se ve igual que una inexistente), FR-026 (es la ruta `''`; busca mientras se escribe con `debounceTime(250)` + `switchMap`) y que se puede buscar por VIN — tester
 - [ ] T056 [US1] Implementar `frontend/src/app/features/vehicles/vehicle-search.page.ts` (+ plantilla y estilos; campo grande con `inputmode="text"` y `autocapitalize="characters"`) como ruta `''` en `frontend/src/app/app.routes.ts` — implementer-frontend
 - [ ] T057 [P] [US1] Ampliar `frontend/src/app/core/api/mock-api.interceptor.spec.ts` con la parte de vehículos: `GET /vehicles/search` (orden, `hasMore`, 400), `POST /vehicles` (201, 400 `INVALID_PLATE`, 409) y `GET /vehicles/{id}` (200, 404) — tester

@@ -25,7 +25,9 @@ export class TenantTransactionInterceptor implements NestInterceptor {
     context: ExecutionContext,
     next: CallHandler,
   ): Observable<unknown> | Promise<Observable<unknown>> {
-    const user = context.switchToHttp().getRequest<AuthenticatedRequest>().user;
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const { user } = request;
+    const ip = request.ip ?? null;
     if (!user) throw new UnauthorizedException();
 
     return defer(async () => {
@@ -35,7 +37,7 @@ export class TenantTransactionInterceptor implements NestInterceptor {
         await runner.startTransaction();
         await runner.query("SELECT set_config('app.tenant_id', $1, true)", [user.tenantId]);
         const result = await tenantStorage.run(
-          { manager: runner.manager, tenantId: user.tenantId, user },
+          { manager: runner.manager, tenantId: user.tenantId, user, ip },
           () => lastValueFrom(next.handle(), { defaultValue: undefined }),
         );
         await runner.commitTransaction();

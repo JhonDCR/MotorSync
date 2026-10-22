@@ -2,6 +2,7 @@
 // Connects as motorsync_app (DATABASE_URL) with raw pg, exactly as the API role would, pinning
 // the tenant with set_config('app.tenant_id', ..., true) inside each transaction.
 // T040 extends it with `vehicles` (US3-AC11, FR-007, FR-021 to FR-023) in a second, independent suite.
+// T064 adds `audit_log` (principle IV, FR-019, FR-020, US4-AC10) in a third, independent suite.
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import {
@@ -756,6 +757,381 @@ describe('RLS y restricciones de vehicles en la BD (T040, principio I, FR-007, F
     );
     expect(byName.get('vehicles_tenant_plate_trgm_idx')).toMatch(
       /USING gin .*gin_trgm_ops/,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// T064: database-level RLS, privileges, immutability and constraints of `audit_log` (principle I,
+// principle IV, FR-019, FR-020, FR-022, FR-023, US4-AC10; data-model.md "audit_log"). Same
+// pattern as T017 and T040, with its own data set. The migrator pool is only used to prove that
+// even the table owner cannot UPDATE or DELETE (trigger audit_log_no_update_delete).
+// ---------------------------------------------------------------------------------------------
+
+interface AuditInput {
+  actorRole?: string;
+  reason?: string | null;
+  tenantId?: string;
+}
+
+const VALID_REASON = 'Cambio solicitado por el propietario';
+
+/** INSERT of an audit record; tenantId undefined lets the column DEFAULT apply. */
+function insertAudit(
+  client: pg.PoolClient,
+  input: AuditInput = {},
+): Promise<pg.QueryResult<{ id: string; tenant_id: string; channel: string; occurred_at: Date }>> {
+  const columns = [
+    'actor_user_id',
+    'actor_name',
+    'actor_role',
+    'action',
+    'entity_type',
+    'entity_id',
+    'before',
+    'after',
+    'reason',
+  ];
+  const values: unknown[] = [
+    ACTOR,
+    'Ana Pérez',
+    input.actorRole ?? 'asesor',
+    'vehicle.plate_changed',
+    'vehicle',
+    randomUUID(),
+    JSON.stringify({ plate: 'PBA1234' }),
+    JSON.stringify({ plate: 'PBC5678' }),
+    input.reason === undefined ? VALID_REASON : input.reason,
+  ];
+  if (input.tenantId !== undefined) {
+    columns.push('tenant_id');
+    values.push(input.tenantId);
+  }
+  const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');
+  return client.query(
+    `INSERT INTO audit_log (${columns.join(', ')}) VALUES (${placeholders})
+     RETURNING id, tenant_id, channel, occurred_at`,
+    values,
+  );
+}
+
+describe('RLS, inmutabilidad y restricciones de audit_log en la BD (T064, principios I y IV, FR-019, FR-020, US4-AC10)', () => {
+  let migratorPool: pg.Pool;
+  const auditIdsA: string[] = [];
+  const auditIdsB: string[] = [];
+
+  /** Same as asApp, but as motorsync_migrator (owner of the table, NOBYPASSRLS); always rolls back. */
+  async function asMigrator<T>(
+    tenantId: string,
+    fn: (client: pg.PoolClient) => Promise<T>,
+  ): Promise<T> {
+    const client = await migratorPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [tenantId]);
+      return await fn(client);
+    } finally {
+      await client.query('ROLLBACK');
+      client.release();
+    }
+  }
+
+  beforeAll(async () => {
+    const url = process.env.DATABASE_URL;
+    const migratorUrl = process.env.DATABASE_MIGRATOR_URL;
+    if (!url) throw new Error('DATABASE_URL is not set in the e2e environment');
+    if (!migratorUrl) throw new Error('DATABASE_MIGRATOR_URL is not set in the e2e environment');
+    appPool = new pg.Pool({ connectionString: url, max: 3 });
+    migratorPool = new pg.Pool({ connectionString: migratorUrl, max: 2 });
+
+    await truncateBusinessTables();
+    tenantA = await createTenant('Taller A (rls audit_log)');
+    tenantB = await createTenant('Taller B (rls audit_log)');
+
+    // Each tenant writes two records through the app role, as AuditService does.
+    for (const [tenant, ids] of [
+      [tenantA, auditIdsA],
+      [tenantB, auditIdsB],
+    ] as const) {
+      await asApp(
+        tenant.id,
+        async (client) => {
+          for (let i = 0; i < 2; i++) {
+            const { rows } = await insertAudit(client);
+            ids.push(rows[0].id);
+          }
+        },
+        'commit',
+      );
+    }
+  });
+
+  afterAll(async () => {
+    await truncateBusinessTables();
+    await migratorPool?.end();
+    await appPool?.end();
+    await closeFixtures();
+  });
+
+  it('[T064][FR-023] sin set_config, SELECT count(*) FROM audit_log = 0 aunque haya filas de A y B', async () => {
+    const count = await asApp(null, async (client) => {
+      const { rows } = await client.query<{ count: string }>('SELECT count(*) FROM audit_log');
+      return Number(rows[0].count);
+    });
+    expect(count).toBe(0);
+
+    const { rows } = await appPool.query<{ count: string }>('SELECT count(*) FROM audit_log');
+    expect(Number(rows[0].count)).toBe(0);
+  });
+
+  it('[T064][FR-023] con el tenant A solo se ven los registros de A, nunca los de B', async () => {
+    const rows = await asApp(tenantA.id, async (client) => {
+      const result = await client.query<{ id: string; tenant_id: string }>(
+        'SELECT id, tenant_id FROM audit_log',
+      );
+      return result.rows;
+    });
+    expect(rows.map((row) => row.id).sort()).toEqual([...auditIdsA].sort());
+    expect(rows.every((row) => row.tenant_id === tenantA.id)).toBe(true);
+
+    const byId = await asApp(tenantA.id, async (client) => {
+      const result = await client.query('SELECT id FROM audit_log WHERE id = ANY($1::uuid[])', [
+        auditIdsB,
+      ]);
+      return result.rowCount;
+    });
+    expect(byId).toBe(0);
+  });
+
+  it('[T064][FR-023] y con el tenant B solo los de B', async () => {
+    const ids = await asApp(tenantB.id, async (client) => {
+      const result = await client.query<{ id: string }>('SELECT id FROM audit_log');
+      return result.rows.map((row) => row.id);
+    });
+    expect(ids.sort()).toEqual([...auditIdsB].sort());
+  });
+
+  it('[T064][FR-022][FR-020] motorsync_app puede INSERT: sin tenant_id toma el de la transacción, con channel web y occurred_at', async () => {
+    const row = await asApp(tenantA.id, async (client) => (await insertAudit(client)).rows[0]);
+    expect(row.tenant_id).toBe(tenantA.id);
+    expect(row.channel).toBe('web');
+    expect(row.occurred_at).toBeInstanceOf(Date);
+  });
+
+  it('[T064][Principio I][FR-022] INSERT con tenant_id de B bajo el tenant A falla por WITH CHECK', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) => insertAudit(client, { tenantId: tenantB.id })),
+    );
+    expect(error.code).toBe('42501');
+    expect(error.message).toMatch(/row-level security/i);
+  });
+
+  it('[T064][Principio I] INSERT sin set_config falla (no hay tenant al que pertenecer)', async () => {
+    await expectPgError(asApp(null, (client) => insertAudit(client)));
+    await expectPgError(asApp(null, (client) => insertAudit(client, { tenantId: tenantA.id })));
+  });
+
+  it('[T064][Principio IV][US4-AC10] UPDATE de audit_log como motorsync_app → permission denied', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) =>
+        client.query(`UPDATE audit_log SET reason = 'Motivo alterado después' WHERE id = $1`, [
+          auditIdsA[0],
+        ]),
+      ),
+    );
+    expect(error.code).toBe('42501');
+    expect(error.message).toMatch(/permission denied/i);
+  });
+
+  it('[T064][Principio IV][US4-AC10] DELETE FROM audit_log como motorsync_app → permission denied', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) => client.query('DELETE FROM audit_log')),
+    );
+    expect(error.code).toBe('42501');
+    expect(error.message).toMatch(/permission denied/i);
+  });
+
+  it('[T064][Principio IV] TRUNCATE audit_log como motorsync_app → permission denied', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) => client.query('TRUNCATE audit_log')),
+    );
+    expect(error.code).toBe('42501');
+    expect(error.message).toMatch(/permission denied/i);
+  });
+
+  it('[T064][Principio IV] motorsync_app tiene exactamente SELECT e INSERT sobre audit_log', async () => {
+    const { rows } = await appPool.query<Record<string, boolean>>(
+      `SELECT has_table_privilege('motorsync_app', 'public.audit_log', 'SELECT')     AS "select",
+              has_table_privilege('motorsync_app', 'public.audit_log', 'INSERT')     AS "insert",
+              has_table_privilege('motorsync_app', 'public.audit_log', 'UPDATE')     AS "update",
+              has_table_privilege('motorsync_app', 'public.audit_log', 'DELETE')     AS "delete",
+              has_table_privilege('motorsync_app', 'public.audit_log', 'TRUNCATE')   AS "truncate",
+              has_table_privilege('motorsync_app', 'public.audit_log', 'REFERENCES') AS "references",
+              has_table_privilege('motorsync_app', 'public.audit_log', 'TRIGGER')    AS "trigger"`,
+    );
+    expect(rows[0]).toEqual({
+      select: true,
+      insert: true,
+      update: false,
+      delete: false,
+      truncate: false,
+      references: false,
+      trigger: false,
+    });
+  });
+
+  it('[T064][Principio IV][US4-AC10] ni el dueño (motorsync_migrator) puede hacer UPDATE: lo impide el trigger', async () => {
+    const error = await expectPgError(
+      asMigrator(tenantA.id, (client) =>
+        client.query(`UPDATE audit_log SET reason = 'Motivo alterado después' WHERE id = $1`, [
+          auditIdsA[0],
+        ]),
+      ),
+    );
+    expect(error.message).toMatch(/audit_log is append-only/);
+  });
+
+  it('[T064][Principio IV][US4-AC10] ni el dueño (motorsync_migrator) puede hacer DELETE: lo impide el trigger', async () => {
+    const error = await expectPgError(
+      asMigrator(tenantA.id, (client) =>
+        client.query('DELETE FROM audit_log WHERE id = $1', [auditIdsA[0]]),
+      ),
+    );
+    expect(error.message).toMatch(/audit_log is append-only/);
+
+    // The record is still there, untouched.
+    const reason = await asApp(tenantA.id, async (client) => {
+      const { rows } = await client.query<{ reason: string }>(
+        'SELECT reason FROM audit_log WHERE id = $1',
+        [auditIdsA[0]],
+      );
+      return rows[0]?.reason;
+    });
+    expect(reason).toBe(VALID_REASON);
+  });
+
+  it('[T064][Principio IV] el trigger audit_log_no_update_delete existe, es BEFORE UPDATE OR DELETE por fila y está habilitado', async () => {
+    const { rows } = await appPool.query<{
+      tgname: string;
+      tgenabled: string;
+      tgtype: number;
+      function: string;
+    }>(
+      `SELECT t.tgname, t.tgenabled, t.tgtype, p.proname AS function
+         FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid
+        WHERE t.tgrelid = 'public.audit_log'::regclass AND NOT t.tgisinternal`,
+    );
+    const trigger = rows.find((row) => row.tgname === 'audit_log_no_update_delete');
+    expect(trigger, 'trigger audit_log_no_update_delete').toBeDefined();
+    expect(trigger?.function).toBe('audit_log_immutable');
+    expect(trigger?.tgenabled).toBe('O');
+    // tgtype bits: 1 ROW, 2 BEFORE, 4 INSERT, 8 DELETE, 16 UPDATE.
+    const tgtype = trigger?.tgtype ?? 0;
+    expect(tgtype & 1).toBe(1);
+    expect(tgtype & 2).toBe(2);
+    expect(tgtype & 8).toBe(8);
+    expect(tgtype & 16).toBe(16);
+    expect(tgtype & 4).toBe(0);
+  });
+
+  it('[T064][FR-019][FR-020] CHECK audit_log_asesor_reason rechaza actor_role = asesor sin reason', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) => insertAudit(client, { actorRole: 'asesor', reason: null })),
+    );
+    expect(error.code).toBe('23514');
+    expect(error.constraint).toBe('audit_log_asesor_reason');
+  });
+
+  it('[T064][FR-019][US4-AC16] un admin sin reason se acepta', async () => {
+    const rowCount = await asApp(tenantA.id, async (client) => {
+      const result = await insertAudit(client, { actorRole: 'admin', reason: null });
+      return result.rowCount;
+    });
+    expect(rowCount).toBe(1);
+  });
+
+  it('[T064][FR-019] reason de 9 caracteres → rechazado por el CHECK de largo (asesor y admin)', async () => {
+    for (const actorRole of ['asesor', 'admin']) {
+      const error = await expectPgError(
+        asApp(tenantA.id, (client) => insertAudit(client, { actorRole, reason: 'a'.repeat(9) })),
+      );
+      expect(error.code).toBe('23514');
+      expect(error.constraint).toBe('audit_log_reason_check');
+    }
+  });
+
+  it('[T064][FR-019] reason de 501 caracteres → rechazado por el CHECK de largo (asesor y admin)', async () => {
+    for (const actorRole of ['asesor', 'admin']) {
+      const error = await expectPgError(
+        asApp(tenantA.id, (client) =>
+          insertAudit(client, { actorRole, reason: 'a'.repeat(501) }),
+        ),
+      );
+      expect(error.code).toBe('23514');
+      expect(error.constraint).toBe('audit_log_reason_check');
+    }
+  });
+
+  it('[T064][FR-019] reason de 10 y de 500 caracteres se aceptan', async () => {
+    const counts = await asApp(tenantA.id, async (client) => [
+      (await insertAudit(client, { reason: 'a'.repeat(10) })).rowCount,
+      (await insertAudit(client, { reason: 'a'.repeat(500) })).rowCount,
+    ]);
+    expect(counts).toEqual([1, 1]);
+  });
+
+  it('[T064][FR-020] actor_role fuera de asesor o admin se rechaza por CHECK', async () => {
+    const error = await expectPgError(
+      asApp(tenantA.id, (client) => insertAudit(client, { actorRole: 'mecanico' })),
+    );
+    expect(error.code).toBe('23514');
+    expect(error.constraint).toBe('audit_log_actor_role_check');
+  });
+
+  it('[T064][Principio I] motorsync_app no es dueño de audit_log', async () => {
+    const { rows } = await appPool.query<{ owner: string }>(
+      `SELECT pg_get_userbyid(relowner) AS owner FROM pg_class WHERE oid = 'public.audit_log'::regclass`,
+    );
+    expect(rows[0].owner).toBe('motorsync_migrator');
+  });
+
+  it('[T064][Principio I] audit_log tiene RLS habilitada y forzada (relrowsecurity y relforcerowsecurity)', async () => {
+    const { rows } = await appPool.query<{
+      relrowsecurity: boolean;
+      relforcerowsecurity: boolean;
+    }>(
+      `SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = 'public.audit_log'::regclass`,
+    );
+    expect(rows[0]).toEqual({ relrowsecurity: true, relforcerowsecurity: true });
+  });
+
+  it('[T064][Principio I] la política audit_log_tenant_isolation existe y filtra por app_current_tenant()', async () => {
+    const { rows } = await appPool.query<{
+      policyname: string;
+      qual: string;
+      with_check: string;
+    }>(
+      `SELECT policyname, qual, with_check FROM pg_policies
+        WHERE schemaname = 'public' AND tablename = 'audit_log'`,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].policyname).toBe('audit_log_tenant_isolation');
+    expect(rows[0].qual).toMatch(/app_current_tenant\(\)/);
+    expect(rows[0].with_check).toMatch(/app_current_tenant\(\)/);
+  });
+
+  it('[T064] existen los índices audit_log_tenant_id_idx y audit_log_entity_idx de data-model.md', async () => {
+    const { rows } = await appPool.query<{ indexname: string; indexdef: string }>(
+      `SELECT indexname, indexdef FROM pg_indexes
+        WHERE schemaname = 'public' AND tablename = 'audit_log'`,
+    );
+    const byName = new Map(rows.map((row) => [row.indexname, row.indexdef]));
+    expect([...byName.keys()]).toEqual(
+      expect.arrayContaining(['audit_log_tenant_id_idx', 'audit_log_entity_idx']),
+    );
+    expect(byName.get('audit_log_tenant_id_idx')).toMatch(/\(tenant_id\)/);
+    expect(byName.get('audit_log_entity_idx')).toMatch(
+      /\(tenant_id, entity_type, entity_id, occurred_at DESC\)/,
     );
   });
 });

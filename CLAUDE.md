@@ -62,6 +62,8 @@ La sesión principal es el **leader**: lee `specs/<feature>/tasks.md`, delega ca
 4. `reviewer`: revisa el diff (solo lectura) contra la spec y la constitución. Si pide cambios, se vuelve al paso 3.
 5. El leader propone el commit y el PR. **✋ El merge lo aprueba el compañero en GitHub.**
 
+Después de cada edición, `.claude/hooks/post-edit-check.mjs` corre lint y las pruebas relacionadas. Para el `tester`, una prueba en rojo llega como contexto ("rojo esperado") y no como fallo; un error de lint sí bloquea a todos los roles.
+
 Los permisos de cada rol los impone `.claude/hooks/guard-paths.mjs`. Si un hook bloquea una acción, no lo rodees (con Bash, renombrando o de otra forma): reporta el bloqueo al leader.
 
 ## Lecciones

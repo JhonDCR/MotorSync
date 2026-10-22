@@ -1,0 +1,79 @@
+<main class="client-detail">
+  <div aria-live="polite">
+    @switch (state().kind) {
+      @case ('loading') {
+        <p class="status" role="status">Cargando cliente…</p>
+      }
+      @case ('error') {
+        <div class="notice notice-error" role="alert" data-testid="load-error">
+          <p>No se pudo cargar el cliente. Revise la conexión e inténtelo de nuevo.</p>
+          <button type="button" class="action" data-testid="retry" (click)="retry()">Reintentar</button>
+        </div>
+      }
+    }
+  </div>
+
+  @if (state(); as current) {
+    @if (current.kind === 'not-found') {
+      <div class="notice notice-error" role="alert">
+        <h1 data-testid="not-found">{{ current.message }}</h1>
+        <p>Puede que no exista o que pertenezca a otro taller.</p>
+        <a class="action" routerLink="/clients" data-testid="back-to-search">Volver a la búsqueda</a>
+      </div>
+    }
+
+    @if (current.kind === 'loaded') {
+      @let client = current.client;
+      <h1 data-testid="client-name">{{ client.displayName }}</h1>
+
+      <section class="card" aria-labelledby="contact-heading">
+        <h2 id="contact-heading">Datos de contacto</h2>
+        <dl class="facts">
+          <div>
+            <dt>Documento</dt>
+            <dd data-testid="client-document">{{ client.documentNumber }}</dd>
+          </div>
+          <div>
+            <dt>Teléfono</dt>
+            <dd data-testid="client-phone">{{ client.phone }}</dd>
+          </div>
+          <div>
+            <dt>Correo electrónico</dt>
+            <dd data-testid="client-email">{{ client.email ?? 'Sin correo' }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card" aria-labelledby="vehicles-heading">
+        <h2 id="vehicles-heading">Vehículos</h2>
+        @if (client.vehicles.length === 0) {
+          <p data-testid="no-vehicles">Este cliente no tiene vehículos registrados</p>
+        } @else {
+          <ul class="vehicle-list">
+            @for (vehicle of client.vehicles; track vehicle.id) {
+              <li>
+                <a class="vehicle" [routerLink]="['/vehicles', vehicle.id]" data-testid="vehicle-item">
+                  <span class="plate">{{ vehicle.plate }}</span>
+                  <span>{{ vehicle.brand }} {{ vehicle.model }} · {{ vehicle.year }}</span>
+                </a>
+              </li>
+            }
+          </ul>
+        }
+        <a
+          class="action"
+          routerLink="/vehicles/new"
+          [queryParams]="{ clientId: client.id }"
+          data-testid="register-vehicle"
+        >
+          Registrar vehículo
+        </a>
+      </section>
+
+      <p class="stamp" data-testid="last-modified">
+        Última modificación por {{ client.updatedByName }} el
+        <time [attr.datetime]="client.updatedAt">{{ client.updatedAt | date: 'dd/MM/yyyy HH:mm' }}</time>
+      </p>
+    }
+  }
+</main>

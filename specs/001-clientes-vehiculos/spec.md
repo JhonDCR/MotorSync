@@ -70,10 +70,10 @@ El asesor registra un cliente nuevo, persona natural o empresa, con su documento
 3. **US2-AC3**: **Given** el asesor registra una persona natural extranjera, **When** informa tipo pasaporte con un número alfanumérico de 5 a 20 caracteres, **Then** el cliente queda registrado sin validación de dígito verificador.
 4. **US2-AC4**: **Given** el asesor informa una cédula que no tiene 10 dígitos o cuyo dígito verificador no es válido, **When** intenta guardar, **Then** el sistema rechaza el registro e indica "Cédula inválida" junto al campo.
 5. **US2-AC5**: **Given** el asesor informa un RUC que no tiene 13 dígitos, no termina en `001` o no supera la validación de su tipo, **When** intenta guardar, **Then** el sistema rechaza el registro e indica "RUC inválido" junto al campo.
-6. **US2-AC6**: **Given** ya existe en el taller un cliente con el documento `1712345678`, **When** el asesor intenta registrar otro cliente con ese documento (con o sin espacios o guiones), **Then** el sistema rechaza el registro, indica que el documento ya está registrado y ofrece abrir la ficha del cliente existente.
+6. **US2-AC6**: **Given** ya existe en el taller un cliente con el documento `1712345675`, **When** el asesor intenta registrar otro cliente con ese documento (con o sin espacios o guiones), **Then** el sistema rechaza el registro, indica que el documento ya está registrado y ofrece abrir la ficha del cliente existente.
 7. **US2-AC7**: **Given** el asesor informa un correo con formato inválido o un teléfono con menos de 7 o más de 15 dígitos, **When** intenta guardar, **Then** el sistema rechaza el registro e indica el campo con error.
 8. **US2-AC8**: **Given** faltan campos obligatorios (tipo de cliente, tipo y número de documento, nombre o razón social, teléfono), **When** el asesor intenta guardar, **Then** el sistema no guarda y marca cada campo faltante.
-9. **US2-AC9 (multi-tenant)**: **Given** el documento `1712345678` ya está registrado en el taller B, **When** un asesor del taller A registra un cliente con ese documento, **Then** el registro se guarda en el taller A sin error y sin revelar que el documento existe en otro taller.
+9. **US2-AC9 (multi-tenant)**: **Given** el documento `1712345675` ya está registrado en el taller B, **When** un asesor del taller A registra un cliente con ese documento, **Then** el registro se guarda en el taller A sin error y sin revelar que el documento existe en otro taller.
 10. **US2-AC10 (multi-tenant)**: **Given** un asesor del taller A registra un cliente, **When** un usuario del taller B busca ese documento o nombre, **Then** no obtiene ningún resultado. El taller del cliente lo determina siempre la sesión del usuario, nunca un dato enviado en el formulario.
 
 ---
@@ -115,7 +115,7 @@ El asesor busca clientes por documento o por nombre, ve la lista de vehículos d
 
 **Acceptance Scenarios**:
 
-1. **US4-AC1**: **Given** el cliente con documento `1712345678` está registrado, **When** el asesor busca `1712345678` (o `171234567-8`), **Then** el sistema muestra ese cliente como primer resultado.
+1. **US4-AC1**: **Given** el cliente con documento `1712345675` está registrado, **When** el asesor busca `1712345675` (o `171234567-5`), **Then** el sistema muestra ese cliente como primer resultado.
 2. **US4-AC2**: **Given** existen los clientes "José Andrés Núñez" y "Maria Nunez", **When** el asesor busca `nunez`, **Then** el sistema muestra ambos: la búsqueda por nombre no distingue mayúsculas ni tildes y encuentra el fragmento en cualquier parte del nombre o razón social.
 3. **US4-AC3**: **Given** el asesor abre la ficha de un cliente, **When** se carga, **Then** muestra sus datos de contacto y la lista de los vehículos de los que es propietario actual (placa, marca, modelo, año), y desde cada vehículo se puede abrir su ficha.
 4. **US4-AC4**: **Given** el asesor edita el teléfono, el correo o el nombre de un cliente con valores válidos, **When** guarda, **Then** los cambios quedan registrados y la ficha muestra quién hizo la última modificación y cuándo.

@@ -358,7 +358,7 @@ components:
       properties:
         clientType: { $ref: '#/components/schemas/ClientType' }
         documentType: { $ref: '#/components/schemas/DocumentType' }
-        documentNumber: { type: string, maxLength: 30, example: '171234567-8' }
+        documentNumber: { type: string, maxLength: 30, example: '171234567-5' }
         firstNames: { type: string, maxLength: 100, description: Obligatorio si `natural`. }
         lastNames: { type: string, maxLength: 100, description: Obligatorio si `natural`. }
         businessName: { type: string, maxLength: 200, description: Obligatorio si `company`. }

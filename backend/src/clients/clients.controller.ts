@@ -1,7 +1,11 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { API_PREFIX } from '../app.setup.js';
-import { ClientsService, type ClientDetail } from './clients.service.js';
+import {
+  ClientsService,
+  type ClientDetail,
+  type ClientSearchResponse,
+} from './clients.service.js';
 import { CreateClientDto } from './dto/create-client.dto.js';
 
 @Controller('clients')
@@ -18,6 +22,15 @@ export class ClientsController {
     const client = await this.clients.create(dto);
     res.setHeader('Location', `/${API_PREFIX}/clients/${client.id}`);
     return client;
+  }
+
+  /**
+   * GET /api/v1/clients/search?q= (US4). Declared before :clientId so that "search" is never
+   * taken as a client id. 400 SEARCH_TERM_TOO_SHORT when q is missing or shorter than 2.
+   */
+  @Get('search')
+  search(@Query('q') q?: string | string[]): Promise<ClientSearchResponse> {
+    return this.clients.search(q);
   }
 
   /** GET /api/v1/clients/{clientId}: 404 NOT_FOUND for missing, foreign or malformed ids. */

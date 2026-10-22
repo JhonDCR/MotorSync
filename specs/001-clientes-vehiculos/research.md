@@ -165,3 +165,14 @@ Fase 0 del plan. Cada decisión sigue el formato Decision / Rationale / Alternat
 **Rationale**: con tres o cuatro pantallas no hace falta una librería de componentes (YAGNI) y así se controla el tamaño del bundle (presupuesto inicial de 500 kB).
 
 **Alternatives considered**: Angular Material (tamaño, estilos y una dependencia que la spec no necesita); Ionic (orientado a apps nativas, fuera de alcance).
+
+---
+
+## Hallazgo durante la implementación (T032, 2026-10-21): RLS impide usar los índices trigram
+
+Con `FORCE ROW LEVEL SECURITY`, el planner de PostgreSQL no lleva un `LIKE '%…%'` a la condición del índice GIN trigram, porque el operador `~~` (`textlike`) no es `LEAKPROOF` y no puede evaluarse antes que la política. El índice solo se usa por `tenant_id` y el `LIKE` queda como filtro, así que la búsqueda recorre todos los registros del taller.
+
+- Medición (implementer-backend, 10 talleres × 20 000 clientes): como superusuario, unos 0,8 ms usando `clients_tenant_search_name_trgm_idx`; como `motorsync_app` con RLS, de 11 a 18 ms recorriendo el taller.
+- No depende de cómo se escriba la consulta ni de los parámetros (pasa también con literales).
+- **Riesgo para el PR2 (US1-AC10 / SC-001, < 200 ms p95):** la búsqueda de vehículos por placa parcial usa el mismo patrón. T059/T060 deben medirlo con el volumen de SC-001 antes de decidir.
+- Opciones si no alcanza, todas con aprobación humana porque tocan seguridad: (a) aceptar el recorrido por taller si el p95 cumple; (b) una función `SECURITY DEFINER` de búsqueda que filtre explícitamente por `app_current_tenant()`; (c) un wrapper `LEAKPROOF` de `LIKE`, que exige superusuario y cuyo análisis de fuga recae sobre nosotros.

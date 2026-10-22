@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
+import { ClientsModule } from './clients/clients.module.js';
 import { requireEnv } from './config/env.js';
 import { appDataSourceOptions } from './database/data-source.js';
 import { TenantTransactionInterceptor } from './database/tenant-transaction.interceptor.js';
@@ -19,6 +20,7 @@ import { TenantTransactionInterceptor } from './database/tenant-transaction.inte
         verifyOptions: { algorithms: ['HS256'] },
       }),
     }),
+    ClientsModule,
   ],
   controllers: [AppController],
   providers: [

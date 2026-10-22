@@ -90,8 +90,8 @@ Rama sugerida: `feat/001-clientes-vehiculos` (o una rama de PR por corte, según
 ## Cierre PR1
 
 - [x] T035 Actualizar `CLAUDE.md` con los comandos nuevos (`npm run db:bootstrap`, `npm run db:migrate`, `npm run token:dev`) y el orden de arranque local — leader
-- [ ] T036 Revisar el diff del PR1 contra spec.md, plan.md (Constitution Check) y la constitución 1.1.0. Foco: tenant tomado solo del JWT, ningún uso del `DataSource` fuera de `database/`, RLS `FORCE` en `clients`, ningún `any` sin justificar, y que cada criterio US2-AC1 a AC10 y US4-AC1 a AC3 tenga una prueba con su ID — reviewer
-- [ ] T037 Verificar el PR1: `cd backend && npm run lint && npm test && npm run db:bootstrap && npm run build && npm run db:migrate && npm run test:e2e`; `cd frontend && npm run lint && npm test -- --watch=false && npm run build`; quickstart §1 (sin `db:seed:dev`, que llega en el PR2; los talleres se crean con los fixtures o a mano) y §2, filas 1 a 4. CI en verde — leader
+- [x] T036 Revisar el diff del PR1 contra spec.md, plan.md (Constitution Check) y la constitución 1.1.0. Foco: tenant tomado solo del JWT, ningún uso del `DataSource` fuera de `database/`, RLS `FORCE` en `clients`, ningún `any` sin justificar, y que cada criterio US2-AC1 a AC10 y US4-AC1 a AC3 tenga una prueba con su ID — reviewer
+- [x] T037 Verificar el PR1: `cd backend && npm run lint && npm test && npm run db:bootstrap && npm run build && npm run db:migrate && npm run test:e2e`; `cd frontend && npm run lint && npm test -- --watch=false && npm run build`; quickstart §1 (sin `db:seed:dev`, que llega en el PR2; los talleres se crean con los fixtures o a mano) y §2, filas 1 a 4. CI en verde — leader
 
 ---
 

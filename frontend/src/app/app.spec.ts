@@ -1,16 +1,19 @@
-// Cierre del PR1 (001-clientes-vehiculos): la plantilla de ejemplo de Angular se reemplaza por una shell mínima.
-// Cambio de prueba aprobado por el leader (constitución, principio II): la versión anterior exigía
-// "Hello, frontend" de la plantilla; ahora se exige la shell de MotorSync.
+// Shell de MotorSync (cierre del PR1) y pantalla inicial del asesor (PR2, FR-026 y T056).
+// Cambios de prueba aprobados por el leader (constitución, principio II):
+//   - PR1: la versión anterior exigía "Hello, frontend" de la plantilla; se exige la shell de MotorSync.
+//   - PR2: la raíz "" ya no redirige a /clients; es la búsqueda de vehículos por placa (FR-026: accesible desde la
+//     pantalla inicial en un solo toque). La navegación suma el enlace "Vehículos".
 //
 // Contrato para el implementer (app.ts / app.html / app.routes.ts):
 //   <header> con <h1>MotorSync</h1>.
-//   <nav aria-label="Principal"> con dos enlaces routerLink:
-//     "Clientes"          -> /clients      (routerLinkActive con [routerLinkActiveOptions]="{ exact: true }",
-//                                           si no, también queda activo en /clients/new)
+//   <nav aria-label="Principal"> con tres enlaces routerLink, en este orden:
+//     "Vehículos"         -> /             (routerLinkActive con [routerLinkActiveOptions]="{ exact: true }",
+//                                           si no, queda activo en todas las rutas)
+//     "Clientes"          -> /clients      (también con { exact: true }, si no, queda activo en /clients/new)
 //     "Registrar cliente" -> /clients/new
-//   Ambos con ariaCurrentWhenActive="page" (solo el enlace activo lleva aria-current="page").
+//   Los tres con ariaCurrentWhenActive="page" (solo el enlace activo lleva aria-current="page").
 //   <router-outlet /> para las páginas.
-//   app.routes.ts: { path: '', pathMatch: 'full', redirectTo: 'clients' }.
+//   app.routes.ts: { path: '', pathMatch: 'full', loadComponent: VehicleSearchPage } (sin redirectTo).
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
@@ -19,7 +22,8 @@ import { of } from 'rxjs';
 import { App } from './app';
 import { routes } from './app.routes';
 import { ClientsApiService } from './core/api/clients-api.service';
-import { ClientSearchPage } from './features/clients/client-search.page';
+import { VehiclesApiService } from './core/api/vehicles-api.service';
+import { VehicleSearchPage } from './features/vehicles/vehicle-search.page';
 
 @Component({ template: '' })
 class StubPage {}
@@ -38,6 +42,7 @@ describe('App (shell)', () => {
       imports: [App],
       providers: [
         provideRouter([
+          { path: '', pathMatch: 'full', component: StubPage },
           { path: 'clients', component: StubPage },
           { path: 'clients/new', component: StubPage },
         ]),
@@ -58,34 +63,48 @@ describe('App (shell)', () => {
     expect(h1?.textContent?.trim()).toBe('MotorSync');
   });
 
-  it('[shell] la navegación principal enlaza a /clients y /clients/new', async () => {
+  it('[FR-026] la navegación principal tiene "Vehículos" (/), "Clientes" (/clients) y "Registrar cliente" (/clients/new)', async () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const root = fixture.nativeElement as HTMLElement;
 
     expect(root.querySelector('nav[aria-label="Principal"]')).not.toBeNull();
-    const clients = linkByText(root, 'Clientes');
-    const newClient = linkByText(root, 'Registrar cliente');
-    expect(clients?.getAttribute('href')).toBe('/clients');
-    expect(newClient?.getAttribute('href')).toBe('/clients/new');
+    expect(navLinks(root).map((a) => a.textContent?.trim())).toEqual(['Vehículos', 'Clientes', 'Registrar cliente']);
+    expect(linkByText(root, 'Vehículos')?.getAttribute('href')).toBe('/');
+    expect(linkByText(root, 'Clientes')?.getAttribute('href')).toBe('/clients');
+    expect(linkByText(root, 'Registrar cliente')?.getAttribute('href')).toBe('/clients/new');
   });
 
-  it('[shell] solo el enlace de la ruta activa lleva aria-current="page"', async () => {
+  it('[FR-026] el enlace "Vehículos" lleva en un toque a la búsqueda por placa (/)', async () => {
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/clients');
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    linkByText(fixture.nativeElement as HTMLElement, 'Vehículos')?.click();
+    await fixture.whenStable();
+    expect(router.url).toBe('/');
+  });
+
+  it('[shell] solo el enlace de la ruta activa lleva aria-current="page" ("Vehículos" con coincidencia exacta)', async () => {
     const fixture = TestBed.createComponent(App);
     const router = TestBed.inject(Router);
     const root = fixture.nativeElement as HTMLElement;
 
-    await router.navigateByUrl('/clients/new');
-    fixture.detectChanges();
-    await fixture.whenStable();
-    expect(linkByText(root, 'Registrar cliente')?.getAttribute('aria-current')).toBe('page');
-    expect(linkByText(root, 'Clientes')?.hasAttribute('aria-current')).toBe(false);
+    const activeAt = async (url: string): Promise<string[]> => {
+      await router.navigateByUrl(url);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      return navLinks(root)
+        .filter((a) => a.getAttribute('aria-current') === 'page')
+        .map((a) => a.textContent?.trim() ?? '');
+    };
 
-    await router.navigateByUrl('/clients');
-    fixture.detectChanges();
-    await fixture.whenStable();
-    expect(linkByText(root, 'Clientes')?.getAttribute('aria-current')).toBe('page');
-    expect(linkByText(root, 'Registrar cliente')?.hasAttribute('aria-current')).toBe(false);
+    expect(await activeAt('/')).toEqual(['Vehículos']);
+    expect(await activeAt('/clients/new')).toEqual(['Registrar cliente']);
+    expect(await activeAt('/clients')).toEqual(['Clientes']);
+    expect(navLinks(root).filter((a) => a.hasAttribute('aria-current'))).toHaveLength(1);
   });
 
   it('[shell] incluye un <router-outlet>', async () => {
@@ -109,14 +128,22 @@ describe('Rutas raíz en app.routes (shell)', () => {
             search: vi.fn(() => of({ items: [], hasMore: false })),
           },
         },
+        {
+          provide: VehiclesApiService,
+          useValue: {
+            create: vi.fn(),
+            getById: vi.fn(),
+            search: vi.fn(() => of({ items: [], hasMore: false })),
+          },
+        },
       ],
     });
   });
 
-  it('[shell] la raíz "" redirige a /clients (búsqueda de clientes)', async () => {
+  it('[FR-026] la raíz "" muestra la búsqueda de vehículos por placa, sin redirigir', async () => {
     const harness = await RouterTestingHarness.create();
     const page = await harness.navigateByUrl('');
-    expect(TestBed.inject(Router).url).toBe('/clients');
-    expect(page).toBeInstanceOf(ClientSearchPage);
+    expect(TestBed.inject(Router).url).toBe('/');
+    expect(page).toBeInstanceOf(VehicleSearchPage);
   });
 });

@@ -34,11 +34,16 @@ docker compose up -d                 # en la raíz; requiere .env copiado de .en
 cd backend && npm run build
 npm run db:bootstrap                 # roles motorsync_migrator y motorsync_app + extensiones (idempotente)
 npm run db:migrate                   # como motorsync_migrator (idempotente)
+npm run db:seed:dev                  # talleres A y B con clientes y vehículos de ejemplo; imprime sus uuid
 npm run token:dev -- --tenant <uuid> --role asesor --name "Ana"   # JWT HS256 de desarrollo
 npm run start:dev                    # API en http://localhost:3000/api/v1
 ```
 
+`npm run test:perf` siembra 10 talleres × 30 000 clientes y 50 000 vehículos (de 1 a 9 min según la carga de la máquina) y falla si el p95 de búsqueda por placa, documento o VIN llega a 200 ms (US1-AC10). Corre en CI después de las e2e; en local úsalo solo al tocar consultas o índices de búsqueda.
+
 Las e2e (`npm run test:e2e`) corren en serie contra PostgreSQL real y aplican las migraciones en su `globalSetup`. Si el puerto 5432 lo ocupa otro PostgreSQL, apunta las variables a otro contenedor: las variables exportadas en el proceso ganan sobre `.env`.
+
+Problema conocido en Windows: a veces el worker de Vitest muere con `Worker exited unexpectedly` y se pierden las pruebas que le quedaban a ese archivo, sin que falle ninguna aserción. No es del código (pasa igual en commits anteriores y nunca en el CI de Linux); vuelve a correr la suite. Si una e2e falla con una aserción, eso sí es un fallo real.
 
 Frontend (`cd frontend`, Angular 22 con Vitest + jsdom y angular-eslint): `npm run lint`, `npm test -- --watch=false`, `npm run build`, `npm start`.
 Una sola prueba: `npx ng test --include=src/app/ruta/archivo.spec.ts --watch=false`.

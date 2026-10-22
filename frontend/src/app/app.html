@@ -4,6 +4,15 @@
     <ul>
       <li>
         <a
+          routerLink="/"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: true }"
+          ariaCurrentWhenActive="page"
+          >Vehículos</a
+        >
+      </li>
+      <li>
+        <a
           routerLink="/clients"
           routerLinkActive="active"
           [routerLinkActiveOptions]="{ exact: true }"

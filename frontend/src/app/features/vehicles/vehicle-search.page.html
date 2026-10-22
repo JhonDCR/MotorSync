@@ -1,0 +1,80 @@
+<section class="vehicle-search" aria-labelledby="vehicle-search-title">
+  <h2 id="vehicle-search-title">Buscar vehículo</h2>
+
+  <form class="search" role="search" (submit)="$event.preventDefault()">
+    <label for="vehicle-search-term">Placa o VIN</label>
+    <input
+      id="vehicle-search-term"
+      type="search"
+      inputmode="text"
+      autocapitalize="characters"
+      autocomplete="off"
+      autocorrect="off"
+      spellcheck="false"
+      enterkeyhint="search"
+      [formControl]="term"
+      [attr.maxlength]="maxLength"
+      data-testid="search-input"
+      aria-describedby="vehicle-search-hint"
+      aria-controls="vehicle-search-results"
+    />
+    <p class="hint" id="vehicle-search-hint">Placa completa o parcial (mínimo 2 caracteres) o VIN completo.</p>
+  </form>
+
+  <div id="vehicle-search-results" class="results" aria-live="polite" aria-label="Resultados de la búsqueda">
+    @switch (state().kind) {
+      @case ('loading') {
+        <p class="status" role="status">Buscando…</p>
+      }
+      @case ('too-short') {
+        <p class="notice notice-info" data-testid="search-too-short">Escriba al menos 2 caracteres</p>
+      }
+      @case ('error') {
+        <p class="notice notice-error" role="alert" data-testid="search-error">
+          No se pudo completar la búsqueda. Revise la conexión y vuelva a escribir para intentarlo de nuevo.
+        </p>
+      }
+    }
+
+    @if (state(); as current) {
+      @if (current.kind === 'results') {
+        @if (current.items.length === 0) {
+          <p class="notice notice-info" data-testid="search-empty">No se encontró ningún vehículo</p>
+          @if (current.registerPlate; as plate) {
+            <a class="action" routerLink="/vehicles/new" [queryParams]="{ plate: plate }" data-testid="register-vehicle"
+              >Registrar vehículo</a
+            >
+          }
+        } @else {
+          <ul class="result-list">
+            @for (vehicle of current.items; track vehicle.id) {
+              <li>
+                <a class="result" [routerLink]="['/vehicles', vehicle.id]" data-testid="vehicle-result">
+                  <span class="result-plate">{{ vehicle.plate }}</span>
+                  <span class="result-vehicle">
+                    {{ vehicle.brand }} {{ vehicle.model }} · {{ vehicle.year }} · {{ vehicle.color }} ·
+                    {{ bodyTypeLabel(vehicle.bodyType) }}
+                  </span>
+                  <span class="result-mileage">{{ formatMileage(vehicle.initialMileage) }} km</span>
+                  <span class="result-owner">
+                    <span class="result-owner-name">{{ vehicle.owner.displayName }}</span>
+                    <span>{{ vehicle.owner.documentNumber }}</span>
+                    <span>{{ vehicle.owner.phone }}</span>
+                    @if (vehicle.owner.email !== null) {
+                      <span>{{ vehicle.owner.email }}</span>
+                    }
+                  </span>
+                </a>
+              </li>
+            }
+          </ul>
+          @if (current.hasMore) {
+            <p class="notice notice-info" data-testid="search-has-more">
+              Hay más resultados. Escriba más caracteres de la placa para acotar la búsqueda.
+            </p>
+          }
+        }
+      }
+    }
+  </div>
+</section>

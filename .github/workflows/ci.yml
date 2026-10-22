@@ -24,7 +24,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend == 'true' && steps.scaffold.outputs.backend == 'true' }}
       frontend: ${{ steps.filter.outputs.frontend == 'true' && steps.scaffold.outputs.frontend == 'true' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # Until the Angular/NestJS scaffolds exist there is nothing to build: skip those jobs.
       - id: scaffold
         run: |
@@ -45,8 +45,8 @@ jobs:
   harness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - name: Hook tests
@@ -58,6 +58,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    # test:perf seeds ~800 000 rows; locally it took from 1 to 9 minutes depending on machine load.
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: backend
@@ -83,8 +85,8 @@ jobs:
       DB_MIGRATOR_PASSWORD: migrator_ci
       DB_APP_PASSWORD: app_ci
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -98,6 +100,8 @@ jobs:
       - run: npm run db:bootstrap
       - run: npm run db:migrate
       - run: npm run test:e2e
+      # US1-AC10 / SC-001: seeds 10 workshops x 50 000 vehicles and fails if the search p95 reaches 200 ms.
+      - run: npm run test:perf
 
   frontend:
     needs: changes
@@ -107,8 +111,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm

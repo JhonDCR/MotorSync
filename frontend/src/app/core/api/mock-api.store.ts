@@ -3,7 +3,7 @@ import { isValidCedula, isValidPassport, isValidRuc } from '../../shared/identif
 import { isValidEmail, normalizeEmail } from '../../shared/identifiers/email';
 import { normalizeDocument } from '../../shared/identifiers/normalize';
 import { isValidPhone, normalizePhone } from '../../shared/identifiers/phone';
-import { isBodyType, isValidPlate, normalizePlateForWrite } from '../../shared/identifiers/plate';
+import { isBodyType, isValidPlate, normalizePlateForSearch, normalizePlateForWrite } from '../../shared/identifiers/plate';
 import { isValidVin, normalizeVin } from '../../shared/identifiers/vin';
 import { MAX_MILEAGE, maxVehicleYear, MIN_VEHICLE_YEAR } from '../../shared/validators/vehicle.validators';
 import type {
@@ -17,6 +17,8 @@ import type {
   Problem,
   ProblemCode,
   VehicleDetail,
+  VehicleSearchItem,
+  VehicleSearchResponse,
   VehicleSummary,
 } from './api.models';
 
@@ -31,6 +33,8 @@ const MOCK_USER = { id: '11111111-1111-4111-8111-111111111111', name: 'Asesor de
 const SEARCH_LIMIT = 20;
 const MIN_SEARCH_LENGTH = 2;
 const MAX_SEARCH_LENGTH = 100;
+/** Contract `q` of /vehicles/search: maxLength 40, before normalizing (as the backend). */
+const MAX_VEHICLE_SEARCH_LENGTH = 40;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const CLIENT_CREATE_FIELDS = [
@@ -575,8 +579,9 @@ export class MockApiStore {
   }
 
   searchClients(q: string | null): MockResult<ClientSearchResponse> {
+    // Without q it is an empty term: 400 SEARCH_TERM_TOO_SHORT, as the backend.
     if (q === null) {
-      return fail(400, 'VALIDATION_ERROR', { errors: [{ field: 'q', ...REQUIRED }] });
+      return fail(400, 'SEARCH_TERM_TOO_SHORT');
     }
     if (q.length > MAX_SEARCH_LENGTH) {
       return fail(400, 'VALIDATION_ERROR', {
@@ -605,6 +610,47 @@ export class MockApiStore {
       status: 200,
       body: {
         items: ranked.slice(0, SEARCH_LIMIT).map(({ client }) => toSummary(client)),
+        hasMore: ranked.length > SEARCH_LIMIT,
+      },
+    };
+  }
+
+  /**
+   * GET /vehicles/search (US1), as data-model.md "Consultas de referencia": the plate contains the normalized
+   * term or the VIN equals it; exact (plate or VIN) → plate prefix → contains, then plate. Max 20 + hasMore.
+   */
+  searchVehicles(q: string | null): MockResult<VehicleSearchResponse> {
+    const raw = q ?? '';
+    if (raw.length > MAX_VEHICLE_SEARCH_LENGTH) {
+      return fail(400, 'VALIDATION_ERROR', {
+        errors: [
+          {
+            field: 'q',
+            code: 'VALIDATION_ERROR',
+            message: `El término admite como máximo ${MAX_VEHICLE_SEARCH_LENGTH} caracteres`,
+          },
+        ],
+      });
+    }
+    const term = normalizePlateForSearch(raw);
+    if (term.length < MIN_SEARCH_LENGTH) {
+      return fail(400, 'SEARCH_TERM_TOO_SHORT');
+    }
+
+    const ranked: { rank: number; vehicle: VehicleRecord }[] = [];
+    for (const vehicle of this.vehicles.values()) {
+      let rank: number | null = null;
+      if (vehicle.plate === term || vehicle.vin === term) rank = 0;
+      else if (vehicle.plate.startsWith(term)) rank = 1;
+      else if (vehicle.plate.includes(term)) rank = 2;
+      if (rank !== null) ranked.push({ rank, vehicle });
+    }
+    ranked.sort((a, b) => a.rank - b.rank || a.vehicle.plate.localeCompare(b.vehicle.plate));
+    return {
+      ok: true,
+      status: 200,
+      body: {
+        items: ranked.slice(0, SEARCH_LIMIT).map(({ vehicle }) => this.toSearchItem(vehicle)),
         hasMore: ranked.length > SEARCH_LIMIT,
       },
     };
@@ -649,6 +695,11 @@ export class MockApiStore {
       throw new Error(`Mock vehicle ${record.id} without owner`);
     }
     return { ...vehicle, owner: toSummary(owner) };
+  }
+
+  private toSearchItem(record: VehicleRecord): VehicleSearchItem {
+    const { id, plate, brand, model, year, vin, color, bodyType, initialMileage, owner } = this.toVehicleDetail(record);
+    return { id, plate, brand, model, year, vin, color, bodyType, initialMileage, owner };
   }
 
   /** Vehicles whose current owner is the client, ordered by plate (as the backend). */

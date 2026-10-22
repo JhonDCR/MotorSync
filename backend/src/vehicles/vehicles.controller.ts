@@ -1,8 +1,12 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { API_PREFIX } from '../app.setup.js';
 import { CreateVehicleDto } from './dto/create-vehicle.dto.js';
-import { VehiclesService, type VehicleDetail } from './vehicles.service.js';
+import {
+  VehiclesService,
+  type VehicleDetail,
+  type VehicleSearchResponse,
+} from './vehicles.service.js';
 
 @Controller('vehicles')
 export class VehiclesController {
@@ -18,6 +22,15 @@ export class VehiclesController {
     const vehicle = await this.vehicles.create(dto);
     res.setHeader('Location', `/${API_PREFIX}/vehicles/${vehicle.id}`);
     return vehicle;
+  }
+
+  /**
+   * GET /api/v1/vehicles/search?q= (US1). Declared before :vehicleId so that "search" is never
+   * taken as a vehicle id. 400 SEARCH_TERM_TOO_SHORT under 2 characters after normalizing.
+   */
+  @Get('search')
+  search(@Query('q') q?: string | string[]): Promise<VehicleSearchResponse> {
+    return this.vehicles.searchVehicles(q);
   }
 
   /** GET /api/v1/vehicles/{vehicleId}: 404 NOT_FOUND for missing, foreign or malformed ids. */

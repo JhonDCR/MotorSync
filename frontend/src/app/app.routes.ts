@@ -13,7 +13,13 @@ const devRoutes: Routes = isDevMode()
   : [];
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'clients' },
+  // FR-026: the start screen is the vehicle search by plate, one tap away from anywhere.
+  {
+    path: '',
+    pathMatch: 'full',
+    title: 'Buscar vehículo',
+    loadComponent: () => import('./features/vehicles/vehicle-search.page').then((m) => m.VehicleSearchPage),
+  },
   {
     path: 'clients',
     title: 'Clientes',

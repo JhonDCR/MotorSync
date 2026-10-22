@@ -176,3 +176,15 @@ Con `FORCE ROW LEVEL SECURITY`, el planner de PostgreSQL no lleva un `LIKE '%…
 - No depende de cómo se escriba la consulta ni de los parámetros (pasa también con literales).
 - **Riesgo para el PR2 (US1-AC10 / SC-001, < 200 ms p95):** la búsqueda de vehículos por placa parcial usa el mismo patrón. T059/T060 deben medirlo con el volumen de SC-001 antes de decidir.
 - Opciones si no alcanza, todas con aprobación humana porque tocan seguridad: (a) aceptar el recorrido por taller si el p95 cumple; (b) una función `SECURITY DEFINER` de búsqueda que filtre explícitamente por `app_current_tenant()`; (c) un wrapper `LEAKPROOF` de `LIKE`, que exige superusuario y cuyo análisis de fuga recae sobre nosotros.
+
+**Medición y decisión (T059, 2026-10-21):** con el volumen de SC-001 (10 talleres × 30 000 clientes y 50 000 vehículos), 300 búsquedas por tipo como `motorsync_app`:
+
+| Tipo | p50 | p95 | p99 |
+|---|---|---|---|
+| Placa exacta | 15 ms | 20 ms | 22 ms |
+| Placa parcial (2–4) | 16 ms | 20 ms | 25 ms |
+| Documento | 12 ms | 13 ms | 15 ms |
+| VIN | 13 ms | 15 ms | 16 ms |
+| Nombre | 12 ms | 14 ms | 15 ms |
+
+Sin `Seq Scan`: los planes usan los índices compuestos, pero solo filtran por `tenant_id`, y el `LIKE` se evalúa sobre las filas del taller. El p95 queda unas 10 veces por debajo del umbral, así que se adopta la **opción (a)**: aceptar el recorrido por taller, sin cambios de seguridad. `npm run test:perf` corre en CI para detectar si eso deja de cumplirse al crecer los datos o cambiar las consultas.

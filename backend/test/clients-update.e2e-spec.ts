@@ -696,7 +696,7 @@ describe('Clients update (e2e, T068, US4)', () => {
 
   it('US4-AC13 A con la cabecera X-Tenant-Id de B tampoco edita el cliente de B → 404', async () => {
     const res = await request(app.getHttpServer())
-      .patch(`/api/v1/clients/${clientB.id}`)
+      .patch(`/api/v1/clients/${String(clientB.id)}`)
       .set(authHeader(asesorA.token))
       .set('X-Tenant-Id', tenantB.id)
       .send({ version: 1, phone: '0990000000' });
@@ -711,7 +711,7 @@ describe('Clients update (e2e, T068, US4)', () => {
 
   it('US4-AC13 la cabecera X-Tenant-Id se ignora: A edita su propio cliente aunque envíe la de B', async () => {
     const res = await request(app.getHttpServer())
-      .patch(`/api/v1/clients/${clientA.id}`)
+      .patch(`/api/v1/clients/${String(clientA.id)}`)
       .set(authHeader(asesorA.token))
       .set('X-Tenant-Id', tenantB.id)
       .send({ version: 1, phone: '0993334455' });
@@ -896,7 +896,7 @@ describe('Clients update (e2e, T068, US4)', () => {
 
   it('US4-AC4 PATCH sin token → 401 UNAUTHORIZED, sin cambios', async () => {
     const res = await request(app.getHttpServer())
-      .patch(`/api/v1/clients/${clientA.id}`)
+      .patch(`/api/v1/clients/${String(clientA.id)}`)
       .send({ version: 1, phone: '0990000000' });
 
     expect(res.status).toBe(401);

@@ -785,7 +785,7 @@ describe('Vehicles update (e2e, T070, US4)', () => {
 
   it('US4-AC13 A con la cabecera X-Tenant-Id de B tampoco edita el vehículo de B → 404', async () => {
     const res = await request(app.getHttpServer())
-      .patch(`/api/v1/vehicles/${vehicleB.id}`)
+      .patch(`/api/v1/vehicles/${String(vehicleB.id)}`)
       .set(authHeader(asesorA.token))
       .set('X-Tenant-Id', tenantB.id)
       .send({ version: 1, color: 'Negro' });
@@ -799,7 +799,7 @@ describe('Vehicles update (e2e, T070, US4)', () => {
 
   it('US4-AC13 la cabecera X-Tenant-Id se ignora: A edita su propio vehículo aunque envíe la de B', async () => {
     const res = await request(app.getHttpServer())
-      .patch(`/api/v1/vehicles/${vehicleA.id}`)
+      .patch(`/api/v1/vehicles/${String(vehicleA.id)}`)
       .set(authHeader(asesorA.token))
       .set('X-Tenant-Id', tenantB.id)
       .send({ version: 1, color: 'Negro' });
@@ -1003,7 +1003,7 @@ describe('Vehicles update (e2e, T070, US4)', () => {
 
   it('US4-AC6 PATCH sin token → 401 UNAUTHORIZED, sin cambios', async () => {
     const res = await request(app.getHttpServer())
-      .patch(`/api/v1/vehicles/${vehicleA.id}`)
+      .patch(`/api/v1/vehicles/${String(vehicleA.id)}`)
       .send({ version: 1, color: 'Negro' });
 
     expect(res.status).toBe(401);

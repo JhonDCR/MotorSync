@@ -53,6 +53,21 @@ export interface ClientSearchResponse {
   hasMore: boolean;
 }
 
+/**
+ * Raw row of the search queries (pg types: uuid and text arrive as string, a NULL email as
+ * null). client_type and document_type are text columns restricted by CHECK constraints to
+ * the ClientType and DocumentType values, so they are typed as such.
+ */
+interface ClientSummaryRow {
+  id: string;
+  clientType: ClientType;
+  documentType: DocumentType;
+  documentNumber: string;
+  displayName: string;
+  phone: string;
+  email: string | null;
+}
+
 const CREATE_SAVEPOINT = 'client_create';
 
 /** FR-003/FR-004: at least 2 significant characters, at most 20 items per page. */
@@ -157,14 +172,14 @@ export class ClientsService {
 
     // The unique index decides duplicates (also under concurrency). The savepoint keeps the
     // request transaction usable after a unique violation, to look up existingId under RLS.
-    await manager.query(`SAVEPOINT ${CREATE_SAVEPOINT}`);
+    await manager.query<unknown>(`SAVEPOINT ${CREATE_SAVEPOINT}`);
     let id: string;
     try {
       const result = await manager.getRepository(Client).insert(values);
       id = (result.identifiers[0] as Pick<Client, 'id'>).id;
-      await manager.query(`RELEASE SAVEPOINT ${CREATE_SAVEPOINT}`);
+      await manager.query<unknown>(`RELEASE SAVEPOINT ${CREATE_SAVEPOINT}`);
     } catch (error: unknown) {
-      await manager.query(`ROLLBACK TO SAVEPOINT ${CREATE_SAVEPOINT}`);
+      await manager.query<unknown>(`ROLLBACK TO SAVEPOINT ${CREATE_SAVEPOINT}`);
       throw await this.translateCreateError(error, dto.documentNumber);
     }
     return this.getById(id);
@@ -185,16 +200,16 @@ export class ClientsService {
 
     const document = normalizeDocument(term);
     const name = escapeLike(term);
-    const rows: ClientSummary[] = SEARCHABLE_DOCUMENT.test(document)
-      ? await getManager().query(SEARCH_BY_DOCUMENT_OR_NAME_SQL, [
+    const rows = SEARCHABLE_DOCUMENT.test(document)
+      ? await getManager().query<ClientSummaryRow[]>(SEARCH_BY_DOCUMENT_OR_NAME_SQL, [
           escapeLike(document),
           name,
           document,
         ])
-      : await getManager().query(SEARCH_BY_NAME_SQL, [name]);
+      : await getManager().query<ClientSummaryRow[]>(SEARCH_BY_NAME_SQL, [name]);
 
     return {
-      items: rows.slice(0, SEARCH_PAGE_SIZE).map((row) => ({
+      items: rows.slice(0, SEARCH_PAGE_SIZE).map((row): ClientSummary => ({
         id: row.id,
         clientType: row.clientType,
         documentType: row.documentType,

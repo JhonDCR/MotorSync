@@ -129,8 +129,9 @@ const SEARCH_COLUMNS = `v.id, v.plate, v.brand, v.model, v.year, v.vin, v.color,
 
 /**
  * Reference query of data-model.md ("Búsqueda de vehículos"). $1 is the normalized term
- * ([A-Z0-9]{2,}) escaped for LIKE (defense in depth: no metacharacter survives the
- * normalization) and $2 the raw normalized term for the exact match. Explicit tenant filter on
+ * ([A-Z0-9]{2,}) passed through escapeLike, and both LIKEs declare ESCAPE '\' to match, so `%`,
+ * `_` and `\` would stay literal even if the normalization ever let them through; $2 is the
+ * raw normalized term for the exact match. Explicit tenant filter on
  * both tables (principle I) plus RLS. LIMIT page size + 1 to compute hasMore.
  */
 function vehicleSearchSql(withVin: boolean): string {
@@ -142,9 +143,9 @@ FROM vehicles v
 JOIN clients c ON c.tenant_id = v.tenant_id AND c.id = v.owner_client_id
 WHERE v.tenant_id = app_current_tenant()
   AND c.tenant_id = app_current_tenant()
-  AND (v.plate LIKE '%' || $1 || '%' ESCAPE ''${vinMatch})
+  AND (v.plate LIKE '%' || $1 || '%' ESCAPE '\'${vinMatch})
 ORDER BY CASE WHEN ${exact} THEN 0
-              WHEN v.plate LIKE $1 || '%' ESCAPE '' THEN 1 ELSE 2 END,
+              WHEN v.plate LIKE $1 || '%' ESCAPE '\' THEN 1 ELSE 2 END,
          v.plate
 LIMIT ${SEARCH_PAGE_SIZE + 1}`;
 }
@@ -257,6 +258,8 @@ export class VehiclesService {
     let id: string;
     try {
       const result = await manager.getRepository(Vehicle).insert(values);
+      // insert() returns ObjectLiteral[] at the TypeORM boundary; a single-row insert yields one
+      // entry holding the generated primary key, so the cast pins it to that shape.
       id = (result.identifiers[0] as Pick<Vehicle, 'id'>).id;
       await manager.query<unknown>(`RELEASE SAVEPOINT ${CREATE_SAVEPOINT}`);
     } catch (error: unknown) {

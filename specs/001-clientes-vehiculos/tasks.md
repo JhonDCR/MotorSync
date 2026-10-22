@@ -167,8 +167,8 @@ Rama sugerida: `feat/001-clientes-vehiculos` (o una rama de PR por corte, según
 
 ## Cierre PR2
 
-- [ ] T062 Revisar el diff del PR2. Foco: FK compuesta y `CHECK` de placa iguales al data-model, filtro explícito por tenant en las búsquedas, mensajes exactos de US3-AC12 y US3-AC13, ninguna fuga entre talleres en los 409 (FR-024), y pruebas con ID para US1-AC1 a AC10 y US3-AC1 a AC14 — reviewer
-- [ ] T063 Verificar el PR2: lo mismo que en T037 más `npm run test:perf`; quickstart §2 filas 5 a 10, §4 (revisión manual a 360 × 640 y 768 × 1024: sin scroll horizontal, objetivos de ≥ 44 px, búsqueda como pantalla inicial: FR-025, FR-026, SC-002) y §5. CI en verde — leader
+- [x] T062 Revisar el diff del PR2. Foco: FK compuesta y `CHECK` de placa iguales al data-model, filtro explícito por tenant en las búsquedas, mensajes exactos de US3-AC12 y US3-AC13, ninguna fuga entre talleres en los 409 (FR-024), y pruebas con ID para US1-AC1 a AC10 y US3-AC1 a AC14 — reviewer
+- [x] T063 Verificar el PR2: lo mismo que en T037 más `npm run test:perf`; quickstart §2 filas 5 a 10, §4 (revisión manual a 360 × 640 y 768 × 1024: sin scroll horizontal, objetivos de ≥ 44 px, búsqueda como pantalla inicial: FR-025, FR-026, SC-002) y §5. CI en verde — leader
 
 ---
 

@@ -662,6 +662,20 @@ describe('Vehicles (e2e, T043, US3)', () => {
     expect(await vehicleRowsAs(tenantA.id)).toHaveLength(0);
   });
 
+  it.each(['tenantId', 'tenant_id'])(
+    'US3-AC11 FR-022 %s en el body → 400 UNKNOWN_FIELD y no se guarda en ningún taller',
+    async (field) => {
+      const res = await postVehicle(
+        actorA,
+        sedan(ownerA.id as string, { [field]: tenantB.id }),
+      );
+
+      expectValidationError(res, field, 'UNKNOWN_FIELD');
+      expect(await vehicleRowsAs(tenantA.id)).toHaveLength(0);
+      expect(await vehicleRowsAs(tenantB.id)).toHaveLength(0);
+    },
+  );
+
   // ---------------------------------------------------------------- US3-AC12
 
   it.each([

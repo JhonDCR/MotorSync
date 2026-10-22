@@ -40,6 +40,8 @@ npm run start:dev                    # API en http://localhost:3000/api/v1
 
 Las e2e (`npm run test:e2e`) corren en serie contra PostgreSQL real y aplican las migraciones en su `globalSetup`. Si el puerto 5432 lo ocupa otro PostgreSQL, apunta las variables a otro contenedor: las variables exportadas en el proceso ganan sobre `.env`.
 
+Problema conocido en Windows: a veces el worker de Vitest muere con `Worker exited unexpectedly` y se pierden las pruebas que le quedaban a ese archivo, sin que falle ninguna aserción. No es del código (pasa igual en commits anteriores y nunca en el CI de Linux); vuelve a correr la suite. Si una e2e falla con una aserción, eso sí es un fallo real.
+
 Frontend (`cd frontend`, Angular 22 con Vitest + jsdom y angular-eslint): `npm run lint`, `npm test -- --watch=false`, `npm run build`, `npm start`.
 Una sola prueba: `npx ng test --include=src/app/ruta/archivo.spec.ts --watch=false`.
 Sin backend: `npx ng serve --configuration mock` (API simulada en memoria con las mismas reglas del contrato). Con backend: `npm start` usa el proxy `/api` → `localhost:3000`; pega un token de `npm run token:dev` en `/dev-token`.

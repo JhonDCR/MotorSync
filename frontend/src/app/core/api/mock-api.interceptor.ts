@@ -67,6 +67,10 @@ function route(req: HttpRequest<unknown>, store: MockApiStore): Observable<HttpE
     const result = store.createVehicle(req.body);
     return respond(req, result, result.ok ? `${VEHICLES_PATH}/${result.body.id}` : undefined);
   }
+  // Before VEHICLE_BY_ID, otherwise "search" would be read as a vehicle id.
+  if (path === `${VEHICLES_PATH}/search` && req.method === 'GET') {
+    return respond(req, store.searchVehicles(req.params.get('q')));
+  }
   const vehicleById = VEHICLE_BY_ID.exec(path);
   if (vehicleById !== null && req.method === 'GET') {
     return respond(req, store.getVehicle(decodeURIComponent(vehicleById[1])));

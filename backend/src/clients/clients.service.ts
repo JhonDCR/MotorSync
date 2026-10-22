@@ -70,6 +70,17 @@ interface ClientSummaryRow {
 
 const CREATE_SAVEPOINT = 'client_create';
 
+/**
+ * Vehicles whose current owner is the client (US4-AC3), ordered by plate. Raw row typed as
+ * VehicleSummary: pg parses uuid and text as string and smallint as number.
+ */
+const OWNED_VEHICLES_SQL = `
+SELECT v.id, v.plate, v.brand, v.model, v.year
+FROM vehicles v
+WHERE v.tenant_id = app_current_tenant()
+  AND v.owner_client_id = $1
+ORDER BY v.plate, v.id`;
+
 /** FR-003/FR-004: at least 2 significant characters, at most 20 items per page. */
 export const SEARCH_MIN_LENGTH = 2;
 export const SEARCH_MAX_LENGTH = 100;
@@ -226,8 +237,17 @@ export class ClientsService {
     if (!isUUID(clientId)) throw notFound();
     const client = await getManager().getRepository(Client).findOneBy({ id: clientId });
     if (!client) throw notFound();
-    // Vehicles arrive with the vehicles table (PR2).
-    return toDetail(client, []);
+    const vehicles = await getManager().query<VehicleSummary[]>(OWNED_VEHICLES_SQL, [client.id]);
+    return toDetail(
+      client,
+      vehicles.map((row): VehicleSummary => ({
+        id: row.id,
+        plate: row.plate,
+        brand: row.brand,
+        model: row.model,
+        year: row.year,
+      })),
+    );
   }
 
   private async translateCreateError(error: unknown, documentNumber: string): Promise<unknown> {

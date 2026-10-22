@@ -14,5 +14,7 @@ export default defineConfig({
     root: './',
     include: ['**/*.e2e-spec.ts'],
     globalSetup: ['./test/setup/global-setup.ts'],
+    // The e2e suites share one database and truncate its tables: run the files one at a time.
+    fileParallelism: false,
   },
 });

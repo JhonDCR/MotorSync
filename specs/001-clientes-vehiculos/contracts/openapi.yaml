@@ -552,6 +552,7 @@ components:
             - DOCUMENT_ALREADY_EXISTS
             - VERSION_CONFLICT
             - SAME_OWNER
+            - INTERNAL_ERROR
         errors:
           type: array
           items: { $ref: '#/components/schemas/FieldError' }

@@ -13,6 +13,7 @@ const devRoutes: Routes = isDevMode()
   : [];
 
 export const routes: Routes = [
+  { path: '', pathMatch: 'full', redirectTo: 'clients' },
   {
     path: 'clients',
     title: 'Clientes',

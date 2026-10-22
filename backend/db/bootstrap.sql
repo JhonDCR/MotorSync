@@ -1,0 +1,37 @@
+-- MotorSync database bootstrap (research R2). Run as the container superuser through
+-- `npm run db:bootstrap` (scripts/db-bootstrap.ts, DATABASE_ADMIN_URL). Idempotent.
+-- Passwords are parameters: the script sets the session settings
+-- motorsync.migrator_password and motorsync.app_password before running this file.
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'motorsync_migrator') THEN
+    CREATE ROLE motorsync_migrator;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'motorsync_app') THEN
+    CREATE ROLE motorsync_app;
+  END IF;
+
+  -- Attributes are (re)applied on every run so an existing role converges to them.
+  EXECUTE format(
+    'ALTER ROLE motorsync_migrator LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE PASSWORD %L',
+    current_setting('motorsync.migrator_password')
+  );
+  EXECUTE format(
+    'ALTER ROLE motorsync_app LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOINHERIT PASSWORD %L',
+    current_setting('motorsync.app_password')
+  );
+
+  EXECUTE format(
+    'GRANT CONNECT ON DATABASE %I TO motorsync_migrator, motorsync_app',
+    current_database()
+  );
+END
+$$;
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE EXTENSION IF NOT EXISTS btree_gin;
+
+ALTER SCHEMA public OWNER TO motorsync_migrator;
+GRANT USAGE ON SCHEMA public TO motorsync_app;

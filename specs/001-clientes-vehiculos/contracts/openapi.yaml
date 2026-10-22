@@ -1,0 +1,567 @@
+openapi: 3.1.0
+info:
+  title: MotorSync API - Clientes y vehículos
+  version: 0.1.0
+  description: |
+    Contrato de la feature 001-clientes-vehiculos. Frontend y backend trabajan contra este documento (principio III).
+
+    Reglas transversales:
+    - Todas las rutas exigen `Authorization: Bearer <JWT HS256>` con los claims `sub`, `tenant_id`, `role` (`asesor` | `admin`), `name` y `exp`.
+      El taller se toma **solo** del token. Cualquier `tenantId`/`tenant_id` en el body provoca 400 (`VALIDATION_ERROR`)
+      y las cabeceras como `X-Tenant-Id` se ignoran.
+    - Un recurso de otro taller responde exactamente igual que uno inexistente: `404 NOT_FOUND` (FR-023).
+    - Los errores usan `application/problem+json` (RFC 9457) con un `code` estable que el frontend usa para traducir mensajes.
+    - No existen operaciones de borrado ni desactivación (FR-021): `DELETE` sobre cualquier ruta responde 404 sin efectos.
+    - Fechas en ISO 8601 UTC.
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Desarrollo local
+security:
+  - bearerAuth: []
+tags:
+  - name: vehicles
+  - name: clients
+
+paths:
+  /vehicles/search:
+    get:
+      tags: [vehicles]
+      operationId: searchVehicles
+      summary: Buscar vehículos por placa (completa o parcial) o VIN completo (US1)
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: |
+            Término de búsqueda. El servidor lo normaliza (mayúsculas y solo `[A-Z0-9]`). Tras normalizarlo debe tener
+            al menos 2 caracteres. Coincide por "contiene" sobre la placa y por igualdad sobre el VIN.
+          schema: { type: string, maxLength: 40 }
+          example: pba-12
+      responses:
+        '200':
+          description: Resultados ordenados (exacta, prefijo, contiene), máximo 20.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VehicleSearchResponse' }
+        '400':
+          description: Menos de 2 caracteres tras normalizar (`SEARCH_TERM_TOO_SHORT`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /vehicles:
+    post:
+      tags: [vehicles]
+      operationId: createVehicle
+      summary: Registrar un vehículo de un cliente del taller (US3)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VehicleCreate' }
+      responses:
+        '201':
+          description: Vehículo creado.
+          headers:
+            Location: { schema: { type: string }, description: 'Ruta del recurso creado: /api/v1/vehicles/{id}' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VehicleDetail' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: El `ownerClientId` no existe en el taller (`CLIENT_NOT_FOUND`), incluido el caso de un cliente de otro taller.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409': { $ref: '#/components/responses/DuplicateVehicle' }
+
+  /vehicles/{vehicleId}:
+    parameters:
+      - $ref: '#/components/parameters/VehicleId'
+    get:
+      tags: [vehicles]
+      operationId: getVehicle
+      summary: Ficha del vehículo con su propietario actual
+      responses:
+        '200':
+          description: Vehículo.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VehicleDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [vehicles]
+      operationId: updateVehicle
+      summary: Editar datos del vehículo (US4)
+      description: |
+        Solo se cambian los campos enviados. `version` es obligatorio (bloqueo optimista).
+        Si `plate` o `vin` cambian respecto del valor guardado (comparando ya normalizados), se audita
+        (`vehicle.plate_changed`, `vehicle.vin_changed`) y, si el rol es `asesor`, `reason` es obligatorio.
+        La placa se revalida contra la carrocería resultante (US3-AC14). El propietario no se cambia aquí:
+        se usa `ownership-transfers`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/VehicleUpdate' }
+      responses:
+        '200':
+          description: Vehículo actualizado (con `version` incrementada).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VehicleDetail' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Placa o VIN duplicado (`PLATE_ALREADY_EXISTS`, `VIN_ALREADY_EXISTS`) o versión desactualizada (`VERSION_CONFLICT`, con `current`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /vehicles/{vehicleId}/ownership-transfers:
+    parameters:
+      - $ref: '#/components/parameters/VehicleId'
+    post:
+      tags: [vehicles]
+      operationId: transferVehicleOwnership
+      summary: Transferir el vehículo a otro cliente del mismo taller (US4-AC7 a US4-AC9, US4-AC15, US4-AC16)
+      description: |
+        Actualiza el propietario y escribe `vehicle.owner_changed` en `audit_log` en la misma transacción.
+        `reason` es obligatorio (10 a 500 caracteres) si el rol del token es `asesor`, y opcional si es `admin`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OwnershipTransferRequest' }
+      responses:
+        '200':
+          description: Transferencia hecha. Devuelve el vehículo con el nuevo propietario.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VehicleDetail' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: Vehículo (`NOT_FOUND`) o cliente destino (`CLIENT_NOT_FOUND`) inexistente en el taller.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: Versión desactualizada (`VERSION_CONFLICT`, con `current`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422':
+          description: El cliente destino ya es el propietario (`SAME_OWNER`). No se crea auditoría.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /vehicles/{vehicleId}/ownership-history:
+    parameters:
+      - $ref: '#/components/parameters/VehicleId'
+    get:
+      tags: [vehicles]
+      operationId: getVehicleOwnershipHistory
+      summary: Historial de propietarios, del más reciente al más antiguo (US4-AC10)
+      responses:
+        '200':
+          description: Lista (posiblemente vacía), de solo lectura.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/OwnershipChange' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /clients/search:
+    get:
+      tags: [clients]
+      operationId: searchClients
+      summary: Buscar clientes por documento (completo o parcial) o por nombre/razón social (US4-AC1, US4-AC2)
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: |
+            Al menos 2 caracteres significativos. Se busca a la vez por documento normalizado ("contiene", con prioridad
+            a la coincidencia exacta y al prefijo) y por nombre sin distinguir mayúsculas ni tildes ("contiene").
+          schema: { type: string, maxLength: 100 }
+          example: nunez
+      responses:
+        '200':
+          description: Resultados, máximo 20.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientSearchResponse' }
+        '400':
+          description: Término demasiado corto (`SEARCH_TERM_TOO_SHORT`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /clients:
+    post:
+      tags: [clients]
+      operationId: createClient
+      summary: Registrar un cliente (US2)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientCreate' }
+      responses:
+        '201':
+          description: Cliente creado.
+          headers:
+            Location: { schema: { type: string }, description: 'Ruta del recurso creado: /api/v1/clients/{id}' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientDetail' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: Documento ya registrado en este taller (`DOCUMENT_ALREADY_EXISTS`, con `existingId`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /clients/{clientId}:
+    parameters:
+      - $ref: '#/components/parameters/ClientId'
+    get:
+      tags: [clients]
+      operationId: getClient
+      summary: Ficha del cliente con los vehículos de los que es propietario actual (US4-AC3)
+      responses:
+        '200':
+          description: Cliente.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [clients]
+      operationId: updateClient
+      summary: Editar datos del cliente (US4-AC4, US4-AC5, US4-AC11)
+      description: |
+        Solo se cambian los campos enviados. `version` es obligatorio. Si `documentType` o `documentNumber` cambian,
+        se audita (`client.document_changed`) y, si el rol es `asesor`, `reason` es obligatorio.
+        `clientType` no se puede cambiar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientUpdate' }
+      responses:
+        '200':
+          description: Cliente actualizado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientDetail' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Documento duplicado (`DOCUMENT_ALREADY_EXISTS`) o versión desactualizada (`VERSION_CONFLICT`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    VehicleId:
+      name: vehicleId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ClientId:
+      name: clientId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    Unauthorized:
+      description: Token ausente, inválido o expirado (`UNAUTHORIZED`).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: No existe en el taller del usuario (`NOT_FOUND`). Mismo cuerpo para "no existe" y "es de otro taller".
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ValidationError:
+      description: |
+        Datos inválidos. `code` es `VALIDATION_ERROR` y `errors[]` detalla cada campo con su código
+        (`INVALID_PLATE`, `INVALID_VIN`, `INVALID_CEDULA`, `INVALID_RUC`, `INVALID_PASSPORT`, `INVALID_DOCUMENT_TYPE`,
+        `INVALID_PHONE`, `INVALID_EMAIL`, `INVALID_YEAR`, `INVALID_MILEAGE`, `REASON_REQUIRED`, `REQUIRED`, `UNKNOWN_FIELD`).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    DuplicateVehicle:
+      description: Placa (`PLATE_ALREADY_EXISTS`) o VIN (`VIN_ALREADY_EXISTS`) ya registrados en este taller, con `existingId`.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    ClientType:
+      type: string
+      enum: [natural, company]
+    DocumentType:
+      type: string
+      enum: [cedula, ruc, passport]
+    BodyType:
+      type: string
+      enum: [sedan, suv, pickup, motorcycle, other]
+    Role:
+      type: string
+      enum: [asesor, admin]
+    Reason:
+      type: string
+      minLength: 10
+      maxLength: 500
+      description: Motivo. Obligatorio para `asesor` y opcional para `administrador` en transferencias y cambios de placa, VIN o documento; si se informa, siempre de 10 a 500 caracteres (FR-019).
+
+    AuditStamp:
+      type: object
+      required: [createdAt, updatedAt, updatedBy, updatedByName]
+      properties:
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        updatedBy: { type: string, format: uuid }
+        updatedByName: { type: string }
+
+    ClientCreate:
+      type: object
+      additionalProperties: false
+      required: [clientType, documentType, documentNumber, phone]
+      properties:
+        clientType: { $ref: '#/components/schemas/ClientType' }
+        documentType: { $ref: '#/components/schemas/DocumentType' }
+        documentNumber: { type: string, maxLength: 30, example: '171234567-5' }
+        firstNames: { type: string, maxLength: 100, description: Obligatorio si `natural`. }
+        lastNames: { type: string, maxLength: 100, description: Obligatorio si `natural`. }
+        businessName: { type: string, maxLength: 200, description: Obligatorio si `company`. }
+        phone: { type: string, maxLength: 25, example: '+593 99 123 4567' }
+        email: { type: [string, 'null'], format: email, maxLength: 254 }
+
+    ClientUpdate:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: { type: integer, minimum: 1 }
+        documentType: { $ref: '#/components/schemas/DocumentType' }
+        documentNumber: { type: string, maxLength: 30 }
+        firstNames: { type: string, maxLength: 100 }
+        lastNames: { type: string, maxLength: 100 }
+        businessName: { type: string, maxLength: 200 }
+        phone: { type: string, maxLength: 25 }
+        email: { type: [string, 'null'], format: email, maxLength: 254 }
+        reason: { $ref: '#/components/schemas/Reason' }
+
+    ClientSummary:
+      type: object
+      required: [id, clientType, documentType, documentNumber, displayName, phone, email]
+      properties:
+        id: { type: string, format: uuid }
+        clientType: { $ref: '#/components/schemas/ClientType' }
+        documentType: { $ref: '#/components/schemas/DocumentType' }
+        documentNumber: { type: string, description: Normalizado. }
+        displayName: { type: string }
+        phone: { type: string }
+        email: { type: [string, 'null'] }
+
+    ClientDetail:
+      allOf:
+        - $ref: '#/components/schemas/ClientSummary'
+        - $ref: '#/components/schemas/AuditStamp'
+        - type: object
+          required: [version, vehicles]
+          properties:
+            firstNames: { type: [string, 'null'] }
+            lastNames: { type: [string, 'null'] }
+            businessName: { type: [string, 'null'] }
+            version: { type: integer }
+            vehicles:
+              type: array
+              description: Vehículos de los que es propietario actual, ordenados por placa.
+              items: { $ref: '#/components/schemas/VehicleSummary' }
+
+    ClientSearchResponse:
+      type: object
+      required: [items, hasMore]
+      properties:
+        items:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/ClientSummary' }
+        hasMore: { type: boolean }
+
+    VehicleCreate:
+      type: object
+      additionalProperties: false
+      required: [ownerClientId, plate, brand, model, year, color, bodyType, initialMileage]
+      properties:
+        ownerClientId: { type: string, format: uuid }
+        plate: { type: string, maxLength: 15, example: pba-1234 }
+        vin: { type: [string, 'null'], maxLength: 25 }
+        brand: { type: string, minLength: 1, maxLength: 60 }
+        model: { type: string, minLength: 1, maxLength: 60 }
+        year: { type: integer, minimum: 1950, description: Máximo el año UTC en curso + 1. }
+        color: { type: string, minLength: 1, maxLength: 60 }
+        bodyType: { $ref: '#/components/schemas/BodyType' }
+        initialMileage: { type: integer, minimum: 0, maximum: 9999999 }
+
+    VehicleUpdate:
+      type: object
+      additionalProperties: false
+      required: [version]
+      properties:
+        version: { type: integer, minimum: 1 }
+        plate: { type: string, maxLength: 15 }
+        vin: { type: [string, 'null'], maxLength: 25 }
+        brand: { type: string, minLength: 1, maxLength: 60 }
+        model: { type: string, minLength: 1, maxLength: 60 }
+        year: { type: integer, minimum: 1950 }
+        color: { type: string, minLength: 1, maxLength: 60 }
+        bodyType: { $ref: '#/components/schemas/BodyType' }
+        initialMileage: { type: integer, minimum: 0, maximum: 9999999 }
+        reason: { $ref: '#/components/schemas/Reason' }
+
+    VehicleSummary:
+      type: object
+      required: [id, plate, brand, model, year]
+      properties:
+        id: { type: string, format: uuid }
+        plate: { type: string, description: Normalizada. }
+        brand: { type: string }
+        model: { type: string }
+        year: { type: integer }
+
+    VehicleDetail:
+      allOf:
+        - $ref: '#/components/schemas/VehicleSummary'
+        - $ref: '#/components/schemas/AuditStamp'
+        - type: object
+          required: [vin, color, bodyType, initialMileage, version, owner]
+          properties:
+            vin: { type: [string, 'null'] }
+            color: { type: string }
+            bodyType: { $ref: '#/components/schemas/BodyType' }
+            initialMileage: { type: integer }
+            version: { type: integer }
+            owner: { $ref: '#/components/schemas/ClientSummary' }
+
+    VehicleSearchResponse:
+      type: object
+      required: [items, hasMore]
+      properties:
+        items:
+          type: array
+          maxItems: 20
+          items:
+            allOf:
+              - $ref: '#/components/schemas/VehicleSummary'
+              - type: object
+                required: [vin, color, bodyType, initialMileage, owner]
+                properties:
+                  vin: { type: [string, 'null'] }
+                  color: { type: string }
+                  bodyType: { $ref: '#/components/schemas/BodyType' }
+                  initialMileage: { type: integer }
+                  owner: { $ref: '#/components/schemas/ClientSummary' }
+        hasMore: { type: boolean }
+
+    OwnershipTransferRequest:
+      type: object
+      additionalProperties: false
+      required: [newOwnerClientId, version]
+      properties:
+        newOwnerClientId: { type: string, format: uuid }
+        version: { type: integer, minimum: 1, description: Versión vigente del vehículo. }
+        reason: { $ref: '#/components/schemas/Reason' }
+
+    OwnerSnapshot:
+      type: object
+      required: [clientId, displayName, documentNumber]
+      properties:
+        clientId: { type: string, format: uuid }
+        displayName: { type: string }
+        documentNumber: { type: string }
+
+    OwnershipChange:
+      type: object
+      required: [id, occurredAt, previousOwner, newOwner, actorUserId, actorName, actorRole, reason]
+      properties:
+        id: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+        previousOwner: { $ref: '#/components/schemas/OwnerSnapshot' }
+        newOwner: { $ref: '#/components/schemas/OwnerSnapshot' }
+        actorUserId: { type: string, format: uuid }
+        actorName: { type: string }
+        actorRole: { $ref: '#/components/schemas/Role' }
+        reason: { type: [string, 'null'] }
+
+    FieldError:
+      type: object
+      required: [field, code, message]
+      properties:
+        field: { type: string, example: plate }
+        code: { type: string, example: INVALID_PLATE }
+        message: { type: string, example: 'Placa inválida: para autos use 3 letras y 3 o 4 dígitos (ej. PBA1234)' }
+
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri-reference, example: about:blank }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code:
+          type: string
+          enum:
+            - UNAUTHORIZED
+            - VALIDATION_ERROR
+            - SEARCH_TERM_TOO_SHORT
+            - NOT_FOUND
+            - CLIENT_NOT_FOUND
+            - PLATE_ALREADY_EXISTS
+            - VIN_ALREADY_EXISTS
+            - DOCUMENT_ALREADY_EXISTS
+            - VERSION_CONFLICT
+            - SAME_OWNER
+            - INTERNAL_ERROR
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/FieldError' }
+        existingId:
+          type: string
+          format: uuid
+          description: Solo en `*_ALREADY_EXISTS`. Siempre un registro del mismo taller.
+        current:
+          description: Solo en `VERSION_CONFLICT`. Estado actual del recurso.
+          oneOf:
+            - $ref: '#/components/schemas/ClientDetail'
+            - $ref: '#/components/schemas/VehicleDetail'

@@ -1,0 +1,62 @@
+<main class="client-search">
+  <header class="page-header">
+    <h1>Clientes</h1>
+    <a class="action" routerLink="/clients/new" data-testid="new-client">Registrar cliente</a>
+  </header>
+
+  <form class="search" role="search" (submit)="$event.preventDefault()">
+    <label for="client-search-term">Buscar por documento o nombre</label>
+    <input
+      id="client-search-term"
+      type="search"
+      [formControl]="term"
+      data-testid="search-input"
+      maxlength="100"
+      autocomplete="off"
+      enterkeyhint="search"
+      aria-describedby="client-search-hint"
+      aria-controls="client-search-results"
+    />
+    <p class="hint" id="client-search-hint">Cédula, RUC, pasaporte, nombres o razón social (mínimo 2 caracteres).</p>
+  </form>
+
+  <section id="client-search-results" class="results" aria-live="polite" aria-label="Resultados de la búsqueda">
+    @switch (state().kind) {
+      @case ('loading') {
+        <p class="status" role="status">Buscando…</p>
+      }
+      @case ('too-short') {
+        <p class="notice notice-info" data-testid="search-too-short">Escriba al menos 2 caracteres</p>
+      }
+      @case ('error') {
+        <p class="notice notice-error" role="alert" data-testid="search-error">
+          No se pudo completar la búsqueda. Revise la conexión y vuelva a escribir para intentarlo de nuevo.
+        </p>
+      }
+    }
+
+    @if (state(); as current) {
+      @if (current.kind === 'results') {
+        @if (current.items.length === 0) {
+          <p class="notice notice-info" data-testid="search-empty">Sin resultados</p>
+        } @else {
+          <ul class="result-list">
+            @for (client of current.items; track client.id) {
+              <li>
+                <a class="result" [routerLink]="['/clients', client.id]" data-testid="client-result">
+                  <span class="result-name">{{ client.displayName }}</span>
+                  <span class="result-document">{{ client.documentNumber }}</span>
+                </a>
+              </li>
+            }
+          </ul>
+          @if (current.hasMore) {
+            <p class="notice notice-info" data-testid="search-has-more">
+              Hay más resultados. Escriba un término más específico para acotar la búsqueda.
+            </p>
+          }
+        }
+      }
+    }
+  </section>
+</main>

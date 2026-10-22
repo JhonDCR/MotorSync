@@ -1,4 +1,4 @@
-import type { FieldError, Problem } from './api.models';
+import { PROBLEM_CODES, type FieldError, type Problem } from './api.models';
 import { fieldErrorMessage, fieldErrorMessages, isProblem, problemMessage } from './problem';
 
 // Traducción de `code` (Problem) y `errors[].code` (FieldError) de contracts/openapi.yaml
@@ -158,6 +158,26 @@ describe('problem: código del Problem (code)', () => {
       expect(message).not.toBe('Titulo del servidor');
     },
   );
+
+  // El contrato añadió INTERNAL_ERROR al enum de Problem.code (500 sin detalles internos).
+  // El cast permite compilar antes de que PROBLEM_CODES lo incluya; la prueba falla en ejecución.
+  const INTERNAL_ERROR = 'INTERNAL_ERROR' as Problem['code'];
+
+  it('[contrato Problem] PROBLEM_CODES incluye INTERNAL_ERROR', () => {
+    expect(PROBLEM_CODES).toContain(INTERNAL_ERROR);
+  });
+
+  it('[contrato Problem] INTERNAL_ERROR tiene un mensaje propio en español (no el código, el title ni el detail)', () => {
+    const message = problemMessage(
+      problem(INTERNAL_ERROR, { status: 500, title: 'Internal Server Error', detail: 'stack del servidor' }),
+    );
+    expect(message.trim().length).toBeGreaterThan(0);
+    expect(message).not.toBe(INTERNAL_ERROR);
+    expect(message).not.toBe('Internal Server Error');
+    expect(message).not.toBe('stack del servidor');
+    const others = PROBLEM_CODES.filter((code) => code !== INTERNAL_ERROR).map((code) => problemMessage(problem(code)));
+    expect(others).not.toContain(message);
+  });
 
   it('[contrato Problem] cada code del enum produce un mensaje distinto', () => {
     const codes: Problem['code'][] = [

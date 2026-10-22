@@ -163,6 +163,7 @@ export const PROBLEM_CODES = [
   'DOCUMENT_ALREADY_EXISTS',
   'VERSION_CONFLICT',
   'SAME_OWNER',
+  'INTERNAL_ERROR',
 ] as const;
 
 export type ProblemCode = (typeof PROBLEM_CODES)[number];

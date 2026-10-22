@@ -38,6 +38,7 @@ const PROBLEM_MESSAGES: Record<ProblemCode, string> = {
   DOCUMENT_ALREADY_EXISTS: 'El documento ya está registrado',
   VERSION_CONFLICT: 'Otra persona modificó este registro. Revise los datos actuales y vuelva a intentarlo',
   SAME_OWNER: 'El vehículo ya pertenece a este cliente',
+  INTERNAL_ERROR: 'Ocurrió un error inesperado en el servidor. Inténtelo de nuevo en unos minutos',
 };
 
 const NOT_FOUND_BY_RESOURCE: Record<NonNullable<ProblemContext['resource']>, string> = {

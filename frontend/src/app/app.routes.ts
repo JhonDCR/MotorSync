@@ -12,4 +12,11 @@ const devRoutes: Routes = isDevMode()
     ]
   : [];
 
-export const routes: Routes = [...devRoutes];
+export const routes: Routes = [
+  {
+    path: 'clients/new',
+    title: 'Nuevo cliente',
+    loadComponent: () => import('./features/clients/client-form.page').then((m) => m.ClientFormPage),
+  },
+  ...devRoutes,
+];

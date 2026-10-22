@@ -1,0 +1,206 @@
+<main class="client-form">
+  <h1>Nuevo cliente</h1>
+
+  <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+    <fieldset class="choice">
+      <legend>Tipo de cliente</legend>
+      <div class="options">
+        <label class="option" for="client-type-natural">
+          <input
+            id="client-type-natural"
+            type="radio"
+            formControlName="clientType"
+            value="natural"
+            data-testid="client-type-natural"
+          />
+          Persona natural
+        </label>
+        <label class="option" for="client-type-company">
+          <input
+            id="client-type-company"
+            type="radio"
+            formControlName="clientType"
+            value="company"
+            data-testid="client-type-company"
+          />
+          Empresa
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="choice">
+      <legend>Tipo de documento</legend>
+      <div class="options">
+        @if (clientType() === 'natural') {
+          <label class="option" for="document-type-cedula">
+            <input
+              id="document-type-cedula"
+              type="radio"
+              formControlName="documentType"
+              value="cedula"
+              data-testid="document-type-cedula"
+            />
+            Cédula
+          </label>
+        }
+        <label class="option" for="document-type-ruc">
+          <input id="document-type-ruc" type="radio" formControlName="documentType" value="ruc" data-testid="document-type-ruc" />
+          RUC
+        </label>
+        @if (clientType() === 'natural') {
+          <label class="option" for="document-type-passport">
+            <input
+              id="document-type-passport"
+              type="radio"
+              formControlName="documentType"
+              value="passport"
+              data-testid="document-type-passport"
+            />
+            Pasaporte
+          </label>
+        }
+      </div>
+    </fieldset>
+
+    <div class="field">
+      <label for="document-number">Número de documento <span class="required">(obligatorio)</span></label>
+      <input
+        id="document-number"
+        type="text"
+        formControlName="documentNumber"
+        data-testid="document-number"
+        maxlength="30"
+        autocomplete="off"
+        [attr.inputmode]="documentType() === 'passport' ? 'text' : 'numeric'"
+        [attr.aria-invalid]="errorFor('documentNumber') ? 'true' : null"
+        [attr.aria-describedby]="errorFor('documentNumber') ? 'error-documentNumber' : null"
+        (blur)="checkPossibleDuplicate()"
+      />
+      @if (errorFor('documentNumber'); as message) {
+        <p class="field-error" id="error-documentNumber" data-testid="error-documentNumber">{{ message }}</p>
+      }
+      @if (possibleDuplicate(); as match) {
+        <p class="warning" role="status" data-testid="possible-duplicate-warning">
+          Posible duplicado: ya existe {{ match.displayName }} con el documento {{ match.documentNumber }}. Puede guardar
+          igualmente si corresponde.
+        </p>
+      }
+    </div>
+
+    @if (clientType() === 'natural') {
+      <div class="field">
+        <label for="first-names">Nombres <span class="required">(obligatorio)</span></label>
+        <input
+          id="first-names"
+          type="text"
+          formControlName="firstNames"
+          data-testid="first-names"
+          maxlength="100"
+          autocomplete="given-name"
+          [attr.aria-invalid]="errorFor('firstNames') ? 'true' : null"
+          [attr.aria-describedby]="errorFor('firstNames') ? 'error-firstNames' : null"
+        />
+        @if (errorFor('firstNames'); as message) {
+          <p class="field-error" id="error-firstNames" data-testid="error-firstNames">{{ message }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="last-names">Apellidos <span class="required">(obligatorio)</span></label>
+        <input
+          id="last-names"
+          type="text"
+          formControlName="lastNames"
+          data-testid="last-names"
+          maxlength="100"
+          autocomplete="family-name"
+          [attr.aria-invalid]="errorFor('lastNames') ? 'true' : null"
+          [attr.aria-describedby]="errorFor('lastNames') ? 'error-lastNames' : null"
+        />
+        @if (errorFor('lastNames'); as message) {
+          <p class="field-error" id="error-lastNames" data-testid="error-lastNames">{{ message }}</p>
+        }
+      </div>
+    } @else {
+      <div class="field">
+        <label for="business-name">Razón social <span class="required">(obligatorio)</span></label>
+        <input
+          id="business-name"
+          type="text"
+          formControlName="businessName"
+          data-testid="business-name"
+          maxlength="200"
+          autocomplete="organization"
+          [attr.aria-invalid]="errorFor('businessName') ? 'true' : null"
+          [attr.aria-describedby]="errorFor('businessName') ? 'error-businessName' : null"
+        />
+        @if (errorFor('businessName'); as message) {
+          <p class="field-error" id="error-businessName" data-testid="error-businessName">{{ message }}</p>
+        }
+      </div>
+    }
+
+    <div class="field">
+      <label for="phone">Teléfono <span class="required">(obligatorio)</span></label>
+      <input
+        id="phone"
+        type="tel"
+        formControlName="phone"
+        data-testid="phone"
+        maxlength="25"
+        autocomplete="tel"
+        [attr.aria-invalid]="errorFor('phone') ? 'true' : null"
+        [attr.aria-describedby]="errorFor('phone') ? 'error-phone' : null"
+      />
+      @if (errorFor('phone'); as message) {
+        <p class="field-error" id="error-phone" data-testid="error-phone">{{ message }}</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="email">Correo electrónico <span class="optional">(opcional)</span></label>
+      <input
+        id="email"
+        type="email"
+        formControlName="email"
+        data-testid="email"
+        maxlength="254"
+        autocomplete="email"
+        [attr.aria-invalid]="errorFor('email') ? 'true' : null"
+        [attr.aria-describedby]="errorFor('email') ? 'error-email' : null"
+      />
+      @if (errorFor('email'); as message) {
+        <p class="field-error" id="error-email" data-testid="error-email">{{ message }}</p>
+      }
+    </div>
+
+    @if (duplicate(); as dup) {
+      <div class="notice notice-error" role="alert">
+        <p data-testid="duplicate-message">{{ dup.message }}</p>
+        @if (dup.existingId) {
+          <a class="action" data-testid="open-existing-client" [routerLink]="['/clients', dup.existingId]">
+            Abrir cliente existente
+          </a>
+        }
+      </div>
+    }
+
+    @if (networkError()) {
+      <div class="notice notice-error" role="alert" data-testid="network-error">
+        <p>No se pudo conectar con el servidor. Sus datos siguen en el formulario.</p>
+        <button type="button" class="action" data-testid="retry" [disabled]="saving()" (click)="retry()">Reintentar</button>
+      </div>
+    }
+
+    @if (generalError(); as message) {
+      <p class="notice notice-error" role="alert">{{ message }}</p>
+    }
+
+    <div class="actions">
+      <button type="submit" class="primary" data-testid="save" [disabled]="saving()" [attr.aria-busy]="saving()">
+        {{ saving() ? 'Guardando…' : 'Guardar' }}
+      </button>
+    </div>
+    <p class="sr-only" role="status" aria-live="polite">{{ saving() ? 'Guardando cliente' : '' }}</p>
+  </form>
+</main>

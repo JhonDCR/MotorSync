@@ -274,7 +274,7 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
   - en "Lecciones" o en comandos: las migraciones que cambien funciones `auth_*` deben hacer `SET ROLE motorsync_auth` (data-model, "Mantenimiento").
 
   — leader
-- [ ] T031 Revisar el diff del PR1 contra spec.md, plan.md (Constitution Check) y la **constitución 1.2.0**. Foco:
+- [x] T031 Revisar el diff del PR1 contra spec.md, plan.md (Constitution Check) y la **constitución 1.2.0**. Foco:
   - el taller sale solo del JWT o de la base, nunca del cliente;
   - las funciones `SECURITY DEFINER` tienen `search_path` fijo, dueño `motorsync_auth` y columnas mínimas;
   - ninguna contraseña ni hash en respuestas ni logs;
@@ -283,7 +283,7 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
   - pruebas con ID para US1-AC1 a AC10, US2-AC1 a AC12 y FR-T01.
 
   — reviewer
-- [ ] T032 Verificar el PR1:
+- [x] T032 Verificar el PR1:
   - `cd backend && npm run lint && npm test && npm run build && npm run db:bootstrap && npm run db:migrate && npm run test:e2e`;
   - `cd frontend && npm run lint && npm test -- --watch=false && npm run build`;
   - quickstart §1 (incluido `db:seed:dev` con usuarios) y §2, filas "Registro" a "Datos del taller";
@@ -295,6 +295,11 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
 ---
 
 # PR2: sesión, contraseña y frontend (US3, US5)
+
+> **Ajustes del reviewer T031 (aceptados por el leader, se hacen en el PR2 sin número de tarea propio):**
+> 1. `1761000000800-CreateAuthFunctions`: la poda oportunista de `auth_record_login_failure` puede provocar un deadlock entre dos fallos simultáneos. Corregir con `FOR UPDATE SKIP LOCKED` en la subconsulta, mediante una migración nueva que reemplace la función con `SET ROLE motorsync_auth`.
+> 2. `backend/src/config/env.ts`: rechazar `AUTH_COOKIE_SECURE=false` con `NODE_ENV=production`, igual que FR-T01, con su prueba.
+> 3. `backend/scripts/seed-dev.ts`: abortar si `NODE_ENV=production`.
 
 Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin actividad y se cierra a mano. Las contraseñas temporales obligan a cambiarlas y vencen a las 72 h, y el frontend usa la sesión real.
 

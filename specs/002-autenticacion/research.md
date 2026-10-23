@@ -288,3 +288,9 @@ Detalles:
    - `/users` (listar, ver, crear con temporal, rol, desactivar, reactivar, restablecer, historial).
    - Último administrador (advisory lock + trigger diferido).
    - Auditoría y pantallas de usuarios.
+
+---
+
+## Decisión tras la revisión T031 (2026-10-23): ráfagas concurrentes en el bloqueo
+
+El bloqueo comprueba `auth_login_locked_until` antes de verificar la contraseña y registra el fallo después. En una ráfaga de intentos simultáneos sobre el mismo correo, se pueden probar más de 5 contraseñas antes de que el quinto fallo bloquee la cuenta: el exceso lo limita el pool de libuv, unos 4 scrypt en paralelo por instancia. US2-AC9 se cumple tal como está escrito, porque todos los fallos se cuentan. **El humano decidió aceptar el riesgo tal como está**, sin reservar el intento antes de calcular el hash. Si en el futuro se quiere un tope estricto, la alternativa es contar el fallo antes de scrypt y limpiarlo en `auth_record_login_success`.

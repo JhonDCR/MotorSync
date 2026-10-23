@@ -10,6 +10,7 @@ import { inject } from '@angular/core';
 import { mergeMap, Observable, throwError, timer, of } from 'rxjs';
 import { decodeSessionToken } from '../auth/current-session';
 import { MockApiStore, mockActor, mockProblem, type MockActor, type MockResult } from './mock-api.store';
+import { MockAuthStore } from './mock-auth.store';
 import { USE_MOCK_API } from './use-mock-api';
 
 // API simulada en memoria (research R8). Solo actúa con USE_MOCK_API en true y en rutas /api/.
@@ -25,6 +26,8 @@ const VEHICLES_PATH = '/api/v1/vehicles';
 const VEHICLE_BY_ID = /^\/api\/v1\/vehicles\/([^/]+)$/;
 const VEHICLE_TRANSFERS = /^\/api\/v1\/vehicles\/([^/]+)\/ownership-transfers$/;
 const VEHICLE_HISTORY = /^\/api\/v1\/vehicles\/([^/]+)\/ownership-history$/;
+const AUTH_REGISTER_PATH = '/api/v1/auth/register';
+const AUTH_LOGIN_PATH = '/api/v1/auth/login';
 const BEARER = /^Bearer\s+(\S+)$/i;
 
 /** Role and name of the request token (signature not verified); without a readable token, an asesor. */
@@ -59,8 +62,16 @@ function respond(req: HttpRequest<unknown>, result: MockResult<unknown>, locatio
   return of(new HttpResponse({ body: result.body, headers, status: result.status, url: req.urlWithParams }));
 }
 
-function route(req: HttpRequest<unknown>, store: MockApiStore): Observable<HttpEvent<unknown>> {
+function route(req: HttpRequest<unknown>, store: MockApiStore, auth: MockAuthStore): Observable<HttpEvent<unknown>> {
   const path = pathOf(req.url);
+
+  // Public auth routes of contract 002 (no token needed).
+  if (path === AUTH_REGISTER_PATH && req.method === 'POST') {
+    return respond(req, auth.register(req.body));
+  }
+  if (path === AUTH_LOGIN_PATH && req.method === 'POST') {
+    return respond(req, auth.login(req.body));
+  }
 
   if (path === CLIENTS_PATH && req.method === 'POST') {
     const result = store.createClient(req.body);
@@ -107,5 +118,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     return next(req);
   }
   const store = inject(MockApiStore);
-  return timer(MOCK_LATENCY_MS).pipe(mergeMap(() => route(req, store)));
+  const auth = inject(MockAuthStore);
+  return timer(MOCK_LATENCY_MS).pipe(mergeMap(() => route(req, store, auth)));
 };

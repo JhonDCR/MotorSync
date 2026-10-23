@@ -1,0 +1,52 @@
+<section class="auth-page" aria-labelledby="login-title">
+  <h1 id="login-title">Iniciar sesión</h1>
+  <p class="intro">Entre con el correo y la contraseña de su cuenta.</p>
+
+  @if (formError(); as message) {
+    <p class="form-error" role="alert" data-testid="form-error">{{ message }}</p>
+  }
+
+  @let fieldErrors = errors();
+  <form novalidate (submit)="submit($event)">
+    <div class="field">
+      <label for="login-email">Correo electrónico</label>
+      <input
+        id="login-email"
+        type="email"
+        inputmode="email"
+        autocomplete="username"
+        autocapitalize="off"
+        spellcheck="false"
+        data-testid="email"
+        [attr.aria-invalid]="fieldErrors.email ? 'true' : null"
+        [attr.aria-describedby]="fieldErrors.email ? 'login-email-error' : null"
+        (input)="update('email', $event)"
+      />
+      @if (fieldErrors.email) {
+        <p class="field-error" id="login-email-error" data-testid="error-email">{{ fieldErrors.email }}</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="login-password">Contraseña</label>
+      <input
+        id="login-password"
+        type="password"
+        autocomplete="current-password"
+        data-testid="password"
+        [attr.aria-invalid]="fieldErrors.password ? 'true' : null"
+        [attr.aria-describedby]="fieldErrors.password ? 'login-password-error' : null"
+        (input)="update('password', $event)"
+      />
+      @if (fieldErrors.password) {
+        <p class="field-error" id="login-password-error" data-testid="error-password">{{ fieldErrors.password }}</p>
+      }
+    </div>
+
+    <button type="submit" class="primary" data-testid="submit" [disabled]="submitting()">
+      {{ submitting() ? 'Entrando…' : 'Iniciar sesión' }}
+    </button>
+  </form>
+
+  <p class="alternate">¿Su taller aún no usa MotorSync? <a routerLink="/register">Registrar taller</a></p>
+</section>

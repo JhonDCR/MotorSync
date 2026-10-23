@@ -94,9 +94,11 @@ const MUST_BE_TEXT = 'Debe ser texto';
 
 const STATUS_TITLES: Record<number, string> = {
   400: 'Bad Request',
+  401: 'Unauthorized',
   404: 'Not Found',
   409: 'Conflict',
   422: 'Unprocessable Content',
+  429: 'Too Many Requests',
 };
 
 export function mockProblem(status: number, code: ProblemCode, extra: Partial<Problem> = {}): Problem {
@@ -117,7 +119,7 @@ function searchDocument(value: string): string {
   return fold(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
-function newId(): string {
+export function newId(): string {
   const cryptoApi: Crypto | undefined = globalThis.crypto;
   if (cryptoApi && typeof cryptoApi.randomUUID === 'function') {
     return cryptoApi.randomUUID();

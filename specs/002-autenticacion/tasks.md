@@ -236,7 +236,7 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
 
   — implementer-backend
 - [ ] T023 [P] [US2] Actualizar `backend/scripts/seed-dev.ts` (RUC válido para los talleres A y B, y un admin y un asesor por taller con contraseña de desarrollo impresa en consola; idempotente) y `backend/scripts/issue-dev-token.ts` (aviso si `AUTH_ALLOW_SESSIONLESS_TOKENS` no es `true`). Son scripts de desarrollo sin prueba propia: se verifican en T032 con quickstart §1 — implementer-backend
-- [ ] T024 [P] [US1] [US2] Pruebas del frontend:
+- [x] T024 [P] [US1] [US2] Pruebas del frontend:
   - `frontend/src/app/core/api/auth-api.service.spec.ts`: `register` y `login` llaman a `POST /api/v1/auth/register` y `/login` con `withCredentials` y propagan el `Problem`.
   - `frontend/src/app/core/api/mock-api.interceptor.auth.spec.ts` (nuevo), para `register` y `login` del mock:
     - 201 o 200 con `SessionResponse`;
@@ -244,8 +244,8 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
     - validación de campos.
 
   — tester
-- [ ] T025 [US1] [US2] Implementar los tipos del contrato 002 en `frontend/src/app/core/api/api.models.ts`, `frontend/src/app/core/api/auth-api.service.ts` y las rutas `register` y `login` en `frontend/src/app/core/api/mock-api.interceptor.ts` y `mock-api.store.ts` — implementer-frontend
-- [ ] T026 [US1] Pruebas de `frontend/src/app/features/auth/register.page.spec.ts`:
+- [x] T025 [US1] [US2] Implementar los tipos del contrato 002 en `frontend/src/app/core/api/api.models.ts`, `frontend/src/app/core/api/auth-api.service.ts` y las rutas `register` y `login` en `frontend/src/app/core/api/mock-api.interceptor.ts` y `mock-api.store.ts` — implementer-frontend
+- [x] T026 [US1] Pruebas de `frontend/src/app/features/auth/register.page.spec.ts`:
   - **US1-AC1**: al registrarse guarda `accessToken` en `localStorage` `motorsync.token` y navega a `/`.
   - **US1-AC3**: "RUC inválido" junto al campo, con el validador de `shared/identifiers/ec-document.ts`.
   - **US1-AC4**: "Este RUC ya tiene un taller registrado en MotorSync".
@@ -254,8 +254,8 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
   - Objetivos táctiles de 44 px (FR-025).
 
   — tester
-- [ ] T027 [US1] Implementar `frontend/src/app/features/auth/register.page.ts` (+ `.html` y `.scss`, mobile-first) y la ruta pública `register` en `frontend/src/app/app.routes.ts` — implementer-frontend
-- [ ] T028 [US2] Pruebas de `frontend/src/app/features/auth/login.page.spec.ts`:
+- [x] T027 [US1] Implementar `frontend/src/app/features/auth/register.page.ts` (+ `.html` y `.scss`, mobile-first) y la ruta pública `register` en `frontend/src/app/app.routes.ts` — implementer-frontend
+- [x] T028 [US2] Pruebas de `frontend/src/app/features/auth/login.page.spec.ts`:
   - **US2-AC1**: guarda el token y navega a `/`; si `user.mustChangePassword`, navega a `/change-password`.
   - **US2-AC3**: "Correo o contraseña incorrectos" para `INVALID_CREDENTIALS`.
   - **US2-AC5**: "Demasiados intentos fallidos. Intente de nuevo en unos minutos".
@@ -263,7 +263,7 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
   - El formulario no envía `tenantId` ni `role` (US2-AC10).
 
   — tester
-- [ ] T029 [US2] Implementar `frontend/src/app/features/auth/login.page.ts` (+ `.html` y `.scss`) y la ruta pública `login` — implementer-frontend
+- [x] T029 [US2] Implementar `frontend/src/app/features/auth/login.page.ts` (+ `.html` y `.scss`) y la ruta pública `login` — implementer-frontend
 
 ## Cierre PR1
 

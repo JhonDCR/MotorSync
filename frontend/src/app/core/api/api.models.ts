@@ -1,5 +1,5 @@
-// Tipos escritos a mano desde specs/001-clientes-vehiculos/contracts/openapi.yaml (research.md R8).
-// Si cambia el contrato, este archivo cambia con él.
+// Tipos escritos a mano desde specs/001-clientes-vehiculos/contracts/openapi.yaml (research.md R8)
+// y specs/002-autenticacion/contracts/openapi.yaml. Si cambia un contrato, este archivo cambia con él.
 
 export type ClientType = 'natural' | 'company';
 export type DocumentType = 'cedula' | 'ruc' | 'passport';
@@ -150,6 +150,45 @@ export interface OwnershipHistoryResponse {
   items: OwnershipChange[];
 }
 
+// --- Autenticación (contrato 002) ---
+
+export interface RegisterRequest {
+  workshopName: string;
+  ruc: string;
+  name: string;
+  email: string;
+  /** Se envía tal cual: sin recorte ni cambio de mayúsculas (FR-005). */
+  password: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface SessionUser {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  mustChangePassword: boolean;
+  temporaryPasswordExpiresAt: string | null;
+}
+
+export interface Workshop {
+  id: string;
+  name: string;
+}
+
+export interface SessionResponse {
+  /** JWT de acceso; el frontend lo guarda en localStorage `motorsync.token`. */
+  accessToken: string;
+  /** Segundos de vida del token de acceso (900). */
+  expiresIn: number;
+  user: SessionUser;
+  workshop: Workshop;
+}
+
 // --- Errores (application/problem+json, RFC 9457) ---
 
 export const PROBLEM_CODES = [
@@ -164,6 +203,22 @@ export const PROBLEM_CODES = [
   'VERSION_CONFLICT',
   'SAME_OWNER',
   'INTERNAL_ERROR',
+  // Contrato 002
+  'TOKEN_EXPIRED',
+  'SESSION_EXPIRED',
+  'SESSION_REVOKED',
+  'REFRESH_CONFLICT',
+  'INVALID_CREDENTIALS',
+  'ACCOUNT_LOCKED',
+  'TEMPORARY_PASSWORD_EXPIRED',
+  'PASSWORD_CHANGE_REQUIRED',
+  'CURRENT_PASSWORD_INCORRECT',
+  'RUC_ALREADY_REGISTERED',
+  'REGISTRATION_FAILED',
+  'EMAIL_UNAVAILABLE',
+  'LAST_ADMIN',
+  'SELF_RESET_NOT_ALLOWED',
+  'FORBIDDEN',
 ] as const;
 
 export type ProblemCode = (typeof PROBLEM_CODES)[number];
@@ -182,7 +237,12 @@ export type FieldErrorCode =
   | 'INVALID_MILEAGE'
   | 'REASON_REQUIRED'
   | 'REQUIRED'
-  | 'UNKNOWN_FIELD';
+  | 'UNKNOWN_FIELD'
+  // Contrato 002
+  | 'PASSWORD_TOO_SHORT'
+  | 'PASSWORD_TOO_LONG'
+  | 'SAME_PASSWORD'
+  | 'CURRENT_PASSWORD_INCORRECT';
 
 export interface FieldError {
   field: string;

@@ -134,3 +134,106 @@ export function touchSize(element: HTMLElement): number {
   const values = [toPx(style.minHeight), toPx(style.height)].filter((v) => !Number.isNaN(v));
   return values.length === 0 ? Number.NaN : Math.max(...values);
 }
+
+// --- PR2 (US3, US5): sesión, refresh, logout, me y cambio de contraseña ---
+//
+// Igual que arriba, tipos estructurales SOLO para las pruebas. El implementer-frontend (T040, T042, T044) debe
+// exportar desde core/api/api.models.ts los equivalentes del contrato: ChangePasswordRequest
+// ({ currentPassword, newPassword }) y el schema CurrentSession ({ user, workshop }) de GET /auth/me. Como
+// core/auth/current-session.ts ya exporta otro `CurrentSession` (rol y nombre del JWT, 001), el nombre del tipo de
+// /auth/me en api.models.ts queda a criterio del implementer (por ejemplo `CurrentSessionResponse`).
+
+export interface ChangePasswordRequestFixture {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface CurrentSessionFixture {
+  user: SessionUserFixture;
+  workshop: { id: string; name: string };
+}
+
+/** Nueva contraseña válida con espacios al inicio y al final: tampoco se recorta (FR-005). */
+export const NEW_PASSWORD = ' Nueva Clave Segura 2027  ';
+
+/** Contraseña temporal que el administrador entregó (US4-AC2); válida según FR-005. */
+export const TEMPORARY_PASSWORD = 'Temporal 2026!';
+
+export const REQUESTED_WITH_HEADER = 'X-Requested-With';
+export const REQUESTED_WITH_VALUE = 'motorsync';
+
+export const LOGIN_URL = '/api/v1/auth/login';
+export const REFRESH_URL = '/api/v1/auth/refresh';
+export const LOGOUT_URL = '/api/v1/auth/logout';
+export const ME_URL = '/api/v1/auth/me';
+export const PASSWORD_URL = '/api/v1/auth/password';
+
+/** Problem en application/problem+json, como lo responde el backend. */
+export const PROBLEM_HEADERS = { 'Content-Type': 'application/problem+json' } as const;
+
+const STATUS_TEXT: Record<number, string> = {
+  400: 'Bad Request',
+  401: 'Unauthorized',
+  403: 'Forbidden',
+  409: 'Conflict',
+  429: 'Too Many Requests',
+};
+
+/** Opciones de TestRequest.flush para responder un Problem con su status. */
+export function problemFlush(status: number): { status: number; statusText: string; headers: typeof PROBLEM_HEADERS } {
+  return { status, statusText: STATUS_TEXT[status] ?? 'Error', headers: PROBLEM_HEADERS };
+}
+
+/** Respuesta de GET /auth/me (schema CurrentSession del contrato 002). */
+export function currentSession(overrides: Partial<SessionUserFixture> = {}): CurrentSessionFixture {
+  const { user, workshop } = sessionResponse(overrides);
+  return { user, workshop };
+}
+
+/** SessionResponse con un accessToken propio (para distinguir el token viejo del nuevo tras un refresh). */
+export function sessionResponseWithToken(
+  accessToken: string,
+  overrides: Partial<SessionUserFixture> = {},
+): SessionResponseFixture {
+  return { ...sessionResponse(overrides), accessToken };
+}
+
+/** Claims del payload de un JWT (sin verificar la firma); null si no se puede leer. */
+export function decodeClaims(token: string): Record<string, unknown> | null {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const bytes = Uint8Array.from(atob(padded), (char) => char.charCodeAt(0));
+    const payload: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    return typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Motivos con los que se llega a /login (query `reason`) y el mensaje que muestra la página
+ * (data-testid="session-reason"). "expired" es literal de spec.md (US3-AC2); "temporary-expired" es el de US5-AC9;
+ * "revoked" y "logout" los fija esta suite.
+ */
+export const LOGIN_REASON_MESSAGES = {
+  expired: 'Su sesión expiró por inactividad',
+  revoked: 'Su sesión fue cerrada. Vuelva a iniciar sesión',
+  logout: 'Cerró su sesión',
+  'temporary-expired': 'Su contraseña temporal venció. Pida al administrador de su taller que la restablezca',
+} as const;
+
+export type LoginReason = keyof typeof LOGIN_REASON_MESSAGES;
+
+/** Mensajes de la pantalla de cambio de contraseña (US5). Los dos primeros son literales de spec.md. */
+export const CHANGE_PASSWORD_MESSAGES = {
+  MUST_CHANGE: 'Debe cambiar su contraseña antes de continuar',
+  CURRENT_PASSWORD_INCORRECT: 'La contraseña actual no es correcta',
+  PASSWORD_TOO_SHORT: 'La contraseña debe tener al menos 8 caracteres',
+  PASSWORD_TOO_LONG: 'La contraseña admite como máximo 128 caracteres',
+  SAME_PASSWORD: 'La nueva contraseña debe ser distinta de la actual',
+  CONFIRMATION_MISMATCH: 'Las contraseñas no coinciden',
+  REQUIRED: 'Este campo es obligatorio',
+} as const;

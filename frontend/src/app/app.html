@@ -1,30 +1,52 @@
 <header class="app-header">
   <h1 class="brand">MotorSync</h1>
-  <nav class="main-nav" aria-label="Principal">
-    <ul>
-      <li>
-        <a
-          routerLink="/"
-          routerLinkActive="active"
-          [routerLinkActiveOptions]="{ exact: true }"
-          ariaCurrentWhenActive="page"
-          >Vehículos</a
-        >
-      </li>
-      <li>
-        <a
-          routerLink="/clients"
-          routerLinkActive="active"
-          [routerLinkActiveOptions]="{ exact: true }"
-          ariaCurrentWhenActive="page"
-          >Clientes</a
-        >
-      </li>
-      <li>
-        <a routerLink="/clients/new" routerLinkActive="active" ariaCurrentWhenActive="page">Registrar cliente</a>
-      </li>
-    </ul>
-  </nav>
+  <!-- FR-026: with a temporary password pending, the workshop navigation is hidden. -->
+  @if (!session.mustChangePassword()) {
+    <nav class="main-nav" aria-label="Principal">
+      <ul>
+        <li>
+          <a
+            routerLink="/"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+            ariaCurrentWhenActive="page"
+            >Vehículos</a
+          >
+        </li>
+        <li>
+          <a
+            routerLink="/clients"
+            routerLinkActive="active"
+            [routerLinkActiveOptions]="{ exact: true }"
+            ariaCurrentWhenActive="page"
+            >Clientes</a
+          >
+        </li>
+        <li>
+          <a routerLink="/clients/new" routerLinkActive="active" ariaCurrentWhenActive="page">Registrar cliente</a>
+        </li>
+      </ul>
+    </nav>
+  }
+  @if (session.user(); as user) {
+    <div class="session-bar">
+      <p class="session-info">
+        <span class="session-user" data-testid="session-user">{{ user.name }}</span>
+        <span class="session-role" data-testid="session-role">{{ roleLabel() }}</span>
+        <span class="session-workshop" data-testid="session-workshop">{{ session.workshop()?.name }}</span>
+      </p>
+      <button
+        type="button"
+        class="logout"
+        data-testid="logout"
+        [disabled]="loggingOut()"
+        [attr.aria-busy]="loggingOut() ? 'true' : null"
+        (click)="logout()"
+      >
+        Cerrar sesión
+      </button>
+    </div>
+  }
 </header>
 
 <main>

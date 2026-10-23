@@ -1,6 +1,7 @@
 import {
   Inject,
   Injectable,
+  Logger,
   Optional,
   UnauthorizedException,
   type CallHandler,
@@ -15,7 +16,9 @@ import type { AuthRole, AuthUser, AuthenticatedRequest } from '../auth/auth-user
 import { IS_PUBLIC_KEY } from '../auth/public.decorator.js';
 import { ROLES_KEY } from '../auth/roles.decorator.js';
 import { SessionValidator } from '../auth/session-validator.js';
+import { revokeSessionApart } from '../auth/sessions.service.js';
 import { ProblemException } from '../common/problem-details.filter.js';
+import { AfterReleaseError } from './after-release.js';
 import { tenantStorage } from './tenant-context.js';
 
 /**
@@ -31,6 +34,8 @@ import { tenantStorage } from './tenant-context.js';
  */
 @Injectable()
 export class TenantTransactionInterceptor implements NestInterceptor {
+  private readonly logger = new Logger(TenantTransactionInterceptor.name);
+
   constructor(
     @Inject(DataSource) private readonly dataSource: DataSource,
     @Optional() @Inject(Reflector) private readonly reflector?: Reflector,
@@ -51,6 +56,8 @@ export class TenantTransactionInterceptor implements NestInterceptor {
 
     return defer(async () => {
       const runner = this.dataSource.createQueryRunner();
+      let revokeExpiredTemporary = false;
+      let afterRelease: (() => Promise<unknown>) | undefined;
       try {
         await runner.connect();
         await runner.startTransaction();
@@ -66,11 +73,35 @@ export class TenantTransactionInterceptor implements NestInterceptor {
         return result;
       } catch (error) {
         if (runner.isTransactionActive) await runner.rollbackTransaction();
+        revokeExpiredTemporary = isTemporaryPasswordExpired(error);
+        if (error instanceof AfterReleaseError) {
+          afterRelease = error.afterRelease;
+          throw error.response;
+        }
         throw error;
       } finally {
+        // Work committed apart runs only now, after the rollback and the release: asking the pool
+        // for a second connection while holding the first one (with the session row locked) can
+        // exhaust it and hang every request of the session (T049).
         await runner.release();
+        if (revokeExpiredTemporary) await this.revokeExpiredTemporarySession(tokenUser);
+        // Not caught: if it fails the client gets a 500 (e.g. a failure that could not be counted).
+        if (afterRelease) await afterRelease();
       }
     });
+  }
+
+  /**
+   * Research R7: revokes the session in its own transaction. A failure is logged (no user data)
+   * and the 401 TEMPORARY_PASSWORD_EXPIRED is kept; the next request detects the expiry again.
+   */
+  private async revokeExpiredTemporarySession(user: AuthUser): Promise<void> {
+    try {
+      await revokeSessionApart(this.dataSource, user, 'temp_password_expired');
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Could not revoke a session with an expired temporary password: ${reason}`);
+    }
   }
 
   /** The token user, refreshed from the database when the token carries a session. */
@@ -106,4 +137,9 @@ export class TenantTransactionInterceptor implements NestInterceptor {
       context.getClass(),
     ]);
   }
+}
+
+/** 401 TEMPORARY_PASSWORD_EXPIRED: from SessionValidator or from POST /auth/password (R7). */
+function isTemporaryPasswordExpired(error: unknown): boolean {
+  return error instanceof ProblemException && error.code === 'TEMPORARY_PASSWORD_EXPIRED';
 }

@@ -49,9 +49,14 @@ function collectAuthFlags(source: NodeJS.ProcessEnv, problems: string[]): AuthFl
     problems,
   );
   const cookieSecure = readBoolean(source, 'AUTH_COOKIE_SECURE', true, problems);
+  const production = source.NODE_ENV?.trim() === 'production';
   // FR-T01: tokens without a session are never accepted in production.
-  if (allowSessionlessTokens && source.NODE_ENV?.trim() === 'production') {
+  if (allowSessionlessTokens && production) {
     problems.push('AUTH_ALLOW_SESSIONLESS_TOKENS=true is not allowed with NODE_ENV=production');
+  }
+  // Research R11 (T031-2): the refresh cookie always carries Secure in production.
+  if (!cookieSecure && production) {
+    problems.push('AUTH_COOKIE_SECURE=false is not allowed with NODE_ENV=production');
   }
   return { allowSessionlessTokens, cookieSecure };
 }

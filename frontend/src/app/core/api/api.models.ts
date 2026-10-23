@@ -189,6 +189,18 @@ export interface SessionResponse {
   workshop: Workshop;
 }
 
+/** GET /auth/me (schema CurrentSession del contrato 002): datos vigentes de la sesión. */
+export interface CurrentSessionResponse {
+  user: SessionUser;
+  workshop: Workshop;
+}
+
+/** POST /auth/password. Ambas contraseñas se envían tal cual (FR-005); sin userId (US5-AC8). */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
 // --- Errores (application/problem+json, RFC 9457) ---
 
 export const PROBLEM_CODES = [

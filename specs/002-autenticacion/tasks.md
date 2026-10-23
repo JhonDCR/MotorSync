@@ -305,14 +305,14 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
 
 ## Phase 5: Base del PR2
 
-- [ ] T033 [P] Pruebas en `backend/src/auth/cookies.spec.ts`:
+- [x] T033 [P] Pruebas en `backend/src/auth/cookies.spec.ts`:
   - `parseCookies()` con varias cookies, valores con `=`, header ausente o mal formado (no lanza);
   - opciones de `ms_refresh`: `HttpOnly`, `Secure` según `AUTH_COOKIE_SECURE`, `SameSite=Strict`, `Path=/api/v1/auth` y sin `Max-Age`;
   - `clearRefreshCookie` con `Max-Age=0` y el mismo `Path`;
   - `assertRequestedWith(headers)`: sin `X-Requested-With: motorsync` → 400 `VALIDATION_ERROR`.
 
   — tester
-- [ ] T034 Completar `backend/src/auth/cookies.ts` (parser propio, sin `cookie-parser`; research R11) — implementer-backend
+- [x] T034 Completar `backend/src/auth/cookies.ts` (parser propio, sin `cookie-parser`; research R11) — implementer-backend
 
 ## Phase 6: User Story 3, mantener la sesión y cerrarla (P1) (PR2)
 
@@ -320,7 +320,7 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
 
 **Independent Test**: quickstart §2, filas "Refresh" y "Logout", y la técnica de inactividad; e2e `backend/test/auth-session.e2e-spec.ts`.
 
-- [ ] T035 [US3] E2e en `backend/test/auth-session.e2e-spec.ts`:
+- [x] T035 [US3] E2e en `backend/test/auth-session.e2e-spec.ts`:
   - **US3-AC1**:
     - con `setSessionLastActivity(sid, 29)`, una petición da 200 y `last_activity_at` vuelve a ≈ `now()`;
     - repetir el ciclo tres veces, simulando más de 12 h de sesión con actividad, sigue dando 200 (sin duración máxima);
@@ -340,7 +340,7 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
   - Registrar en el log el p95 de 200 peticiones `GET /auth/me` (quickstart §5, sin umbral).
 
   — tester
-- [ ] T036 [US3] Implementar en `backend/src/auth/sessions.service.ts`:
+- [x] T036 [US3] Implementar en `backend/src/auth/sessions.service.ts`:
   - rotación con detección de reutilización y la ventana de 10 s;
   - poda de tokens rotados hace más de 1 día de la misma sesión;
   - revocación.
@@ -353,7 +353,7 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
 
 **Independent Test**: quickstart §2, fila "Temporal"; e2e `backend/test/auth-password.e2e-spec.ts`. Las cuentas temporales se crean con `createUser({ mustChangePassword: true, tempPasswordExpiresAt })` de T002, porque `/users` llega en el PR3.
 
-- [ ] T037 [US5] E2e en `backend/test/auth-password.e2e-spec.ts`:
+- [x] T037 [US5] E2e en `backend/test/auth-password.e2e-spec.ts`:
   - **US5-AC1**: con una temporal vigente, el login da 200 con `pwd_change: true`. Con ese token, `GET /vehicles/search?q=PB`, `GET /clients/search?q=an` y `GET /users` dan 403 `PASSWORD_CHANGE_REQUIRED`; `GET /auth/me` da 200.
   - **US5-AC2**: `POST /auth/password` con la temporal y una nueva válida da 200 con un token `pwd_change: false` que ya accede a `/vehicles/search`; la temporal deja de servir para el login.
   - **US5-AC3**: con dos sesiones, cambiar desde la A deja la B con 401 `SESSION_REVOKED` (`password_changed`), la A sigue y la contraseña anterior da `INVALID_CREDENTIALS`.
@@ -367,7 +367,7 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
     - si vence durante la sesión, `POST /auth/password` da 401 `TEMPORARY_PASSWORD_EXPIRED` y revoca la sesión (`temp_password_expired`).
 
   — tester
-- [ ] T038 [US5] Implementar:
+- [x] T038 [US5] Implementar:
   - `backend/src/auth/dto/change-password.dto.ts` (`currentPassword` de 1 a 128 y `newPassword` con `IsPassword`);
   - `AuthService.changePassword`: comprobar el bloqueo, verificar la actual (un fallo cuenta con `auth_record_login_failure`), rechazar `SAME_PASSWORD`, actualizar el hash, `must_change_password = false` y `temp_password_expires_at = NULL`, revocar las otras sesiones (`password_changed`) y emitir un acceso nuevo;
   - la comprobación de vencimiento de la temporal en `AuthService.login`;
@@ -377,7 +377,7 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
 
 ## Phase 8: Frontend de sesión (US3, US5) (PR2)
 
-- [ ] T039 [P] [US3] Pruebas en `frontend/src/app/core/auth/session.store.spec.ts` y `frontend/src/app/core/auth/auth.guards.spec.ts`:
+- [x] T039 [P] [US3] Pruebas en `frontend/src/app/core/auth/session.store.spec.ts` y `frontend/src/app/core/auth/auth.guards.spec.ts`:
   - el store se llena desde `SessionResponse` y desde `/auth/me`, no del JWT;
   - `clear()` borra `motorsync.token`;
   - `authGuard` sin sesión → `/login`;
@@ -385,8 +385,8 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
   - `adminGuard` con rol `asesor` → `/` (US4-AC16, interfaz).
 
   — tester
-- [ ] T040 [US3] Implementar `frontend/src/app/core/auth/session.store.ts` y `frontend/src/app/core/auth/auth.guards.ts` — implementer-frontend
-- [ ] T041 [P] [US3] Pruebas en `frontend/src/app/core/auth/auth-refresh.interceptor.spec.ts`:
+- [x] T040 [US3] Implementar `frontend/src/app/core/auth/session.store.ts` y `frontend/src/app/core/auth/auth.guards.ts` — implementer-frontend
+- [x] T041 [P] [US3] Pruebas en `frontend/src/app/core/auth/auth-refresh.interceptor.spec.ts`:
   - 401 `TOKEN_EXPIRED` → **un solo** refresh aunque fallen 3 peticiones a la vez, y luego reintento de las 3 con el token nuevo;
   - `REFRESH_CONFLICT` → un reintento;
   - `SESSION_EXPIRED` → `clear()` y `/login?reason=expired`;
@@ -396,8 +396,8 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
   - no hay ningún refresh sin una petición del usuario (sin temporizadores; US3-AC2).
 
   — tester
-- [ ] T042 [US3] Implementar `frontend/src/app/core/auth/auth-refresh.interceptor.ts` y registrarlo en `frontend/src/app/app.config.ts`, después de `authTokenInterceptor` y antes de `mockApiInterceptor` — implementer-frontend
-- [ ] T043 [US5] Pruebas en `frontend/src/app/features/auth/change-password.page.spec.ts`:
+- [x] T042 [US3] Implementar `frontend/src/app/core/auth/auth-refresh.interceptor.ts` y registrarlo en `frontend/src/app/app.config.ts`, después de `authTokenInterceptor` y antes de `mockApiInterceptor` — implementer-frontend
+- [x] T043 [US5] Pruebas en `frontend/src/app/features/auth/change-password.page.spec.ts`:
   - **US5-AC1**: con `mustChangePassword` muestra "Debe cambiar su contraseña antes de continuar".
   - **US5-AC2**: al guardar actualiza el token y navega a `/`.
   - **US5-AC4**: "La contraseña actual no es correcta".
@@ -405,8 +405,8 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
   - **US5-AC9**: "Su contraseña temporal venció. Pida al administrador de su taller que la restablezca" y vuelta a `/login`.
 
   — tester
-- [ ] T044 [US5] Implementar `frontend/src/app/features/auth/change-password.page.ts` (+ `.html` y `.scss`) y la ruta `change-password` con `authGuard` — implementer-frontend
-- [ ] T045 [US3] Pruebas en `frontend/src/app/app.session.spec.ts` (nuevo) y `frontend/src/app/features/auth/login.page.session.spec.ts` (nuevo):
+- [x] T044 [US5] Implementar `frontend/src/app/features/auth/change-password.page.ts` (+ `.html` y `.scss`) y la ruta `change-password` con `authGuard` — implementer-frontend
+- [x] T045 [US3] Pruebas en `frontend/src/app/app.session.spec.ts` (nuevo) y `frontend/src/app/features/auth/login.page.session.spec.ts` (nuevo):
   - **US3-AC3**: la barra muestra el nombre y el taller, y "Cerrar sesión" a un toque o a dos desde el menú en 360 px (FR-025); al pulsarlo llama a `POST /auth/logout`, limpia la sesión y navega a `/login`.
   - **US3-AC2**: `/login?reason=expired` muestra "Su sesión expiró por inactividad".
   - Las rutas del taller (`''`, `clients`, `vehicles/...`) exigen `authGuard`.
@@ -414,13 +414,13 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
   - **US3-AC4** (interfaz): después de cerrar sesión, volver con "atrás" a una pantalla del taller redirige a `/login` sin mostrar datos.
 
   — tester
-- [ ] T046 [US3] Implementar la barra en `frontend/src/app/app.ts` y `frontend/src/app/app.html`, el mensaje de `reason` en `login.page.ts` y los guards en `frontend/src/app/app.routes.ts` — implementer-frontend
-- [ ] T047 [P] [US3] [US5] Pruebas del mock en `frontend/src/app/core/api/mock-api.interceptor.session.spec.ts` (nuevo): `refresh` (cookie simulada en memoria), `logout` idempotente, `me`, `password` (`CURRENT_PASSWORD_INCORRECT`, `SAME_PASSWORD`) y `PASSWORD_CHANGE_REQUIRED` con una sesión temporal — tester
-- [ ] T048 [US3] [US5] Implementar esas rutas en `frontend/src/app/core/api/mock-api.interceptor.ts` y `mock-api.store.ts` — implementer-frontend
+- [x] T046 [US3] Implementar la barra en `frontend/src/app/app.ts` y `frontend/src/app/app.html`, el mensaje de `reason` en `login.page.ts` y los guards en `frontend/src/app/app.routes.ts` — implementer-frontend
+- [x] T047 [P] [US3] [US5] Pruebas del mock en `frontend/src/app/core/api/mock-api.interceptor.session.spec.ts` (nuevo): `refresh` (cookie simulada en memoria), `logout` idempotente, `me`, `password` (`CURRENT_PASSWORD_INCORRECT`, `SAME_PASSWORD`) y `PASSWORD_CHANGE_REQUIRED` con una sesión temporal — tester
+- [x] T048 [US3] [US5] Implementar esas rutas en `frontend/src/app/core/api/mock-api.interceptor.ts` y `mock-api.store.ts` — implementer-frontend
 
 ## Cierre PR2
 
-- [ ] T049 Revisar el diff del PR2 contra la spec y la constitución 1.2.0. Foco:
+- [x] T049 Revisar el diff del PR2 contra la spec y la constitución 1.2.0. Foco:
   - la cookie con `HttpOnly`, `Secure`, `SameSite=Strict` y `Path`;
   - el refresh token nunca en un body ni en `localStorage`;
   - revocación inmediata en cada caso de FR-013;
@@ -430,7 +430,7 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
   - pruebas con ID para US3-AC1 a AC7 y US5-AC1 a AC9.
 
   — reviewer
-- [ ] T050 Verificar el PR2: lo mismo que en T032, más quickstart §2, filas "Refresh", "Logout" y "Temporal", la técnica de inactividad y §4, pasos 1 a 3, en 360 px y en una tablet. CI en verde — leader
+- [x] T050 Verificar el PR2: lo mismo que en T032, más quickstart §2, filas "Refresh", "Logout" y "Temporal", la técnica de inactividad y §4, pasos 1 a 3, en 360 px y en una tablet. CI en verde — leader
 
 ---
 
@@ -477,6 +477,7 @@ Al terminar, el administrador gestiona las cuentas de su taller con auditoría, 
   - **US4-AC23**: restablecer la propia cuenta → 409 `SELF_RESET_NOT_ALLOWED`.
   - **FR-020**: después de crear, cambiar el rol o desactivar, la cuenta devuelve `updatedAt` posterior al anterior y `updatedByName` del administrador que actuó.
   - Caso borde "restablecimiento mientras cambia su contraseña": si se restablece primero y luego Luis intenta `POST /auth/password` con la temporal anterior, la respuesta es 401 `SESSION_REVOKED`, porque su sesión ya se cerró; con la temporal nueva, en una sesión nueva, el cambio funciona.
+  - Incluye el caso movido desde T037: con contraseña temporal, GET /users → 403 PASSWORD_CHANGE_REQUIRED (US5-AC1).
 
   — tester
 - [ ] T054 [P] [US4] E2e de auditoría y aislamiento en `backend/test/users-audit.e2e-spec.ts`:

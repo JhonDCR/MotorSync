@@ -4,7 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import type { RegisterRequest, SessionResponse } from '../../core/api/api.models';
 import { AuthApiService } from '../../core/api/auth-api.service';
 import { fieldErrorMessage, fieldErrorMessages, isProblem, problemMessage } from '../../core/api/problem';
-import { AUTH_TOKEN_STORAGE_KEY } from '../../core/auth/auth-token.interceptor';
+import { SessionStore } from '../../core/auth/session.store';
 import { isValidRuc } from '../../shared/identifiers/ec-document';
 import { isValidEmail, normalizeEmail } from '../../shared/identifiers/email';
 import { normalizeDocument } from '../../shared/identifiers/normalize';
@@ -47,6 +47,7 @@ function nameError(value: string): string | null {
 export class RegisterPage {
   private readonly api = inject(AuthApiService);
   private readonly router = inject(Router);
+  private readonly session = inject(SessionStore);
   private readonly destroyRef = inject(DestroyRef);
 
   /** Typed values. The password is kept only here and never rendered back (FR-006). */
@@ -131,7 +132,7 @@ export class RegisterPage {
   }
 
   private signedIn(session: SessionResponse): void {
-    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, session.accessToken);
+    this.session.setSession(session);
     this.submitting.set(false);
     void this.router.navigateByUrl('/');
   }

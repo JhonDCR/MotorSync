@@ -23,7 +23,9 @@ import { App } from './app';
 import { routes } from './app.routes';
 import { ClientsApiService } from './core/api/clients-api.service';
 import { VehiclesApiService } from './core/api/vehicles-api.service';
+import { SessionStore } from './core/auth/session.store';
 import { VehicleSearchPage } from './features/vehicles/vehicle-search.page';
+import { sessionResponse } from '../testing/auth-fixtures';
 
 @Component({ template: '' })
 class StubPage {}
@@ -138,6 +140,8 @@ describe('Rutas raíz en app.routes (shell)', () => {
         },
       ],
     });
+    // 002 (PR2, T045): las rutas del taller exigen sesión (authGuard); sin ella irían a /login.
+    TestBed.inject(SessionStore).setSession(sessionResponse());
   });
 
   it('[FR-026] la raíz "" muestra la búsqueda de vehículos por placa, sin redirigir', async () => {

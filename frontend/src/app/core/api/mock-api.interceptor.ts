@@ -10,6 +10,7 @@ import { inject } from '@angular/core';
 import { mergeMap, Observable, throwError, timer, of } from 'rxjs';
 import { decodeSessionToken } from '../auth/current-session';
 import { MockApiStore, mockActor, mockProblem, type MockActor, type MockResult } from './mock-api.store';
+import { REQUESTED_WITH_HEADER, REQUESTED_WITH_VALUE } from './auth-api.service';
 import { MockAuthStore } from './mock-auth.store';
 import { USE_MOCK_API } from './use-mock-api';
 
@@ -28,12 +29,30 @@ const VEHICLE_TRANSFERS = /^\/api\/v1\/vehicles\/([^/]+)\/ownership-transfers$/;
 const VEHICLE_HISTORY = /^\/api\/v1\/vehicles\/([^/]+)\/ownership-history$/;
 const AUTH_REGISTER_PATH = '/api/v1/auth/register';
 const AUTH_LOGIN_PATH = '/api/v1/auth/login';
+const AUTH_REFRESH_PATH = '/api/v1/auth/refresh';
+const AUTH_LOGOUT_PATH = '/api/v1/auth/logout';
+const AUTH_ME_PATH = '/api/v1/auth/me';
+const AUTH_PASSWORD_PATH = '/api/v1/auth/password';
 const BEARER = /^Bearer\s+(\S+)$/i;
+
+function bearerToken(req: HttpRequest<unknown>): string | null {
+  return BEARER.exec(req.headers.get('Authorization')?.trim() ?? '')?.[1] ?? null;
+}
+
+/** R11: refresh and logout only with `X-Requested-With: motorsync` (CSRF). */
+function hasCsrfHeader(req: HttpRequest<unknown>): boolean {
+  return req.headers.get(REQUESTED_WITH_HEADER) === REQUESTED_WITH_VALUE;
+}
 
 /** Role and name of the request token (signature not verified); without a readable token, an asesor. */
 function actorOf(req: HttpRequest<unknown>): MockActor {
-  const token = BEARER.exec(req.headers.get('Authorization')?.trim() ?? '')?.[1] ?? null;
-  return mockActor(decodeSessionToken(token));
+  return mockActor(decodeSessionToken(bearerToken(req)));
+}
+
+/** Query parameter from HttpParams or, if absent, from a query written in the URL itself. */
+function queryParam(req: HttpRequest<unknown>, name: string): string | null {
+  const query = req.urlWithParams.split('#')[0].split('?')[1] ?? '';
+  return req.params.get(name) ?? new URLSearchParams(query).get(name);
 }
 
 /** Path of the request URL, without origin, query or fragment. */
@@ -72,13 +91,31 @@ function route(req: HttpRequest<unknown>, store: MockApiStore, auth: MockAuthSto
   if (path === AUTH_LOGIN_PATH && req.method === 'POST') {
     return respond(req, auth.login(req.body));
   }
+  if (path === AUTH_REFRESH_PATH && req.method === 'POST') {
+    return respond(req, auth.refresh(hasCsrfHeader(req)));
+  }
+  if (path === AUTH_LOGOUT_PATH && req.method === 'POST') {
+    return respond(req, auth.logout(hasCsrfHeader(req)));
+  }
+  if (path === AUTH_ME_PATH && req.method === 'GET') {
+    return respond(req, auth.me(bearerToken(req)));
+  }
+  if (path === AUTH_PASSWORD_PATH && req.method === 'POST') {
+    return respond(req, auth.changePassword(bearerToken(req), req.body));
+  }
+
+  // Workshop routes (001): a token with a session must be live and without a pending temporary password.
+  const blocked = auth.workshopAccessProblem(bearerToken(req));
+  if (blocked !== null) {
+    return respond(req, { ok: false, problem: blocked });
+  }
 
   if (path === CLIENTS_PATH && req.method === 'POST') {
     const result = store.createClient(req.body);
     return respond(req, result, result.ok ? `${CLIENTS_PATH}/${result.body.id}` : undefined);
   }
   if (path === `${CLIENTS_PATH}/search` && req.method === 'GET') {
-    return respond(req, store.searchClients(req.params.get('q')));
+    return respond(req, store.searchClients(queryParam(req, 'q')));
   }
   const byId = CLIENT_BY_ID.exec(path);
   if (byId !== null && req.method === 'GET') {
@@ -93,7 +130,7 @@ function route(req: HttpRequest<unknown>, store: MockApiStore, auth: MockAuthSto
   }
   // Before VEHICLE_BY_ID, otherwise "search" would be read as a vehicle id.
   if (path === `${VEHICLES_PATH}/search` && req.method === 'GET') {
-    return respond(req, store.searchVehicles(req.params.get('q')));
+    return respond(req, store.searchVehicles(queryParam(req, 'q')));
   }
   const vehicleById = VEHICLE_BY_ID.exec(path);
   if (vehicleById !== null && req.method === 'GET') {

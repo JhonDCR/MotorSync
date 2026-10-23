@@ -80,6 +80,52 @@ describe('loadEnv: banderas de autenticación (T006, research R9)', () => {
   );
 });
 
+describe('AUTH_COOKIE_SECURE en producción (ajuste 2 del reviewer T031, research R11)', () => {
+  it('[R11][T031-2] loadEnv lanza un error que nombra AUTH_COOKIE_SECURE si es false con NODE_ENV=production', () => {
+    const error = errorOf(() =>
+      loadEnv(baseEnv({ AUTH_COOKIE_SECURE: 'false', NODE_ENV: 'production' })),
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect(error.message).toContain('AUTH_COOKIE_SECURE');
+  });
+
+  it('[R11][T031-2] readAuthFlags aplica la misma regla (la usa cookies.ts en cada respuesta)', () => {
+    expect(() =>
+      readAuthFlags({ AUTH_COOKIE_SECURE: 'false', NODE_ENV: 'production' }),
+    ).toThrow(/AUTH_COOKIE_SECURE/);
+  });
+
+  it('[R11][T031-2] en producción arranca con AUTH_COOKIE_SECURE=true o ausente', () => {
+    expect(
+      loadEnv(baseEnv({ AUTH_COOKIE_SECURE: 'true', NODE_ENV: 'production' })).cookieSecure,
+    ).toBe(true);
+    expect(loadEnv(baseEnv({ NODE_ENV: 'production' })).cookieSecure).toBe(true);
+  });
+
+  it.each(['development', 'test'])(
+    '[R11][T031-2] AUTH_COOKIE_SECURE=false sigue permitido con NODE_ENV=%s',
+    (nodeEnv) => {
+      expect(
+        loadEnv(baseEnv({ AUTH_COOKIE_SECURE: 'false', NODE_ENV: nodeEnv })).cookieSecure,
+      ).toBe(false);
+    },
+  );
+
+  it('[R11][T031-2][FR-T01] con las dos banderas inválidas en producción el error nombra ambas', () => {
+    const error = errorOf(() =>
+      loadEnv(
+        baseEnv({
+          AUTH_ALLOW_SESSIONLESS_TOKENS: 'true',
+          AUTH_COOKIE_SECURE: 'false',
+          NODE_ENV: 'production',
+        }),
+      ),
+    );
+    expect(error.message).toContain('AUTH_ALLOW_SESSIONLESS_TOKENS');
+    expect(error.message).toContain('AUTH_COOKIE_SECURE');
+  });
+});
+
 describe('loadEnv: validaciones de la 001 sin cambios (T006)', () => {
   it('[T006] con la configuración mínima devuelve los campos de la 001 y el puerto por defecto', () => {
     expect(loadEnv(baseEnv())).toMatchObject({

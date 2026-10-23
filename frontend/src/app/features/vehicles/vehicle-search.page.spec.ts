@@ -31,7 +31,9 @@ import { of, Subject, throwError } from 'rxjs';
 import type { Problem, VehicleSearchItem, VehicleSearchResponse } from '../../core/api/api.models';
 import { ClientsApiService } from '../../core/api/clients-api.service';
 import { VehiclesApiService } from '../../core/api/vehicles-api.service';
+import { SessionStore } from '../../core/auth/session.store';
 import { routes } from '../../app.routes';
+import { sessionResponse } from '../../../testing/auth-fixtures';
 import { VehicleSearchPage } from './vehicle-search.page';
 
 @Component({ template: '' })
@@ -481,6 +483,8 @@ describe('Ruta de búsqueda de vehículos en app.routes (T055/T056)', () => {
         },
       ],
     });
+    // 002 (PR2, T045): las rutas del taller exigen sesión (authGuard); sin ella irían a /login.
+    TestBed.inject(SessionStore).setSession(sessionResponse());
   });
 
   it('[FR-026] la ruta inicial "" es la búsqueda por placa (sin redirigir)', async () => {

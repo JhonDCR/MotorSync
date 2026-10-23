@@ -4,8 +4,13 @@ import type { AuthUser } from './auth-user.js';
 
 /** Transaction of a @Public() auth route, opened without a tenant (research R2). */
 export interface AuthTransaction {
-  /** Manager of the transaction. Before asTenant() RLS shows no tenant rows. */
+  /** Manager of the transaction. Before asTenant() or pinTenant() RLS shows no tenant rows. */
   manager: EntityManager;
+  /**
+   * Pins `app.tenant_id` with a tenant the DATABASE returned (an auth_* function), without
+   * publishing a request context: for work that only uses `manager` (refresh, logout).
+   */
+  pinTenant(tenantId: string): Promise<void>;
   /**
    * Pins `app.tenant_id` with the tenant the DATABASE returned for a verified credential (never
    * one sent by the client) and runs `work` with tenantStorage published, so getManager() and
@@ -31,10 +36,14 @@ export async function withAuthTransaction<T>(
     await runner.connect();
     await runner.startTransaction();
     const manager = runner.manager;
+    const pinTenant = async (tenantId: string): Promise<void> => {
+      await manager.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+    };
     const tx: AuthTransaction = {
       manager,
+      pinTenant,
       async asTenant<U>(user: AuthUser, work: () => Promise<U>): Promise<U> {
-        await manager.query("SELECT set_config('app.tenant_id', $1, true)", [user.tenantId]);
+        await pinTenant(user.tenantId);
         return tenantStorage.run({ manager, tenantId: user.tenantId, user, ip }, work);
       },
     };

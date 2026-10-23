@@ -12,6 +12,7 @@ import { CreateUsers1761000000500 } from './migrations/1761000000500-CreateUsers
 import { CreateSessions1761000000600 } from './migrations/1761000000600-CreateSessions.js';
 import { CreateLoginAttempts1761000000700 } from './migrations/1761000000700-CreateLoginAttempts.js';
 import { CreateAuthFunctions1761000000800 } from './migrations/1761000000800-CreateAuthFunctions.js';
+import { FixLoginFailurePruneLocking1761000000850 } from './migrations/1761000000850-FixLoginFailurePruneLocking.js';
 
 // Registered by class reference, never by glob: TypeORM's path loading does not work in ESM.
 export const ENTITIES: (new () => object)[] = [Client, Vehicle, AuditLog];
@@ -25,7 +26,19 @@ export const MIGRATIONS: (new () => object)[] = [
   CreateSessions1761000000600,
   CreateLoginAttempts1761000000700,
   CreateAuthFunctions1761000000800,
+  FixLoginFailurePruneLocking1761000000850,
 ];
+
+/**
+ * Connections of the API pool: pg's default, made explicit. A request holds ONE connection for its
+ * whole transaction; work committed apart runs after releasing it (after-release.ts, T049).
+ */
+export const APP_POOL_SIZE = 10;
+/**
+ * Upper bound to open a connection or to wait for a free one in the pool (pg
+ * connectionTimeoutMillis): an exhausted pool fails the request instead of waiting forever.
+ */
+export const APP_CONNECT_TIMEOUT_MS = 10_000;
 
 /** Options of the runtime connection of the API as motorsync_app (no BYPASSRLS). */
 export function appDataSourceOptions(
@@ -37,6 +50,8 @@ export function appDataSourceOptions(
     synchronize: false,
     migrationsRun: false,
     entities: ENTITIES,
+    connectTimeoutMS: APP_CONNECT_TIMEOUT_MS,
+    extra: { max: APP_POOL_SIZE },
   };
 }
 

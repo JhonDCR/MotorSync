@@ -8,7 +8,8 @@ Reglas no negociables del proyecto. Todo `plan.md` debe pasar el "Constitution C
 
 - Toda tabla de negocio tiene una columna `tenant_id uuid NOT NULL`, indexada y con FK a `tenants`.
 - Toda tabla de negocio tiene Row-Level Security habilitada (`ENABLE` + `FORCE ROW LEVEL SECURITY`) con una política que compara `tenant_id` con `current_setting('app.tenant_id')`.
-- El backend fija el tenant por transacción (`SET LOCAL app.tenant_id`) a partir del token autenticado. Nunca lo toma del body, de la query ni de un header enviado por el cliente.
+- El backend fija el tenant por transacción (`SET LOCAL app.tenant_id`) a partir del token autenticado o, en las rutas de autenticación (inicio de sesión, renovación de sesión, registro), de la credencial verificada en el servidor. Nunca lo toma del body, de la query ni de un header enviado por el cliente.
+- Una lectura que cruce talleres solo se admite en funciones de base de datos acotadas a la autenticación: buscan por igualdad de un secreto o de un identificador único, devuelven las columnas mínimas y no usan un rol con `BYPASSRLS`. Cualquier otro acceso entre talleres requiere una enmienda.
 - La aplicación se conecta con un rol sin `BYPASSRLS`. Las migraciones usan un rol separado.
 - Cada módulo con datos de negocio tiene al menos una prueba que demuestra que el tenant A no puede leer ni modificar datos del tenant B.
 
@@ -34,7 +35,7 @@ Reglas no negociables del proyecto. Todo `plan.md` debe pasar el "Constitution C
 
 ### IV. Auditoría inmutable
 
-- Estos eventos se registran en `audit_log`: cambio de precio en un presupuesto aprobado, salida manual de inventario, anulación de OT, cambio de estado de OT, aceptación o rechazo de presupuesto por el cliente, cambios de rol de usuarios, transferencia de un vehículo a otro propietario, y modificación de identificadores (placa, VIN, documento del cliente).
+- Estos eventos se registran en `audit_log`: cambio de precio en un presupuesto aprobado, salida manual de inventario, anulación de OT, cambio de estado de OT, aceptación o rechazo de presupuesto por el cliente, cambios de rol de usuarios, desactivación y reactivación de cuentas de usuario, restablecimiento de contraseñas por un administrador, transferencia de un vehículo a otro propietario, y modificación de identificadores (placa, VIN, documento del cliente).
 - Cada registro guarda `tenant_id`, actor y su rol, acción, entidad, id, valores antes y después (JSON), fecha y hora (UTC), IP o canal, y el motivo cuando la acción lo exige.
 - `audit_log` es append-only: el rol de aplicación solo tiene `INSERT` y `SELECT`. No existe endpoint para editar ni borrar registros.
 - La auditoría se escribe en la misma transacción que el cambio auditado.
@@ -72,4 +73,4 @@ Reglas no negociables del proyecto. Todo `plan.md` debe pasar el "Constitution C
 - Una enmienda requiere un PR propio (`docs: amend constitution …`) aprobado por ambos integrantes, con la versión incrementada según SemVer: MAJOR si elimina o redefine un principio, MINOR si agrega uno o lo amplía, PATCH si solo aclara redacción.
 - Todo PR se revisa contra esta constitución. Una violación se justifica en el plan ("Complexity Tracking") o bloquea el merge.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-21 | **Last Amended**: 2026-10-21
+**Version**: 1.2.0 | **Ratified**: 2026-10-21 | **Last Amended**: 2026-10-23

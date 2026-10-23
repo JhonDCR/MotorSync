@@ -267,7 +267,7 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
 
 ## Cierre PR1
 
-- [ ] T030 Actualizar `CLAUDE.md`:
+- [x] T030 Actualizar `CLAUDE.md`:
   - volver a correr `npm run db:bootstrap` tras actualizar (rol `motorsync_auth`);
   - el seed crea usuarios;
   - el login real frente a `token:dev` (`AUTH_ALLOW_SESSIONLESS_TOKENS` y FR-T01);

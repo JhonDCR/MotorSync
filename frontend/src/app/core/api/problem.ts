@@ -25,6 +25,11 @@ const FIELD_MESSAGES: Record<Exclude<FieldErrorCode, 'INVALID_PLATE'>, string> =
   REASON_REQUIRED: 'El motivo es obligatorio (entre 10 y 500 caracteres)',
   REQUIRED: 'Este campo es obligatorio',
   UNKNOWN_FIELD: 'Campo no permitido',
+  // Contrato 002 (FR-005, US5-AC4, US5-AC5). Nunca se repite el `message` del servidor.
+  PASSWORD_TOO_SHORT: 'La contraseña debe tener al menos 8 caracteres',
+  PASSWORD_TOO_LONG: 'La contraseña admite como máximo 128 caracteres',
+  SAME_PASSWORD: 'La nueva contraseña debe ser distinta de la actual',
+  CURRENT_PASSWORD_INCORRECT: 'La contraseña actual no es correcta',
 };
 
 const PROBLEM_MESSAGES: Record<ProblemCode, string> = {
@@ -39,6 +44,23 @@ const PROBLEM_MESSAGES: Record<ProblemCode, string> = {
   VERSION_CONFLICT: 'Otra persona modificó este registro. Revise los datos actuales y vuelva a intentarlo',
   SAME_OWNER: 'El vehículo ya pertenece a este cliente',
   INTERNAL_ERROR: 'Ocurrió un error inesperado en el servidor. Inténtelo de nuevo en unos minutos',
+  // Contrato 002: los mensajes entre comillas de spec.md van literales.
+  TOKEN_EXPIRED: 'Su acceso venció. Vuelva a iniciar sesión',
+  SESSION_EXPIRED: 'Su sesión expiró por inactividad',
+  SESSION_REVOKED: 'Su sesión fue cerrada. Vuelva a iniciar sesión',
+  REFRESH_CONFLICT: 'La sesión se estaba renovando en otra pestaña. Vuelva a intentarlo',
+  INVALID_CREDENTIALS: 'Correo o contraseña incorrectos',
+  ACCOUNT_LOCKED: 'Demasiados intentos fallidos. Intente de nuevo en unos minutos',
+  TEMPORARY_PASSWORD_EXPIRED: 'Su contraseña temporal venció. Pida al administrador de su taller que la restablezca',
+  PASSWORD_CHANGE_REQUIRED: 'Debe cambiar su contraseña antes de continuar',
+  CURRENT_PASSWORD_INCORRECT: 'La contraseña actual no es correcta',
+  RUC_ALREADY_REGISTERED: 'Este RUC ya tiene un taller registrado en MotorSync',
+  REGISTRATION_FAILED: 'No se pudo completar el registro con estos datos; si ya tiene una cuenta, inicie sesión',
+  EMAIL_UNAVAILABLE:
+    'No se pudo crear la cuenta con este correo. Si la persona ya tiene una cuenta en su taller, búsquela en la lista; si no, use otro correo',
+  LAST_ADMIN: 'El taller debe tener al menos un administrador activo',
+  SELF_RESET_NOT_ALLOWED: 'Para su propia cuenta use Cambiar mi contraseña',
+  FORBIDDEN: 'No tiene permisos para gestionar usuarios',
 };
 
 const NOT_FOUND_BY_RESOURCE: Record<NonNullable<ProblemContext['resource']>, string> = {

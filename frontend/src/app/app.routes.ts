@@ -13,6 +13,17 @@ const devRoutes: Routes = isDevMode()
   : [];
 
 export const routes: Routes = [
+  // Public routes of the 002 (US1, US2): no session needed.
+  {
+    path: 'register',
+    title: 'Registrar taller',
+    loadComponent: () => import('./features/auth/register.page').then((m) => m.RegisterPage),
+  },
+  {
+    path: 'login',
+    title: 'Iniciar sesión',
+    loadComponent: () => import('./features/auth/login.page').then((m) => m.LoginPage),
+  },
   // FR-026: the start screen is the vehicle search by plate, one tap away from anywhere.
   {
     path: '',

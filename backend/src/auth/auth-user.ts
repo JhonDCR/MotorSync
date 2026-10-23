@@ -8,6 +8,10 @@ export interface AuthUser {
   tenantId: string;
   role: AuthRole;
   name: string;
+  /** `sid` claim: the user_sessions row validated on every request (research R5, R6). */
+  sessionId?: string;
+  /** `pwd_change` claim; the database is the authority (research R7). */
+  mustChangePassword?: boolean;
 }
 
 /** Shape of the HTTP request once JwtAuthGuard has run. */

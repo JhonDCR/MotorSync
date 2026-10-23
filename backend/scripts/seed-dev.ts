@@ -5,7 +5,10 @@
 // set_config('app.tenant_id', ..., true) inside a single transaction.
 // Idempotent: fixed tenant uuids and ON CONFLICT DO NOTHING on the natural keys (tenant + document,
 // tenant + plate), so a second run inserts nothing and says so.
+// Feature 002 (T023): each workshop gets a valid RUC and one admin and one asesor account, with a
+// development password printed on the console (npm run token:dev keeps working without them).
 import pg from 'pg';
+import { PasswordHasher } from '../src/auth/password-hasher.js';
 import { requireEnv } from '../src/config/env.js';
 import { loadRootEnvFile } from '../src/config/env-file.js';
 import {
@@ -18,9 +21,22 @@ import {
   type BodyType,
 } from '../src/common/identifiers/plate.js';
 import { isValidVin } from '../src/common/identifiers/vin.js';
+import {
+  isValidEmail,
+  normalizeEmail,
+} from '../src/common/identifiers/email.js';
 
 const SEED_ACTOR_ID = '00000000-0000-4000-8000-000000000001';
 const SEED_ACTOR_NAME = 'Seed dev';
+/** Development only: never use it outside a local database. */
+const DEV_PASSWORD = 'MotorSync-dev-2026';
+
+interface SeedUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'asesor';
+}
 
 type SeedClient =
   | {
@@ -58,6 +74,9 @@ interface SeedTenant {
   key: 'A' | 'B';
   id: string;
   name: string;
+  /** RUC of the workshop (private company: third digit 9, structure only, decision P1). */
+  ruc: string;
+  users: SeedUser[];
   clients: SeedClient[];
   vehicles: SeedVehicle[];
 }
@@ -69,6 +88,21 @@ const TENANTS: readonly SeedTenant[] = [
     key: 'A',
     id: '0a000000-0000-4000-8000-00000000000a',
     name: 'Taller A (dev)',
+    ruc: '1791234567001',
+    users: [
+      {
+        id: '0a000000-0000-4000-8000-0000000000a1',
+        name: 'Admin Taller A',
+        email: 'admin@taller-a.test',
+        role: 'admin',
+      },
+      {
+        id: '0a000000-0000-4000-8000-0000000000a2',
+        name: 'Asesor Taller A',
+        email: 'asesor@taller-a.test',
+        role: 'asesor',
+      },
+    ],
     clients: [
       {
         clientType: 'natural',
@@ -137,6 +171,21 @@ const TENANTS: readonly SeedTenant[] = [
     key: 'B',
     id: '0b000000-0000-4000-8000-00000000000b',
     name: 'Taller B (dev)',
+    ruc: '1792345678001',
+    users: [
+      {
+        id: '0b000000-0000-4000-8000-0000000000b1',
+        name: 'Admin Taller B',
+        email: 'admin@taller-b.test',
+        role: 'admin',
+      },
+      {
+        id: '0b000000-0000-4000-8000-0000000000b2',
+        name: 'Asesor Taller B',
+        email: 'asesor@taller-b.test',
+        role: 'asesor',
+      },
+    ],
     clients: [
       {
         clientType: 'natural',
@@ -193,6 +242,14 @@ const DOCUMENT_VALIDATORS = {
 /** Fails before touching the database if an example would be rejected by the API. */
 function assertSeedIsValid(tenants: readonly SeedTenant[]): void {
   for (const tenant of tenants) {
+    if (!isValidRuc(tenant.ruc)) {
+      throw new Error(`Seed: invalid RUC ${tenant.ruc} for workshop ${tenant.key}`);
+    }
+    for (const user of tenant.users) {
+      if (!isValidEmail(user.email) || normalizeEmail(user.email) !== user.email) {
+        throw new Error(`Seed: invalid email ${user.email}`);
+      }
+    }
     const documents = new Set(
       tenant.clients.map((client) => client.documentNumber),
     );
@@ -223,6 +280,7 @@ function assertSeedIsValid(tenants: readonly SeedTenant[]): void {
 
 interface SeedCounts {
   tenants: number;
+  users: number;
   clients: number;
   vehicles: number;
 }
@@ -230,16 +288,43 @@ interface SeedCounts {
 async function seedTenant(
   db: pg.Client,
   tenant: SeedTenant,
+  hasher: PasswordHasher,
   counts: SeedCounts,
 ): Promise<void> {
   const inserted = await db.query(
-    'INSERT INTO tenants (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING',
-    [tenant.id, tenant.name],
+    'INSERT INTO tenants (id, name, ruc) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING',
+    [tenant.id, tenant.name, tenant.ruc],
   );
   counts.tenants += inserted.rowCount ?? 0;
+  // Databases seeded before feature 002 have the workshop without RUC.
+  const withRuc = await db.query(
+    'UPDATE tenants SET ruc = $2 WHERE id = $1 AND ruc IS NULL',
+    [tenant.id, tenant.ruc],
+  );
+  counts.tenants += withRuc.rowCount ?? 0;
 
   // Local to the transaction: from here on RLS only lets this tenant's rows through.
   await db.query(`SELECT set_config('app.tenant_id', $1, true)`, [tenant.id]);
+
+  for (const user of tenant.users) {
+    // ON CONFLICT without target: neither the fixed id nor the (global) email is inserted twice.
+    const result = await db.query(
+      `INSERT INTO users (id, name, email, password_hash, role, created_by, updated_by,
+                          updated_by_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $6, $7)
+       ON CONFLICT DO NOTHING`,
+      [
+        user.id,
+        user.name,
+        user.email,
+        await hasher.hash(DEV_PASSWORD),
+        user.role,
+        SEED_ACTOR_ID,
+        SEED_ACTOR_NAME,
+      ],
+    );
+    counts.users += result.rowCount ?? 0;
+  }
 
   for (const client of tenant.clients) {
     const result = await db.query(
@@ -296,11 +381,12 @@ async function main(): Promise<void> {
     connectionString: requireEnv('DATABASE_MIGRATOR_URL'),
   });
   await db.connect();
-  const counts: SeedCounts = { tenants: 0, clients: 0, vehicles: 0 };
+  const hasher = new PasswordHasher();
+  const counts: SeedCounts = { tenants: 0, users: 0, clients: 0, vehicles: 0 };
   try {
     await db.query('BEGIN');
     try {
-      for (const tenant of TENANTS) await seedTenant(db, tenant, counts);
+      for (const tenant of TENANTS) await seedTenant(db, tenant, hasher, counts);
       await db.query('COMMIT');
     } catch (error: unknown) {
       await db.query('ROLLBACK');
@@ -310,19 +396,25 @@ async function main(): Promise<void> {
     await db.end();
   }
 
-  if (counts.tenants + counts.clients + counts.vehicles === 0) {
+  if (counts.tenants + counts.users + counts.clients + counts.vehicles === 0) {
     console.log('Seed data already present: nothing was inserted.');
   } else {
     console.log(
-      `Seed inserted ${counts.tenants} tenants, ${counts.clients} clients and ${counts.vehicles} vehicles.`,
+      `Seed inserted or updated ${counts.tenants} tenants, ${counts.users} users, ${counts.clients} clients and ${counts.vehicles} vehicles.`,
     );
   }
   for (const tenant of TENANTS) {
     const plates = tenant.vehicles.map((vehicle) => vehicle.plate).join(', ');
     console.log(
-      `Taller ${tenant.key}: ${tenant.id}  (${tenant.name}; placas ${plates})`,
+      `Taller ${tenant.key}: ${tenant.id}  (${tenant.name}; RUC ${tenant.ruc}; placas ${plates})`,
     );
+    for (const user of tenant.users) {
+      console.log(`  ${user.role.padEnd(6)} ${user.email}  (${user.name})`);
+    }
   }
+  console.log(
+    `Contraseña de desarrollo de todas las cuentas: ${DEV_PASSWORD} (solo para la base local).`,
+  );
 }
 
 try {

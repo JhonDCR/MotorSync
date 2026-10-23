@@ -32,12 +32,15 @@ Arranque local del backend, en orden (los scripts de BD ejecutan `dist/`, por es
 ```bash
 docker compose up -d                 # en la raíz; requiere .env copiado de .env.example
 cd backend && npm run build
-npm run db:bootstrap                 # roles motorsync_migrator y motorsync_app + extensiones (idempotente)
+npm run db:bootstrap                 # roles motorsync_migrator, motorsync_app y motorsync_auth + extensiones (idempotente)
 npm run db:migrate                   # como motorsync_migrator (idempotente)
-npm run db:seed:dev                  # talleres A y B con clientes y vehículos de ejemplo; imprime sus uuid
-npm run token:dev -- --tenant <uuid> --role asesor --name "Ana"   # JWT HS256 de desarrollo
+npm run db:seed:dev                  # talleres A y B con clientes, vehículos y usuarios (admin y asesor por taller); imprime la contraseña de desarrollo
 npm run start:dev                    # API en http://localhost:3000/api/v1
 ```
+
+Al actualizar desde una versión anterior a la feature 002, vuelve a correr `npm run db:bootstrap` antes de migrar: crea el rol `motorsync_auth`.
+
+Iniciar sesión en local: `POST /api/v1/auth/login` (o la página `/login` del frontend) con un usuario del seed, por ejemplo `admin@taller-a.test`. `npm run token:dev -- --tenant <uuid> --role asesor --name "Ana"` sigue sirviendo para pruebas rápidas, pero emite un token **sin sesión** que solo se acepta con `AUTH_ALLOW_SESSIONLESS_TOKENS=true`; la API no arranca con ese valor y `NODE_ENV=production` (FR-T01).
 
 `npm run test:perf` siembra 10 talleres × 30 000 clientes y 50 000 vehículos (de 1 a 9 min según la carga de la máquina) y falla si el p95 de búsqueda por placa, documento o VIN llega a 200 ms (US1-AC10). Corre en CI después de las e2e; en local úsalo solo al tocar consultas o índices de búsqueda.
 
@@ -75,4 +78,5 @@ Los permisos de cada rol los impone `.claude/hooks/guard-paths.mjs`. Si un hook 
 
 Cuando un agente cometa el mismo error dos veces, agrega aquí la regla que lo evita (una línea, en imperativo).
 
-- (vacío)
+- Una migración que cree, reemplace o borre funciones `auth_*` debe hacerlo como su dueño: `GRANT CREATE ON SCHEMA public TO motorsync_auth; SET ROLE motorsync_auth; …; RESET ROLE; REVOKE CREATE …` (specs/002-autenticacion/data-model.md, "Mantenimiento"). Sin el `SET ROLE`, un `REVOKE`/`GRANT` sobre ellas solo emite un WARNING y no hace nada.
+- Si dos agentes corren e2e a la vez, cada uno usa su propio puerto de PostgreSQL y su propio archivo de variables en el scratchpad; nunca un `env.sh` compartido.

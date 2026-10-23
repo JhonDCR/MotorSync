@@ -49,17 +49,24 @@ describe('App (e2e, T013)', () => {
     expect(typeof res.body.title).toBe('string');
   });
 
-  it('[T013][R3] GET /api/v1 con un token expirado o de otro secreto → 401 UNAUTHORIZED', async () => {
+  // Feature 002 (research R12, T012): a validly signed but expired token now answers
+  // 401 TOKEN_EXPIRED so the frontend refreshes; a token signed with another secret stays UNAUTHORIZED.
+  it('[T013][R3][R12] GET /api/v1 con un token con firma válida y vencido → 401 TOKEN_EXPIRED', async () => {
     const base = { tenantId: tenant.id, userId: randomUUID(), role: 'asesor' as const, name: 'Ana' };
-    for (const token of [
-      issueTestToken({ ...base, expiresIn: -60 }),
-      issueTestToken({ ...base, secret: 'x'.repeat(48) }),
-    ]) {
-      const res = await request(app.getHttpServer()).get('/api/v1').set(authHeader(token));
-      expect(res.status).toBe(401);
-      expect(res.headers['content-type']).toMatch(/^application\/problem\+json/);
-      expect(res.body).toMatchObject({ code: 'UNAUTHORIZED' });
-    }
+    const token = issueTestToken({ ...base, expiresIn: -60 });
+    const res = await request(app.getHttpServer()).get('/api/v1').set(authHeader(token));
+    expect(res.status).toBe(401);
+    expect(res.headers['content-type']).toMatch(/^application\/problem\+json/);
+    expect(res.body).toMatchObject({ code: 'TOKEN_EXPIRED' });
+  });
+
+  it('[T013][R3] GET /api/v1 con un token de otro secreto → 401 UNAUTHORIZED', async () => {
+    const base = { tenantId: tenant.id, userId: randomUUID(), role: 'asesor' as const, name: 'Ana' };
+    const token = issueTestToken({ ...base, secret: 'x'.repeat(48) });
+    const res = await request(app.getHttpServer()).get('/api/v1').set(authHeader(token));
+    expect(res.status).toBe(401);
+    expect(res.headers['content-type']).toMatch(/^application\/problem\+json/);
+    expect(res.body).toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
   it('[T013][R3] GET /api/v1 con issueTestToken() válido → 200', async () => {

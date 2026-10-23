@@ -22,8 +22,13 @@ const TRANSLATIONS: Record<string, Record<string, TranslatedPgError>> = {
     clients_tenant_document_key: { status: 409, code: 'DOCUMENT_ALREADY_EXISTS' },
     vehicles_tenant_plate_key: { status: 409, code: 'PLATE_ALREADY_EXISTS' },
     vehicles_tenant_vin_key: { status: 409, code: 'VIN_ALREADY_EXISTS' },
+    tenants_ruc_key: { status: 409, code: 'RUC_ALREADY_REGISTERED' },
+    // Generic on purpose: never reveals which workshop owns the email (FR-023).
+    users_email_key: { status: 409, code: 'EMAIL_UNAVAILABLE' },
   },
   [CHECK_VIOLATION]: {
+    // Deferred trigger of the last active administrator (research R8).
+    users_last_admin: { status: 409, code: 'LAST_ADMIN' },
     vehicles_plate_format: {
       status: 400,
       code: 'VALIDATION_ERROR',

@@ -35,3 +35,19 @@ CREATE EXTENSION IF NOT EXISTS btree_gin;
 
 ALTER SCHEMA public OWNER TO motorsync_migrator;
 GRANT USAGE ON SCHEMA public TO motorsync_app;
+
+-- Feature 002 (specs/002-autenticacion/data-model.md, "Bootstrap"; research R1).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'motorsync_auth') THEN
+    CREATE ROLE motorsync_auth;
+  END IF;
+  -- Dueño de las funciones SECURITY DEFINER (R1). Sin login y sin BYPASSRLS.
+  ALTER ROLE motorsync_auth NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOINHERIT;
+END
+$$;
+
+GRANT USAGE ON SCHEMA public TO motorsync_auth;
+-- El migrator debe poder hacer ALTER FUNCTION ... OWNER TO motorsync_auth (PG16: SET),
+-- sin heredar sus privilegios.
+GRANT motorsync_auth TO motorsync_migrator WITH INHERIT FALSE, SET TRUE;

@@ -1,0 +1,637 @@
+openapi: 3.1.0
+info:
+  title: MotorSync API - Autenticación, talleres y usuarios
+  version: 0.2.0
+  description: |
+    Contrato de la feature 002-autenticacion. Complementa al de la 001 (`specs/001-clientes-vehiculos/contracts/openapi.yaml`),
+    que sigue vigente. Frontend y backend trabajan contra este documento (principio III).
+
+    Reglas transversales:
+    - **Rutas públicas** (sin `Authorization`): `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`
+      y `POST /auth/logout`. El resto, incluidas todas las de la 001, exige `Authorization: Bearer <token de acceso>`.
+    - **Token de acceso**: JWT HS256 de 15 minutos con los claims `sub`, `tenant_id`, `role`, `name` y `exp` (los de la 001),
+      más `sid` (id de sesión, uuid) y `pwd_change` (booleano). El rol y el estado **vigentes** se leen de la base en cada
+      request: un cambio de rol o una desactivación aplican desde la siguiente acción (FR-014).
+    - Los tokens sin `sid` (desarrollo y pruebas, `npm run token:dev`) solo se aceptan si el servidor tiene
+      `AUTH_ALLOW_SESSIONLESS_TOKENS=true`; nunca en producción.
+    - **Refresh token**: opaco, solo en la cookie `ms_refresh` (`HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth`).
+      Nunca aparece en un body. `POST /auth/refresh` y `POST /auth/logout` exigen el header `X-Requested-With: motorsync`.
+    - El taller y el rol salen siempre de la sesión. `tenantId`, `tenant_id` o `role` donde el contrato no los define
+      provocan 400 `VALIDATION_ERROR` (US1-AC9, US2-AC10, US4-AC19).
+    - Una cuenta de otro taller responde exactamente igual que una inexistente: 404 `NOT_FOUND` (FR-022).
+    - Respuestas nuevas que puede recibir **cualquier** ruta protegida (también las de la 001):
+      - `401 TOKEN_EXPIRED`: el acceso venció; el frontend llama a `/auth/refresh` y reintenta.
+      - `401 SESSION_EXPIRED`: 30 minutos sin actividad (FR-012).
+      - `401 SESSION_REVOKED`: sesión cerrada, cuenta desactivada o contraseña cambiada o restablecida.
+      - `403 PASSWORD_CHANGE_REQUIRED`: la contraseña es temporal; solo se permiten `GET /auth/me`,
+        `POST /auth/password` y `POST /auth/logout` (FR-026).
+    - No existe borrado de cuentas ni de talleres (FR-017): `DELETE` sobre cualquier ruta responde 404 sin efectos.
+    - Ninguna respuesta contiene contraseñas ni hashes (FR-006).
+    - Errores en `application/problem+json` (RFC 9457) con `code` estable. Fechas en ISO 8601 UTC.
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Desarrollo local (el frontend llega por el proxy /api de ng serve, mismo origen)
+security:
+  - bearerAuth: []
+tags:
+  - name: auth
+  - name: users
+
+paths:
+  /auth/register:
+    post:
+      tags: [auth]
+      operationId: registerWorkshop
+      summary: Registrar un taller y su primer administrador e iniciar sesión (US1)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201':
+          description: Taller y cuenta creados; sesión iniciada. La contraseña elegida no es temporal (US1-AC1).
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/SetRefreshCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionResponse' }
+        '400':
+          description: '`VALIDATION_ERROR` con `errors[]` (US1-AC3: `INVALID_RUC` en `ruc`; US1-AC6).'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: |
+            - `RUC_ALREADY_REGISTERED`: el RUC ya tiene un taller (US1-AC4). Sin datos del taller.
+            - `REGISTRATION_FAILED`: el correo ya está en uso (US1-AC5). Genérico: no señala el campo ni confirma el correo.
+            Si coinciden ambos, se responde `RUC_ALREADY_REGISTERED`.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Iniciar sesión con correo y contraseña (US2)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200':
+          description: |
+            Sesión iniciada. Si `user.mustChangePassword` es `true`, el token lleva `pwd_change: true` y solo sirve
+            para cambiar la contraseña (US5-AC1).
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/SetRefreshCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionResponse' }
+        '400':
+          description: '`VALIDATION_ERROR` (campos ausentes o con formato inválido).'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: |
+            - `INVALID_CREDENTIALS`: correo inexistente, contraseña incorrecta o cuenta desactivada; misma respuesta y tiempo
+              equivalente (US2-AC3, US2-AC4).
+            - `TEMPORARY_PASSWORD_EXPIRED`: contraseña temporal correcta pero vencida (más de 72 h, US5-AC9).
+              No cuenta como intento fallido.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '429':
+          description: '`ACCOUNT_LOCKED`: 5 fallos seguidos para ese correo, durante 15 minutos (US2-AC5, US2-AC8). Igual exista o no el correo.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      operationId: refreshSession
+      summary: Rotar el refresh token y obtener un acceso nuevo (US3)
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/RefreshCookie'
+        - $ref: '#/components/parameters/RequestedWith'
+      responses:
+        '200':
+          description: Token de acceso nuevo, con el rol y el estado vigentes. La cookie se reemplaza (rotación).
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/SetRefreshCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionResponse' }
+        '401':
+          description: |
+            - `SESSION_EXPIRED`: sin cookie, cookie desconocida o 30 minutos sin actividad.
+            - `SESSION_REVOKED`: sesión cerrada, cuenta desactivada, contraseña cambiada o restablecida, o reutilización
+              de un token ya rotado (en ese caso se revoca la sesión entera).
+            La respuesta borra la cookie (`Max-Age=0`).
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/ClearRefreshCookie' }
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: '`REFRESH_CONFLICT`: el token se rotó hace menos de 10 s (dos pestañas a la vez). No revoca; el cliente reintenta una vez.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Cerrar la sesión de este equipo (US3-AC3)
+      description: Idempotente (US3-AC6). Revoca la sesión del refresh token de la cookie y borra la cookie. Las otras sesiones del usuario siguen activas (US3-AC5).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/RefreshCookie'
+        - $ref: '#/components/parameters/RequestedWith'
+      responses:
+        '204':
+          description: Sesión cerrada (o ya lo estaba).
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/ClearRefreshCookie' }
+
+  /auth/me:
+    get:
+      tags: [auth]
+      operationId: getCurrentSession
+      summary: Usuario y taller de la sesión actual
+      description: Permitida también con contraseña temporal pendiente de cambio.
+      responses:
+        '200':
+          description: Datos vigentes leídos de la base.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentSession' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/password:
+    post:
+      tags: [auth]
+      operationId: changeOwnPassword
+      summary: Cambiar la propia contraseña (US5)
+      description: |
+        Solo la cuenta de la sesión: no acepta identificadores de cuenta (US5-AC8). Cierra las **otras** sesiones de la
+        cuenta; la actual sigue (US5-AC3). Si la contraseña era temporal, deja de serlo (US5-AC2). No se audita.
+        Permitida con contraseña temporal pendiente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '200':
+          description: 'Contraseña cambiada. Devuelve un token de acceso nuevo (con `pwd_change: false`).'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionResponse' }
+        '400':
+          description: |
+            - `CURRENT_PASSWORD_INCORRECT` (`errors[]` en `currentPassword`): cuenta para el bloqueo de 5 fallos (US5-AC4).
+            - `VALIDATION_ERROR`: la nueva no cumple 8–128 caracteres o es igual a la actual (`SAME_PASSWORD`) (US5-AC5).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: |
+            Respuestas comunes de sesión, más `TEMPORARY_PASSWORD_EXPIRED`: la temporal venció durante la sesión;
+            se revoca la sesión actual.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '429':
+          description: '`ACCOUNT_LOCKED`: el correo de la cuenta está bloqueado; no se cierra la sesión en curso (US5-AC4).'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /users:
+    get:
+      tags: [users]
+      operationId: listUsers
+      summary: Listar las cuentas del taller (US4-AC1). Solo administrador.
+      responses:
+        '200':
+          description: Todas las cuentas del taller de la sesión (activas y desactivadas), sin contraseñas.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/UserAccount' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [users]
+      operationId: createUser
+      summary: Crear una cuenta con contraseña temporal (US4-AC2). Solo administrador.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateUserRequest' }
+      responses:
+        '201':
+          description: Cuenta activa con contraseña temporal (vence en 72 h). La contraseña no se devuelve.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccount' }
+        '400':
+          description: '`VALIDATION_ERROR` (US4-AC4).'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: '`EMAIL_UNAVAILABLE`: genérico, sin confirmar que el correo exista ni a qué taller pertenece (US4-AC3).'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /users/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [users]
+      operationId: getUser
+      summary: Ver una cuenta del taller. Solo administrador.
+      responses:
+        '200':
+          description: La cuenta.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccount' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /users/{userId}/role:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    put:
+      tags: [users]
+      operationId: changeUserRole
+      summary: Cambiar el rol de una cuenta (US4-AC5). Solo administrador. Auditado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [role]
+              properties:
+                role: { $ref: '#/components/schemas/Role' }
+      responses:
+        '200':
+          description: Cuenta actualizada (o sin cambios si ya tenía ese rol, sin auditoría, US4-AC15).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccount' }
+        '400':
+          description: '`VALIDATION_ERROR`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/LastAdmin' }
+
+  /users/{userId}/deactivate:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      tags: [users]
+      operationId: deactivateUser
+      summary: Desactivar una cuenta y cerrar sus sesiones (US4-AC6). Solo administrador. Auditado.
+      responses:
+        '200':
+          description: Cuenta desactivada (o ya lo estaba, sin auditoría).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccount' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/LastAdmin' }
+
+  /users/{userId}/reactivate:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      tags: [users]
+      operationId: reactivateUser
+      summary: Reactivar una cuenta con su mismo rol (US4-AC7). Solo administrador. Auditado.
+      responses:
+        '200':
+          description: Cuenta activa (o ya lo estaba, sin auditoría). No revive sesiones anteriores.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccount' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /users/{userId}/password-reset:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    post:
+      tags: [users]
+      operationId: resetUserPassword
+      summary: Restablecer la contraseña de otra cuenta del taller con una temporal (US4-AC21). Solo administrador. Auditado.
+      description: |
+        Invalida la contraseña anterior, marca la nueva como temporal (vence en 72 h), cierra todas las sesiones de la cuenta
+        y quita su bloqueo por intentos fallidos. La cuenta puede estar desactivada y sigue así (US4-AC22).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [temporaryPassword]
+              properties:
+                temporaryPassword: { $ref: '#/components/schemas/Password' }
+      responses:
+        '200':
+          description: Contraseña restablecida.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccount' }
+        '400':
+          description: '`VALIDATION_ERROR`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`SELF_RESET_NOT_ALLOWED`: la propia cuenta se cambia con `POST /auth/password` (US4-AC23).'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /users/{userId}/history:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [users]
+      operationId: getUserHistory
+      summary: Registros de auditoría de una cuenta, del más reciente al más antiguo (US4-AC12, AC13, AC24). Solo administrador.
+      responses:
+        '200':
+          description: Solo registros del taller de la sesión (US4-AC20).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/UserAuditEntry' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: ms_refresh
+
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    RefreshCookie:
+      name: ms_refresh
+      in: cookie
+      required: false
+      description: Refresh token opaco (base64url de 32 bytes). Lo pone y lo borra solo el servidor.
+      schema: { type: string }
+    RequestedWith:
+      name: X-Requested-With
+      in: header
+      required: true
+      description: Protección CSRF adicional a SameSite=Strict. Sin este valor, 400 `VALIDATION_ERROR`.
+      schema: { type: string, const: motorsync }
+
+  headers:
+    SetRefreshCookie:
+      description: '`ms_refresh=<token>; Path=/api/v1/auth; HttpOnly; Secure; SameSite=Strict` (sin Max-Age: la sesión no tiene duración máxima).'
+      schema: { type: string }
+    ClearRefreshCookie:
+      description: '`ms_refresh=; Path=/api/v1/auth; HttpOnly; Secure; SameSite=Strict; Max-Age=0`.'
+      schema: { type: string }
+
+  responses:
+    Unauthorized:
+      description: '`UNAUTHORIZED`, `TOKEN_EXPIRED`, `SESSION_EXPIRED` o `SESSION_REVOKED`.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: |
+        - `FORBIDDEN`: el rol vigente no es administrador (US4-AC16).
+        - `PASSWORD_CHANGE_REQUIRED`: contraseña temporal pendiente (US5-AC1).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: '`NOT_FOUND`: la cuenta no existe o es de otro taller (US4-AC17, US4-AC18).'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    LastAdmin:
+      description: '`LAST_ADMIN`: el taller quedaría sin administrador activo (US4-AC9, US4-AC10).'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Role:
+      type: string
+      enum: [asesor, admin]
+    UserStatus:
+      type: string
+      enum: [active, inactive]
+    Email:
+      type: string
+      maxLength: 254
+      description: El servidor recorta espacios y pasa a minúsculas antes de validar y comparar (FR-003).
+      example: ana.perez@taller.ec
+    Password:
+      type: string
+      minLength: 8
+      maxLength: 128
+      description: Se compara tal cual (sin recorte ni cambio de mayúsculas). Longitud en caracteres Unicode (FR-005).
+      writeOnly: true
+
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [workshopName, ruc, name, email, password]
+      properties:
+        workshopName: { type: string, minLength: 2, maxLength: 120, description: 'Nombre comercial; se recortan espacios.' }
+        ruc: { type: string, description: 'RUC del taller; se normaliza sin espacios ni guiones y se valida como en la 001 (FR-002).', example: '1790012345001' }
+        name: { type: string, minLength: 2, maxLength: 120 }
+        email: { $ref: '#/components/schemas/Email' }
+        password: { $ref: '#/components/schemas/Password' }
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+        password: { type: string, minLength: 1, maxLength: 128, writeOnly: true }
+
+    ChangePasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string, minLength: 1, maxLength: 128, writeOnly: true }
+        newPassword: { $ref: '#/components/schemas/Password' }
+
+    CreateUserRequest:
+      type: object
+      additionalProperties: false
+      required: [name, email, role, temporaryPassword]
+      properties:
+        name: { type: string, minLength: 2, maxLength: 120 }
+        email: { $ref: '#/components/schemas/Email' }
+        role: { $ref: '#/components/schemas/Role' }
+        temporaryPassword: { $ref: '#/components/schemas/Password' }
+
+    SessionUser:
+      type: object
+      required: [id, name, email, role, mustChangePassword]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        mustChangePassword: { type: boolean }
+        temporaryPasswordExpiresAt: { type: [string, 'null'], format: date-time }
+
+    Workshop:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+
+    SessionResponse:
+      type: object
+      required: [accessToken, expiresIn, user, workshop]
+      properties:
+        accessToken: { type: string, description: 'JWT HS256; el frontend lo guarda en localStorage `motorsync.token`.' }
+        expiresIn: { type: integer, description: 'Segundos de vida del token de acceso (900).', example: 900 }
+        user: { $ref: '#/components/schemas/SessionUser' }
+        workshop: { $ref: '#/components/schemas/Workshop' }
+
+    CurrentSession:
+      type: object
+      required: [user, workshop]
+      properties:
+        user: { $ref: '#/components/schemas/SessionUser' }
+        workshop: { $ref: '#/components/schemas/Workshop' }
+
+    UserAccount:
+      type: object
+      required: [id, name, email, role, status, mustChangePassword, createdAt, updatedAt, updatedByName]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        status: { $ref: '#/components/schemas/UserStatus' }
+        mustChangePassword: { type: boolean }
+        temporaryPasswordExpiresAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        updatedByName: { type: string }
+
+    UserAuditEntry:
+      type: object
+      required: [id, action, actorName, actorRole, occurredAt, before, after]
+      properties:
+        id: { type: string, format: uuid }
+        action:
+          type: string
+          enum: [user.role_changed, user.deactivated, user.reactivated, user.password_reset]
+        actorName: { type: string }
+        actorRole: { $ref: '#/components/schemas/Role' }
+        occurredAt: { type: string, format: date-time }
+        before: { type: [object, 'null'], additionalProperties: true }
+        after: { type: [object, 'null'], additionalProperties: true }
+        ip: { type: [string, 'null'] }
+        channel: { type: string, example: web }
+
+    FieldError:
+      type: object
+      required: [field, code, message]
+      properties:
+        field: { type: string }
+        code: { type: string, examples: [REQUIRED, INVALID_RUC, INVALID_EMAIL, PASSWORD_TOO_SHORT, PASSWORD_TOO_LONG, SAME_PASSWORD, CURRENT_PASSWORD_INCORRECT, UNKNOWN_FIELD] }
+        message: { type: string }
+
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri-reference, example: about:blank }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code:
+          type: string
+          enum:
+            - UNAUTHORIZED
+            - TOKEN_EXPIRED
+            - SESSION_EXPIRED
+            - SESSION_REVOKED
+            - REFRESH_CONFLICT
+            - INVALID_CREDENTIALS
+            - ACCOUNT_LOCKED
+            - TEMPORARY_PASSWORD_EXPIRED
+            - PASSWORD_CHANGE_REQUIRED
+            - CURRENT_PASSWORD_INCORRECT
+            - RUC_ALREADY_REGISTERED
+            - REGISTRATION_FAILED
+            - EMAIL_UNAVAILABLE
+            - LAST_ADMIN
+            - SELF_RESET_NOT_ALLOWED
+            - FORBIDDEN
+            - VALIDATION_ERROR
+            - NOT_FOUND
+            - INTERNAL_ERROR
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/FieldError' }

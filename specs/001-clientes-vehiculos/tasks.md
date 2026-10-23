@@ -235,8 +235,8 @@ Rama sugerida: `feat/001-clientes-vehiculos` (o una rama de PR por corte, según
 
 ## Cierre PR3
 
-- [ ] T084 Revisar el diff del PR3 contra la spec y la constitución 1.1.0 (principio IV ampliado). Foco: auditoría en la misma transacción, append-only, motivo según el rol tomado solo del JWT, bloqueo optimista en todas las escrituras, ningún endpoint ni botón de borrado, y pruebas con ID para US4-AC4 a AC17 — reviewer
-- [ ] T085 Verificar el PR3: lo mismo que en T063; quickstart §2 completo (filas 1 a 15) y §4 (diálogo de transferencia con token asesor y admin). CI en verde — leader
+- [x] T084 Revisar el diff del PR3 contra la spec y la constitución 1.1.0 (principio IV ampliado). Foco: auditoría en la misma transacción, append-only, motivo según el rol tomado solo del JWT, bloqueo optimista en todas las escrituras, ningún endpoint ni botón de borrado, y pruebas con ID para US4-AC4 a AC17 — reviewer
+- [x] T085 Verificar el PR3: lo mismo que en T063; quickstart §2 completo (filas 1 a 15) y §4 (diálogo de transferencia con token asesor y admin). CI en verde — leader
 
 ---
 

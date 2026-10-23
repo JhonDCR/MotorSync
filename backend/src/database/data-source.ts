@@ -7,6 +7,11 @@ import { CreateTenantsAndHelpers1761000000000 } from './migrations/1761000000000
 import { CreateClients1761000000100 } from './migrations/1761000000100-CreateClients.js';
 import { CreateVehicles1761000000200 } from './migrations/1761000000200-CreateVehicles.js';
 import { CreateAuditLog1761000000300 } from './migrations/1761000000300-CreateAuditLog.js';
+import { AddTenantRuc1761000000400 } from './migrations/1761000000400-AddTenantRuc.js';
+import { CreateUsers1761000000500 } from './migrations/1761000000500-CreateUsers.js';
+import { CreateSessions1761000000600 } from './migrations/1761000000600-CreateSessions.js';
+import { CreateLoginAttempts1761000000700 } from './migrations/1761000000700-CreateLoginAttempts.js';
+import { CreateAuthFunctions1761000000800 } from './migrations/1761000000800-CreateAuthFunctions.js';
 
 // Registered by class reference, never by glob: TypeORM's path loading does not work in ESM.
 export const ENTITIES: (new () => object)[] = [Client, Vehicle, AuditLog];
@@ -15,6 +20,11 @@ export const MIGRATIONS: (new () => object)[] = [
   CreateClients1761000000100,
   CreateVehicles1761000000200,
   CreateAuditLog1761000000300,
+  AddTenantRuc1761000000400,
+  CreateUsers1761000000500,
+  CreateSessions1761000000600,
+  CreateLoginAttempts1761000000700,
+  CreateAuthFunctions1761000000800,
 ];
 
 /** Options of the runtime connection of the API as motorsync_app (no BYPASSRLS). */

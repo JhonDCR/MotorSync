@@ -23,7 +23,7 @@ async function main(): Promise<void> {
       [migratorPassword, appPassword],
     );
     await client.query(sql);
-    console.log('Database bootstrap completed (roles motorsync_migrator, motorsync_app).');
+    console.log('Database bootstrap completed (roles motorsync_migrator, motorsync_app, motorsync_auth).');
   } finally {
     await client.end();
   }

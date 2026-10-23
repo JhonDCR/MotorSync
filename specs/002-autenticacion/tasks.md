@@ -420,7 +420,7 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
 
 ## Cierre PR2
 
-- [ ] T049 Revisar el diff del PR2 contra la spec y la constitución 1.2.0. Foco:
+- [x] T049 Revisar el diff del PR2 contra la spec y la constitución 1.2.0. Foco:
   - la cookie con `HttpOnly`, `Secure`, `SameSite=Strict` y `Path`;
   - el refresh token nunca en un body ni en `localStorage`;
   - revocación inmediata en cada caso de FR-013;
@@ -430,7 +430,7 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
   - pruebas con ID para US3-AC1 a AC7 y US5-AC1 a AC9.
 
   — reviewer
-- [ ] T050 Verificar el PR2: lo mismo que en T032, más quickstart §2, filas "Refresh", "Logout" y "Temporal", la técnica de inactividad y §4, pasos 1 a 3, en 360 px y en una tablet. CI en verde — leader
+- [x] T050 Verificar el PR2: lo mismo que en T032, más quickstart §2, filas "Refresh", "Logout" y "Temporal", la técnica de inactividad y §4, pasos 1 a 3, en 360 px y en una tablet. CI en verde — leader
 
 ---
 

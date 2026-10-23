@@ -18,7 +18,14 @@ Hasta ahora MotorSync se usa con accesos de desarrollo: no hay forma de que un t
 - **Administrador del taller**: gestiona las cuentas de su taller (crear, cambiar rol, desactivar, reactivar, restablecer contraseña) y además tiene todas las capacidades del asesor.
 - **Asesor de servicio**: trabaja con los datos de su taller; no puede ver ni gestionar cuentas de usuario. Como todo usuario, puede cambiar su propia contraseña.
 
-**Fuera de alcance**: recuperación de contraseña por correo, verificación del correo, inicio de sesión con proveedores externos (Google, etc.), autenticación de dos factores, pertenencia de un usuario a varios talleres, pagos o planes de suscripción, eliminación de cuentas o de talleres, edición de los datos del taller después del registro y edición del nombre o del correo de una cuenta ya creada.
+**Fuera de alcance**: recuperación de contraseña por correo, verificación del correo, inicio de sesión con proveedores externos (Google, etc.), autenticación de dos factores, pertenencia de un usuario a varios talleres, pagos o planes de suscripción, eliminación de cuentas o de talleres, edición de los datos del taller después del registro y edición del nombre o del correo de una cuenta ya creada, y la recuperación de acceso por soporte de la plataforma (feature 003).
+
+**Trabajo relacionado (feature 003, decidido por el humano el 2026-10-22, fuera del alcance de la 002)**: recuperación de acceso por soporte de la plataforma, pensada sobre todo para el administrador único que olvida su contraseña.
+
+- Habrá un panel de plataforma para el equipo de MotorSync que muestra solo talleres (nombre, RUC, fecha de alta) y sus cuentas (nombre, correo, rol, estado). Nunca muestra clientes, vehículos ni datos de negocio.
+- Las cuentas de soporte se crean con un procedimiento de operación, nunca desde la aplicación.
+- En el inicio de sesión, "¿Olvidaste tu contraseña?" crea automáticamente un ticket de soporte que llega al panel. El soporte genera una contraseña temporal solo sobre un ticket abierto, y esa acción queda auditada en el taller afectado.
+- Es el primer acceso entre talleres del sistema: la 003 necesitará su propio análisis frente al principio I de la constitución.
 
 ## Clarifications
 
@@ -27,6 +34,9 @@ Hasta ahora MotorSync se usa con accesos de desarrollo: no hay forma de que un t
 - Q: ¿Cuánto dura el periodo de inactividad de la sesión y existe una duración máxima aunque haya actividad? (FR-012) → A: 30 minutos de inactividad y sin duración máxima: mientras haya actividad, la sesión se renueva indefinidamente.
 - Q: ¿Cómo obtiene la persona su contraseña inicial y quién puede cambiarla después? (FR-016) → A: El administrador crea la cuenta con una contraseña temporal que entrega a la persona; en su primer inicio de sesión la persona debe cambiarla antes de usar la aplicación. El administrador puede restablecer la contraseña de una cuenta de su taller con una nueva contraseña temporal, que vuelve a exigir el cambio y cierra las sesiones abiertas de esa cuenta; el restablecimiento queda en la auditoría. Entra al alcance "cambiar mi contraseña": todo usuario puede cambiar la suya dando la actual, y al hacerlo se cierran sus otras sesiones (la actual sigue). El dueño que se registra elige su contraseña y no tiene que cambiarla. Ninguna contraseña aparece en la auditoría ni en ninguna respuesta.
 - Q: ¿Qué se le dice al visitante cuando el RUC o el correo ya están registrados? (US1-AC4, US1-AC5) → A: RUC explícito ("Este RUC ya tiene un taller registrado en MotorSync") y correo genérico, sin confirmar si existe ("No se pudo completar el registro con estos datos; si ya tiene una cuenta, inicie sesión"). El mismo criterio de no confirmar correos aplica cuando el administrador crea una cuenta con un correo ya usado, sin decir nunca de qué taller es.
+- Q: ¿La contraseña temporal vence? → A: Sí, a las 72 horas desde que se crea o se restablece. Vencida ya no sirve para iniciar sesión y el administrador debe restablecerla.
+- Q: ¿Se auditan el cambio de la propia contraseña y los bloqueos? → A: No. Solo se auditan cambio de rol, desactivación, reactivación y restablecimiento de contraseña.
+- Q: ¿Cómo recupera el acceso un administrador único que olvidó su contraseña? → A: Por soporte de la plataforma, en la feature 003 (fuera del alcance de la 002); ver "Trabajo relacionado". En la 002 se mantienen: los fallos de "cambiar mi contraseña" cuentan para el bloqueo, restablecer quita el bloqueo, el administrador no puede restablecer su propia cuenta y US4-AC3 usa el mensaje genérico.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -153,6 +163,7 @@ Todo usuario puede cambiar su propia contraseña dando la actual. Quien entra co
 6. **US5-AC6 (dueño registrado)**: **Given** el dueño que registró su taller en US1 eligió su contraseña, **When** inicia sesión, **Then** no se le exige cambiarla; puede cambiarla voluntariamente como en US5-AC3.
 7. **US5-AC7 (contraseñas nunca visibles)**: **Given** cualquier cambio o restablecimiento de contraseña, **When** se revisan las respuestas del sistema, las pantallas y los registros de auditoría, **Then** ninguna contiene la contraseña actual, la anterior ni la nueva.
 8. **US5-AC8 (solo la propia)**: **Given** un usuario de cualquier rol, **When** intenta cambiar con este flujo la contraseña de otra cuenta (de su taller o de otro), por ejemplo enviando su identificador, **Then** el sistema ignora ese identificador y solo puede cambiar la contraseña de la cuenta de su sesión.
+9. **US5-AC9 (contraseña temporal vencida)**: **Given** el administrador creó o restableció la contraseña temporal de Luis hace más de 72 horas y Luis no la cambió, **When** Luis inicia sesión con esa contraseña temporal correcta, **Then** el sistema no inicia la sesión y responde "Su contraseña temporal venció. Pida al administrador de su taller que la restablezca"; el intento no cuenta como fallido para el bloqueo. Con una contraseña incorrecta la respuesta sigue siendo la genérica de US2-AC3. **When** el administrador la restablece (US4-AC21), **Then** la nueva temporal vale otras 72 horas.
 
 ---
 
@@ -171,6 +182,8 @@ Todo usuario puede cambiar su propia contraseña dando la actual. Quien entra co
 - **Sesión expirada con un formulario a medio llenar**: el usuario vuelve a iniciar sesión; no se garantiza conservar lo escrito (ver Assumptions).
 - **Acceso con una sesión de un taller a una ruta con el identificador de otro taller**: responde "no encontrado" (US2-AC11, US4-AC17).
 - **Contraseña temporal olvidada antes del primer ingreso**: el administrador la restablece con otra temporal (US4-AC21).
+- **Contraseña temporal vencida** (más de 72 horas sin cambiarla): ya no permite iniciar sesión (US5-AC9) y el administrador debe restablecerla. Si vence mientras la persona está en la pantalla de cambio obligatorio, el cambio se rechaza con el mismo mensaje y su sesión se cierra.
+- **Administrador único que olvidó su contraseña**: no puede recuperarla en esta feature; la recuperación por soporte de la plataforma llega con la feature 003 (ver "Trabajo relacionado").
 - **Usuario con contraseña temporal que cierra la ventana sin cambiarla**: en su siguiente inicio de sesión se le vuelve a exigir el cambio (US5-AC1).
 - **Restablecimiento mientras el usuario está cambiando su contraseña**: las dos operaciones se aplican una tras otra, nunca mezcladas. Si el restablecimiento se aplica primero, el cambio se rechaza porque la contraseña actual ya no es válida (US5-AC4); si se aplica después, la cuenta queda con la temporal y sin sesiones (US4-AC21).
 - **Cambio de contraseña con la nueva igual a la actual**: se rechaza (US5-AC5).
@@ -191,7 +204,7 @@ Todo usuario puede cambiar su propia contraseña dando la actual. Quien entra co
 
 - **FR-005**: Las contraseñas MUST tener entre 8 y 128 caracteres. El sistema MUST distinguir mayúsculas y minúsculas y no recortarlas ni transformarlas.
 - **FR-006**: Las contraseñas MUST guardarse de forma irreversible, de modo que nadie (ni el personal de MotorSync ni el administrador del taller) pueda conocerlas a partir de lo guardado. Ninguna pantalla, respuesta, registro de auditoría ni registro técnico MUST mostrar una contraseña, ni actual, ni anterior, ni nueva, ni temporal.
-- **FR-026**: Una contraseña definida por el administrador (al crear la cuenta o al restablecerla) MUST quedar marcada como temporal. Mientras la contraseña de una sesión sea temporal, el sistema MUST rechazar toda acción salvo cambiar la propia contraseña y cerrar sesión. La contraseña que elige el dueño al registrar su taller no es temporal.
+- **FR-026**: Una contraseña definida por el administrador (al crear la cuenta o al restablecerla) MUST quedar marcada como temporal. Mientras la contraseña de una sesión sea temporal, el sistema MUST rechazar toda acción salvo cambiar la propia contraseña y cerrar sesión. La contraseña que elige el dueño al registrar su taller no es temporal. Una contraseña temporal MUST vencer a las 72 horas desde que se creó o se restableció: vencida, no permite iniciar sesión ni completar el cambio obligatorio (US5-AC9) y solo un nuevo restablecimiento la reemplaza.
 - **FR-027**: Todo usuario MUST poder cambiar su propia contraseña informando la actual y una nueva que cumpla FR-005, distinta de la actual y confirmada. Al cambiarla, la contraseña deja de ser temporal y el sistema MUST cerrar todas las demás sesiones de esa cuenta en la misma operación; la sesión desde la que se cambió sigue activa. Los fallos por contraseña actual incorrecta cuentan para el bloqueo de FR-009, sin cerrar la sesión en curso.
 - **FR-028**: El administrador MUST poder restablecer la contraseña de cualquier otra cuenta de su taller (activa o desactivada) con una nueva contraseña temporal que cumpla FR-005. El restablecimiento MUST, en la misma operación, invalidar la contraseña anterior, cerrar todas las sesiones de esa cuenta, reiniciar su contador de intentos fallidos y su bloqueo, y crear el registro de auditoría de FR-021. Un administrador MUST NOT restablecer su propia contraseña por esta vía (usa FR-027).
 
@@ -235,7 +248,7 @@ Todo usuario puede cambiar su propia contraseña dando la actual. Quien entra co
 ### Key Entities *(include if feature involves data)*
 
 - **Taller (tenant)**: el negocio cliente del SaaS. Atributos: nombre comercial, RUC normalizado (único en MotorSync), fecha de registro. Todo lo demás le pertenece.
-- **Cuenta de usuario**: persona que trabaja en un taller. Atributos: taller (exactamente uno), nombre, correo normalizado (único en MotorSync), contraseña guardada de forma irreversible, indicador de contraseña temporal (debe cambiarla al entrar), rol (administrador o asesor), estado (activa o desactivada), contador de intentos fallidos y fin del bloqueo, datos de creación y última modificación.
+- **Cuenta de usuario**: persona que trabaja en un taller. Atributos: taller (exactamente uno), nombre, correo normalizado (único en MotorSync), contraseña guardada de forma irreversible, indicador de contraseña temporal (debe cambiarla al entrar) y su vencimiento (72 horas), rol (administrador o asesor), estado (activa o desactivada), contador de intentos fallidos y fin del bloqueo, datos de creación y última modificación.
 - **Sesión**: acceso abierto de una cuenta desde un equipo. Atributos: cuenta, taller, momento de inicio, última actividad, estado (activa, cerrada por el usuario, expirada, cerrada por desactivación, cerrada por cambio o restablecimiento de contraseña).
 - **Registro de auditoría**: evidencia inmutable de cambios de rol, de activación y de restablecimientos de contraseña de cuentas (además de los eventos de la feature 001), con taller, actor y su rol, acción, cuenta afectada, valores antes y después, fecha UTC e IP o canal.
 
@@ -265,7 +278,8 @@ Todo usuario puede cambiar su propia contraseña dando la actual. Quien entra co
 - La creación de cuentas se registra como metadato de creación en la propia cuenta (FR-020), no en el registro de auditoría. Al registro de auditoría van el cambio de rol, la desactivación, la reactivación y el restablecimiento de contraseña por el administrador.
 - **Para el Constitution Check del plan**: el principio IV de la constitución 1.1.0 solo lista "cambios de rol de usuarios"; la desactivación, la reactivación y el restablecimiento de contraseña son eventos auditables que todavía no lista. El plan debe justificarlos como ampliación compatible con el principio o proponer la enmienda MINOR 1.2.0 correspondiente; lo decide el humano en la revisión del plan. Esta spec no modifica la constitución.
 - Los inicios de sesión, los fallos, los bloqueos y el cambio de la propia contraseña no se registran en el registro de auditoría en esta feature.
-- La contraseña temporal no vence por tiempo: sigue sirviendo para el primer ingreso hasta que se cambie o se vuelva a restablecer.
+- La contraseña temporal vence a las 72 horas (clarify, sesión 2026-10-22); el plazo no se renueva por intentos de inicio de sesión.
+- Si el único administrador activo olvida su contraseña, el taller no puede recuperar el acceso de administrador en esta feature hasta que llegue la feature 003 (soporte de la plataforma); se acepta ese riesgo temporal.
 - Editar el nombre o el correo de una cuenta y editar los datos del taller quedan fuera de alcance. Cambiar la propia contraseña y el restablecimiento por el administrador entran al alcance (clarify, sesión 2026-10-22); la recuperación de contraseña por correo sigue fuera de alcance.
 - Unicidad global del correo: aunque los mensajes sean genéricos (FR-023), quien intenta registrar o crear una cuenta con un correo puede deducir que está en uso por el rechazo mismo; es inevitable con correo único en MotorSync y se acepta.
 - Si la sesión expira con un formulario a medio llenar, no se garantiza conservar lo escrito.

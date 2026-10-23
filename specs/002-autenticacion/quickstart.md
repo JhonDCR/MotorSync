@@ -54,7 +54,7 @@ Para probar la inactividad sin esperar 30 minutos: como `motorsync_migrator`, `U
 ```bash
 cd backend
 npm run lint && npm test            # unitarias: password-hasher, cookies, guard (@Public, sid, TOKEN_EXPIRED), session-validator, servicios
-npm run test:e2e                    # e2e nuevas (auth-*.e2e-spec.ts, users-*.e2e-spec.ts, db/auth-rls.e2e-spec.ts) + TODAS las de la 001 sin cambios
+npm run test:e2e                    # e2e nuevas (auth-*.e2e-spec.ts, users-*.e2e-spec.ts, db/auth-roles.e2e-spec.ts, db/users-last-admin.e2e-spec.ts) + TODAS las de la 001 sin cambios
 cd ../frontend
 npm run lint && npm test -- --watch=false
 ```
@@ -63,7 +63,7 @@ Criterios de aceptación de la verificación:
 - Todas las suites de la 001 pasan sin modificaciones (R9).
 - Cada `USx-ACy` de la spec tiene al menos una prueba con su ID en el nombre.
 - La prueba de tiempos (US2-AC3, SC-003) pasa en CI.
-- `db/auth-rls.e2e-spec.ts` demuestra:
+- `db/auth-roles.e2e-spec.ts` (T001) demuestra:
   - que `motorsync_app` no lee `login_attempts`;
   - que no ve `users`, `user_sessions` ni `refresh_tokens` de otro taller;
   - que las funciones `auth_*` no devuelven más columnas de las del contrato de data-model.

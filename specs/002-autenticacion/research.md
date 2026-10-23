@@ -192,8 +192,9 @@ RETURNING u.role, u.name, u.must_change_password, u.temp_password_expires_at
 - El guard sigue aceptando los claims de la 001. `sid` y `pwd_change` son **opcionales** en el token.
 - Un token **sin `sid`** (de `issueTestToken` o `npm run token:dev`) solo se acepta si `AUTH_ALLOW_SESSIONLESS_TOKENS=true`. En ese caso no hay validación de sesión y el rol es el del claim, exactamente como hoy.
   - `loadEnv` lo lee con valor por defecto `false`.
-  - `.env.example` y el job de CI lo ponen en `true`.
+  - `.env.example` (local) y `backend/vitest.config.ts` y `vitest.config.e2e.ts` (pruebas, también en CI) lo ponen en `true`; `ci.yml` no cambia.
   - En producción queda en `false` (supuesto de la spec: el acceso de desarrollo deja de aceptarse fuera de desarrollo).
+  - **FR-T01** (aprobación del 2026-10-23): `loadEnv` lanza un error al arrancar si `AUTH_ALLOW_SESSIONLESS_TOKENS=true` y `NODE_ENV=production`.
   - `token:dev` avisa si la variable no está activa.
 - Con eso las suites de la 001 siguen igual, sin crear filas en `users`.
 - `tenants` gana la columna `ruc` **nullable** (con `UNIQUE` y `CHECK` de forma). Los fixtures (`createTenant(name)`), `seed-dev` y `seed-volume.sql` insertan talleres sin RUC y siguen funcionando. `auth_register_workshop` exige el RUC.

@@ -4,7 +4,7 @@
 
 **Input**: Feature specification from `specs/002-autenticacion/spec.md`
 
-**Aprobación**: pendiente; requiere aprobación humana de spec y plan antes de implementar.
+**Aprobación**: Aprobado por el humano el 2026-10-23 (spec y plan). Decisiones de la aprobación: IV-a se resuelve con la enmienda MINOR 1.2.0 (PR propio del leader, antes del PR1); la ventana de 10 s de la carrera de refresh queda aprobada; la API falla al arrancar con `AUTH_ALLOW_SESSIONLESS_TOKENS=true` y `NODE_ENV=production` (FR-T01).
 
 ## Summary
 
@@ -53,6 +53,7 @@ Enfoque técnico:
 - El p95 < 200 ms de las búsquedas de la 001 (SC-001) no cambia: `test:perf` usa tokens sin `sid`.
 
 **Constraints**:
+- **FR-T01 (requisito técnico de la aprobación)**: `loadEnv` lanza un error al arrancar si `AUTH_ALLOW_SESSIONLESS_TOKENS=true` y `NODE_ENV=production`. Lo prueba `backend/src/config/env.spec.ts`.
 - El taller sale solo de la credencial verificada en el servidor.
 - Las contraseñas nunca aparecen en respuestas, logs ni auditoría.
 - Mismo origen (sin CORS).
@@ -72,7 +73,7 @@ No quedan `NEEDS CLARIFICATION`: la spec cerró clarify (sesión 2026-10-22) y l
 
 Evaluado antes de la fase 0 y **reevaluado después del diseño** (data-model, contrato).
 
-**Resultado: PASA con una observación pendiente de decisión humana (IV-a)** y dos excepciones justificadas en Complexity Tracking: `login_attempts` sin `tenant_id` y `tenants` sin `FORCE`.
+**Resultado: PASA.** IV-a está resuelta por enmienda (constitución 1.2.0, aprobada por el humano el 2026-10-23). Hay dos excepciones justificadas en Complexity Tracking: `login_attempts` sin `tenant_id` y `tenants` sin `FORCE`.
 
 ### I. Aislamiento multi-tenant (NON-NEGOTIABLE)
 
@@ -82,9 +83,9 @@ Evaluado antes de la fase 0 y **reevaluado después del diseño** (data-model, c
 | RLS `ENABLE` + `FORCE` con política sobre `app.tenant_id` | Las tres tablas tienen `ENABLE` + `FORCE` y una política `USING`/`WITH CHECK` con `app_current_tenant()`. Las únicas excepciones son políticas `TO motorsync_auth` (solo `SELECT`, más `INSERT` del registro con `WITH CHECK` sobre el taller fijado), que solo alcanzan al código de las funciones `SECURITY DEFINER` (R1). | Cumple |
 | El tenant se fija por transacción a partir del token autenticado; nunca del body, query ni headers | Rutas protegidas: igual que la 001 (claim `tenant_id` del JWT verificado). Rutas públicas: el `tenant_id` lo devuelve la base después de verificar la credencial (contraseña o hash del refresh token), y la app hace `set_config(..., true)` antes de cualquier otra operación (R2). `forbidNonWhitelisted` rechaza `tenantId` y `role` en los DTOs. | Cumple (interpretación: en login y refresh la credencial verificada cumple el papel del token; ver nota I-a) |
 | Rol de app sin `BYPASSRLS`; migraciones con rol separado | `motorsync_app` y `motorsync_migrator` sin cambios. `motorsync_auth` también es `NOBYPASSRLS` y `NOLOGIN`; la app no es miembro, solo tiene `EXECUTE` sobre 7 funciones. | Cumple |
-| Prueba de que A no lee ni modifica datos de B, por módulo | E2e: US1-AC10, US2-AC11, US3-AC7, US4-AC17, AC18, AC19, AC20, US5-AC8. De base: `db/auth-rls.e2e-spec.ts` (sin taller → 0 filas; con A no se ve B; `login_attempts` sin permiso; las funciones devuelven solo las columnas definidas). | Cumple |
+| Prueba de que A no lee ni modifica datos de B, por módulo | E2e: US1-AC10, US2-AC11, US3-AC7, US4-AC17, AC18, AC19, AC20, US5-AC8. De base: `db/auth-roles.e2e-spec.ts` (T001: sin taller → 0 filas; con A no se ve B; `login_attempts` sin permiso; las funciones devuelven solo las columnas definidas). | Cumple |
 
-**I-a (nota)**: las funciones `auth_find_user_for_login` y `auth_find_refresh_token` leen entre talleres por diseño, porque el login no pide taller (FR-007). Quedan acotadas a una búsqueda por igualdad de un secreto (correo + verificación de contraseña en Node, o hash de 256 bits) y devuelven columnas mínimas. Es el mismo patrón que tendrá que analizar la 003 (soporte de plataforma), que la spec ya marca como el primer acceso real entre talleres.
+**I-a (nota)**: las funciones `auth_find_user_for_login` y `auth_find_refresh_token` leen entre talleres por diseño, porque el login no pide taller (FR-007). Quedan acotadas a una búsqueda por igualdad de un secreto (correo + verificación de contraseña en Node, o hash de 256 bits) y devuelven columnas mínimas. Es el mismo patrón que tendrá que analizar la 003 (soporte de plataforma), que la spec ya marca como el primer acceso real entre talleres. **Recomendación (analyze, 2026-10-23)**: que la enmienda 1.2.0 incluya también una aclaración de redacción en el principio I: "a partir del token autenticado o, en las rutas de autenticación, de la credencial verificada en el servidor". Así la interpretación queda escrita en la constitución y no solo en este plan. Decide el leader al redactar la enmienda.
 
 ### II. Test-First (NON-NEGOTIABLE)
 
@@ -112,12 +113,9 @@ Evaluado antes de la fase 0 y **reevaluado después del diseño** (data-model, c
 | Campos: `tenant_id`, actor y rol, acción, entidad, id, antes y después, fecha UTC, IP o canal | `audit_log` de la 001 sin cambios de DDL; `entity_type = 'user'`. | Cumple |
 | Append-only | Sin cambios: `GRANT SELECT, INSERT` y el trigger de la 001. `GET /users/{id}/history` es solo lectura. | Cumple |
 | Misma transacción | `AuditService.record` con el manager del request, junto con el `UPDATE` de la cuenta y la revocación de sesiones (US4-AC14). | Cumple |
-| **Eventos nuevos**: desactivación, reactivación y restablecimiento de contraseña | La spec los exige (FR-021), pero la constitución 1.1.0 no los lista. Ver **IV-a**. | Pendiente de decisión humana |
+| **Eventos nuevos**: desactivación, reactivación y restablecimiento de contraseña | `user.deactivated`, `user.reactivated` y `user.password_reset` (FR-021) quedan en la lista del principio IV con la enmienda 1.2.0. Ver **IV-a**. | Cumple (resuelta por enmienda) |
 
-**IV-a (recomendación: enmienda MINOR 1.2.0)**. Como en la 001 (IV-a, enmienda 1.1.0), se recomienda un PR propio `docs: amend constitution 1.2.0` que agregue al principio IV la "desactivación y reactivación de cuentas de usuario y restablecimiento de contraseña por un administrador". Debe aprobarlo ambos integrantes, según Governance.
-- Alternativa: tratarlo como ampliación compatible (el principio fija un mínimo y no prohíbe auditar más) y registrarlo solo en este plan.
-- La enmienda es preferible porque convierte estos eventos en obligatorios para futuras features, como la 003, que también restablecerá contraseñas.
-- **Decide el humano.** Este plan no edita la constitución.
+**IV-a (resuelta por enmienda, constitución 1.2.0)**: la spec (FR-021) exige auditar la desactivación, la reactivación y el restablecimiento de contraseña, que la 1.1.0 no listaba. El humano aprobó el 2026-10-23 la enmienda MINOR 1.2.0, que los agrega al principio IV. El leader la aplica en un PR propio (`docs: amend constitution 1.2.0`) que se integra antes del PR1. Este plan no edita la constitución; los reviewers revisan contra la 1.2.0.
 
 ### V. Simplicidad y tipado estricto
 
@@ -139,7 +137,7 @@ Evaluado antes de la fase 0 y **reevaluado después del diseño** (data-model, c
 
 ### Flujo y arnés
 
-Ciclo spec → clarify → **plan (aquí)** → tasks → issues. Este plan solo escribe en `specs/`. Los cambios en `db/bootstrap.sql`, `.env.example`, `ci.yml` y `test/setup/db-fixtures.ts` quedan como tareas para los roles correspondientes.
+Ciclo spec → clarify → **plan (aquí)** → tasks → issues. Este plan solo escribe en `specs/`. Los cambios en `db/bootstrap.sql`, `.env.example`, `vitest.config*.ts` y `test/setup/db-fixtures.ts` quedan como tareas para los roles correspondientes.
 
 ## Project Structure
 
@@ -175,6 +173,7 @@ backend/
 │   ├── common/
 │   │   ├── identifiers/email.ts (+ .spec.ts)         # N: normalizeEmail, isValidEmail, emailHash
 │   │   ├── validation/is-password.ts                 # N
+│   │   ├── validation/is-email-normalized.ts         # N
 │   │   └── problem-details.filter.ts                 # M: 403 → FORBIDDEN, 429 → ACCOUNT_LOCKED
 │   ├── database/
 │   │   ├── migrations/1761000000400-AddTenantRuc.ts           # N
@@ -182,6 +181,7 @@ backend/
 │   │   ├── migrations/1761000000600-CreateSessions.ts         # N
 │   │   ├── migrations/1761000000700-CreateLoginAttempts.ts    # N
 │   │   ├── migrations/1761000000800-CreateAuthFunctions.ts    # N
+│   │   ├── migrations/1761000000900-AddLastAdminTrigger.ts    # N (PR3)
 │   │   ├── pg-errors.ts                              # M: tenants_ruc_key, users_email_key, users_last_admin
 │   │   └── tenant-transaction.interceptor.ts         # M: @Public, SessionValidator, @Roles, @AllowPendingPasswordChange
 │   ├── auth/
@@ -211,7 +211,8 @@ backend/
 └── test/
     ├── setup/db-fixtures.ts                          # M (tester): BUSINESS_TABLES + createUser() con hash
     ├── setup/auth.ts                                 # M (tester): loginAs(), cookies de supertest
-    ├── db/auth-rls.e2e-spec.ts                       # N
+    ├── db/auth-roles.e2e-spec.ts                     # N  T001: diseño de motorsync_auth y RLS
+    ├── db/users-last-admin.e2e-spec.ts               # N  T051 (PR3)
     ├── auth-register.e2e-spec.ts                     # N  US1
     ├── auth-login.e2e-spec.ts                        # N  US2 (incluye tiempos y concurrencia)
     ├── auth-session.e2e-spec.ts                      # N  US3
@@ -238,7 +239,7 @@ frontend/src/app/
     ├── users-list.page.* | user-form.page.* | user-detail.page.* | reset-password.dialog.*  # N
 ```
 
-Además, fuera de `backend/` y `frontend/`: `.env.example` (M: las 2 banderas) y `.github/workflows/ci.yml` (M: `AUTH_ALLOW_SESSIONLESS_TOKENS: 'true'` en el job de backend).
+Además: `.env.example` (M: las 2 banderas, tarea del leader) y `backend/vitest.config.ts` y `backend/vitest.config.e2e.ts` (M: `AUTH_ALLOW_SESSIONLESS_TOKENS=true` por defecto solo en las pruebas, para que las suites de la 001 sigan con tokens sin `sid`). `.github/workflows/ci.yml` no cambia: las pruebas fijan la bandera en su configuración y el job no arranca la API con `NODE_ENV=production`.
 
 **Structure Decision**: monorepo web existente. Dos módulos de backend nuevos: `auth` (ya existe la carpeta, se amplía) y `users`. Pantallas en `features/auth` y `features/users`, siguiendo el patrón de la 001.
 
@@ -261,13 +262,13 @@ Cada PR deja la 001 en verde y es desplegable por sí mismo. PR2 y PR3 dependen 
 | Rol nuevo `motorsync_auth` y 7 funciones `SECURITY DEFINER` | El login sin taller (FR-007) y el registro (FR-004) necesitan leer o crear filas antes de conocer el taller (R1). | Dueño `motorsync_migrator`: no funciona con `FORCE` (es `NOBYPASSRLS`). Darle `BYPASSRLS` abre todas las tablas. |
 | Una sentencia extra por request (validación de sesión) | FR-013 y US4-AC6 exigen revocación inmediata; FR-014 y US4-AC5, rol vigente en la siguiente acción; FR-012, inactividad exacta (R6). | Aceptar la ventana de 15 minutos del token de acceso viola la spec. |
 
-## Riesgos y preguntas abiertas para el humano
+## Riesgos y preguntas abiertas
 
-1. **IV-a**: ¿enmienda MINOR 1.2.0 (recomendada) o justificación en el plan? Si es enmienda, ¿quién abre el PR `docs: amend constitution 1.2.0` antes del PR3?
+1. **IV-a**: resuelta (enmienda 1.2.0 aprobada; el PR de la constitución entra antes del PR1).
 2. **Bloqueo como denegación de servicio**: un tercero que conozca un correo puede bloquearlo 15 minutos de forma repetida. Se aceptó en la spec. Mitigarlo exigiría límites por IP o CAPTCHA (fuera de alcance).
 3. **Carga de scrypt**: con el pool de libuv por defecto (4 hilos), muchos logins simultáneos se encolan. Si hace falta, se sube `UV_THREADPOOL_SIZE` en el despliegue; no cambia el código.
 4. **Prueba de tiempos (US2-AC3, SC-003)**: es estadística y puede ser inestable en Windows. Se propone una tolerancia del 25 % sobre la mediana y correrla solo en CI si da falsos positivos en local.
-5. **Carrera de refresh entre pestañas**: la ventana de 10 s sin revocar es un compromiso entre seguridad y uso. ¿Está bien ese valor?
-6. **Tokens sin `sid`**: `AUTH_ALLOW_SESSIONLESS_TOKENS` debe quedar en `false` en cualquier despliegue real. Se propone que `loadEnv` falle al arrancar si es `true` y `NODE_ENV=production`.
+5. **Carrera de refresh entre pestañas**: ventana de 10 s aprobada por el humano el 2026-10-23.
+6. **Tokens sin `sid`**: resuelto como requisito FR-T01: la API no arranca con `AUTH_ALLOW_SESSIONLESS_TOKENS=true` y `NODE_ENV=production`.
 7. **Administrador único sin acceso**: no hay recuperación hasta la feature 003 (soporte de plataforma). Riesgo aceptado en la spec.
 8. **Funciones `SECURITY DEFINER` en migraciones futuras**: por `INHERIT FALSE`, toda migración que las cambie debe hacer `SET ROLE motorsync_auth` (data-model, "Mantenimiento"). Conviene anotarlo en "Lecciones" de `CLAUDE.md` si alguien lo olvida dos veces.

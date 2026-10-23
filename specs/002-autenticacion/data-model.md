@@ -124,25 +124,6 @@ GRANT SELECT (id, tenant_id, name, email, password_hash, role, status,
               must_change_password, temp_password_expires_at) ON users TO motorsync_auth;
 GRANT INSERT (id, tenant_id, name, email, password_hash, role, status,
               must_change_password, created_by, updated_by, updated_by_name) ON users TO motorsync_auth;
-
--- FR-018, defensa en la base (R8): al confirmar, el taller conserva al menos un admin activo.
--- La garantía ante concurrencia la da el advisory lock del servicio; esto atrapa olvidos del código.
-CREATE FUNCTION users_require_active_admin() RETURNS trigger LANGUAGE plpgsql AS $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM users
-                  WHERE tenant_id = NEW.tenant_id AND role = 'admin' AND status = 'active') THEN
-    RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'users_last_admin',
-                          MESSAGE = 'tenant must keep at least one active admin';
-  END IF;
-  RETURN NULL;
-END $$;
-
-CREATE CONSTRAINT TRIGGER users_keep_active_admin
-  AFTER UPDATE OF role, status ON users
-  DEFERRABLE INITIALLY DEFERRED
-  FOR EACH ROW
-  WHEN (OLD.role = 'admin' AND OLD.status = 'active')
-  EXECUTE FUNCTION users_require_active_admin();
 ```
 
 ### Migración `1761000000600-CreateSessions`
@@ -348,6 +329,31 @@ GRANT EXECUTE ON FUNCTION auth_register_workshop(text, text, text, text, text),
 **Mantenimiento**: por `INHERIT FALSE`, el migrator no tiene los privilegios de dueño de estas funciones. Toda migración posterior que las reemplace (`CREATE OR REPLACE`) o las borre (`down`) debe envolverse así: `GRANT CREATE ON SCHEMA public TO motorsync_auth; SET ROLE motorsync_auth; …; RESET ROLE; REVOKE CREATE ON SCHEMA public FROM motorsync_auth;`.
 
 `email_hash` se calcula igual en Node y en SQL: SHA-256 en hex del correo normalizado codificado en UTF-8 (`createHash('sha256').update(email, 'utf8').digest('hex')`).
+
+### Migración `1761000000900-AddLastAdminTrigger` (PR3)
+
+Va en el PR3, junto con la gestión de usuarios, para que su prueba (T051) nazca en rojo.
+
+```sql
+-- FR-018, defensa en la base (R8): al confirmar, el taller conserva al menos un admin activo.
+-- La garantía ante concurrencia la da el advisory lock del servicio; esto atrapa olvidos del código.
+CREATE FUNCTION users_require_active_admin() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM users
+                  WHERE tenant_id = NEW.tenant_id AND role = 'admin' AND status = 'active') THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', CONSTRAINT = 'users_last_admin',
+                          MESSAGE = 'tenant must keep at least one active admin';
+  END IF;
+  RETURN NULL;
+END $$;
+
+CREATE CONSTRAINT TRIGGER users_keep_active_admin
+  AFTER UPDATE OF role, status ON users
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW
+  WHEN (OLD.role = 'admin' AND OLD.status = 'active')
+  EXECUTE FUNCTION users_require_active_admin();
+```
 
 ### `audit_log` (sin cambios de DDL)
 

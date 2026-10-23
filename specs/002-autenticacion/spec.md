@@ -248,7 +248,8 @@ Todo usuario puede cambiar su propia contraseña dando la actual. Quien entra co
 ### Key Entities *(include if feature involves data)*
 
 - **Taller (tenant)**: el negocio cliente del SaaS. Atributos: nombre comercial, RUC normalizado (único en MotorSync), fecha de registro. Todo lo demás le pertenece.
-- **Cuenta de usuario**: persona que trabaja en un taller. Atributos: taller (exactamente uno), nombre, correo normalizado (único en MotorSync), contraseña guardada de forma irreversible, indicador de contraseña temporal (debe cambiarla al entrar) y su vencimiento (72 horas), rol (administrador o asesor), estado (activa o desactivada), contador de intentos fallidos y fin del bloqueo, datos de creación y última modificación.
+- **Cuenta de usuario**: persona que trabaja en un taller. Atributos: taller (exactamente uno), nombre, correo normalizado (único en MotorSync), contraseña guardada de forma irreversible, indicador de contraseña temporal (debe cambiarla al entrar) y su vencimiento (72 horas), rol (administrador o asesor), estado (activa o desactivada), datos de creación y última modificación.
+- **Intentos fallidos**: contador de intentos fallidos seguidos y fin del bloqueo, llevados **por correo** (exista o no una cuenta con ese correo, FR-009). No pertenece a ningún taller ni guarda el correo en claro.
 - **Sesión**: acceso abierto de una cuenta desde un equipo. Atributos: cuenta, taller, momento de inicio, última actividad, estado (activa, cerrada por el usuario, expirada, cerrada por desactivación, cerrada por cambio o restablecimiento de contraseña).
 - **Registro de auditoría**: evidencia inmutable de cambios de rol, de activación y de restablecimientos de contraseña de cuentas (además de los eventos de la feature 001), con taller, actor y su rol, acción, cuenta afectada, valores antes y después, fecha UTC e IP o canal.
 

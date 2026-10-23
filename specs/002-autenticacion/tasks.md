@@ -377,7 +377,7 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
 
 ## Phase 8: Frontend de sesión (US3, US5) (PR2)
 
-- [ ] T039 [P] [US3] Pruebas en `frontend/src/app/core/auth/session.store.spec.ts` y `frontend/src/app/core/auth/auth.guards.spec.ts`:
+- [x] T039 [P] [US3] Pruebas en `frontend/src/app/core/auth/session.store.spec.ts` y `frontend/src/app/core/auth/auth.guards.spec.ts`:
   - el store se llena desde `SessionResponse` y desde `/auth/me`, no del JWT;
   - `clear()` borra `motorsync.token`;
   - `authGuard` sin sesión → `/login`;
@@ -385,8 +385,8 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
   - `adminGuard` con rol `asesor` → `/` (US4-AC16, interfaz).
 
   — tester
-- [ ] T040 [US3] Implementar `frontend/src/app/core/auth/session.store.ts` y `frontend/src/app/core/auth/auth.guards.ts` — implementer-frontend
-- [ ] T041 [P] [US3] Pruebas en `frontend/src/app/core/auth/auth-refresh.interceptor.spec.ts`:
+- [x] T040 [US3] Implementar `frontend/src/app/core/auth/session.store.ts` y `frontend/src/app/core/auth/auth.guards.ts` — implementer-frontend
+- [x] T041 [P] [US3] Pruebas en `frontend/src/app/core/auth/auth-refresh.interceptor.spec.ts`:
   - 401 `TOKEN_EXPIRED` → **un solo** refresh aunque fallen 3 peticiones a la vez, y luego reintento de las 3 con el token nuevo;
   - `REFRESH_CONFLICT` → un reintento;
   - `SESSION_EXPIRED` → `clear()` y `/login?reason=expired`;
@@ -396,8 +396,8 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
   - no hay ningún refresh sin una petición del usuario (sin temporizadores; US3-AC2).
 
   — tester
-- [ ] T042 [US3] Implementar `frontend/src/app/core/auth/auth-refresh.interceptor.ts` y registrarlo en `frontend/src/app/app.config.ts`, después de `authTokenInterceptor` y antes de `mockApiInterceptor` — implementer-frontend
-- [ ] T043 [US5] Pruebas en `frontend/src/app/features/auth/change-password.page.spec.ts`:
+- [x] T042 [US3] Implementar `frontend/src/app/core/auth/auth-refresh.interceptor.ts` y registrarlo en `frontend/src/app/app.config.ts`, después de `authTokenInterceptor` y antes de `mockApiInterceptor` — implementer-frontend
+- [x] T043 [US5] Pruebas en `frontend/src/app/features/auth/change-password.page.spec.ts`:
   - **US5-AC1**: con `mustChangePassword` muestra "Debe cambiar su contraseña antes de continuar".
   - **US5-AC2**: al guardar actualiza el token y navega a `/`.
   - **US5-AC4**: "La contraseña actual no es correcta".
@@ -405,8 +405,8 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
   - **US5-AC9**: "Su contraseña temporal venció. Pida al administrador de su taller que la restablezca" y vuelta a `/login`.
 
   — tester
-- [ ] T044 [US5] Implementar `frontend/src/app/features/auth/change-password.page.ts` (+ `.html` y `.scss`) y la ruta `change-password` con `authGuard` — implementer-frontend
-- [ ] T045 [US3] Pruebas en `frontend/src/app/app.session.spec.ts` (nuevo) y `frontend/src/app/features/auth/login.page.session.spec.ts` (nuevo):
+- [x] T044 [US5] Implementar `frontend/src/app/features/auth/change-password.page.ts` (+ `.html` y `.scss`) y la ruta `change-password` con `authGuard` — implementer-frontend
+- [x] T045 [US3] Pruebas en `frontend/src/app/app.session.spec.ts` (nuevo) y `frontend/src/app/features/auth/login.page.session.spec.ts` (nuevo):
   - **US3-AC3**: la barra muestra el nombre y el taller, y "Cerrar sesión" a un toque o a dos desde el menú en 360 px (FR-025); al pulsarlo llama a `POST /auth/logout`, limpia la sesión y navega a `/login`.
   - **US3-AC2**: `/login?reason=expired` muestra "Su sesión expiró por inactividad".
   - Las rutas del taller (`''`, `clients`, `vehicles/...`) exigen `authGuard`.
@@ -414,9 +414,9 @@ Al terminar, la sesión se mantiene con actividad, expira a los 30 minutos sin a
   - **US3-AC4** (interfaz): después de cerrar sesión, volver con "atrás" a una pantalla del taller redirige a `/login` sin mostrar datos.
 
   — tester
-- [ ] T046 [US3] Implementar la barra en `frontend/src/app/app.ts` y `frontend/src/app/app.html`, el mensaje de `reason` en `login.page.ts` y los guards en `frontend/src/app/app.routes.ts` — implementer-frontend
-- [ ] T047 [P] [US3] [US5] Pruebas del mock en `frontend/src/app/core/api/mock-api.interceptor.session.spec.ts` (nuevo): `refresh` (cookie simulada en memoria), `logout` idempotente, `me`, `password` (`CURRENT_PASSWORD_INCORRECT`, `SAME_PASSWORD`) y `PASSWORD_CHANGE_REQUIRED` con una sesión temporal — tester
-- [ ] T048 [US3] [US5] Implementar esas rutas en `frontend/src/app/core/api/mock-api.interceptor.ts` y `mock-api.store.ts` — implementer-frontend
+- [x] T046 [US3] Implementar la barra en `frontend/src/app/app.ts` y `frontend/src/app/app.html`, el mensaje de `reason` en `login.page.ts` y los guards en `frontend/src/app/app.routes.ts` — implementer-frontend
+- [x] T047 [P] [US3] [US5] Pruebas del mock en `frontend/src/app/core/api/mock-api.interceptor.session.spec.ts` (nuevo): `refresh` (cookie simulada en memoria), `logout` idempotente, `me`, `password` (`CURRENT_PASSWORD_INCORRECT`, `SAME_PASSWORD`) y `PASSWORD_CHANGE_REQUIRED` con una sesión temporal — tester
+- [x] T048 [US3] [US5] Implementar esas rutas en `frontend/src/app/core/api/mock-api.interceptor.ts` y `mock-api.store.ts` — implementer-frontend
 
 ## Cierre PR2
 

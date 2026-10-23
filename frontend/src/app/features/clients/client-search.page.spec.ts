@@ -26,7 +26,9 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { of, Subject, throwError } from 'rxjs';
 import type { ClientDetail, ClientSearchResponse, ClientSummary, Problem } from '../../core/api/api.models';
 import { ClientsApiService } from '../../core/api/clients-api.service';
+import { SessionStore } from '../../core/auth/session.store';
 import { routes } from '../../app.routes';
+import { sessionResponse } from '../../../testing/auth-fixtures';
 import { ClientDetailPage } from './client-detail.page';
 import { ClientFormPage } from './client-form.page';
 import { ClientSearchPage } from './client-search.page';
@@ -366,6 +368,8 @@ describe('Rutas de clientes en app.routes (T033/T034)', () => {
         },
       ],
     });
+    // 002 (PR2, T045): las rutas del taller exigen sesión (authGuard); sin ella irían a /login.
+    TestBed.inject(SessionStore).setSession(sessionResponse());
   });
 
   it('[US4-AC1] /clients abre la búsqueda de clientes', async () => {

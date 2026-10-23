@@ -2,6 +2,10 @@
   <h1 id="login-title">Iniciar sesión</h1>
   <p class="intro">Entre con el correo y la contraseña de su cuenta.</p>
 
+  @if (reason(); as message) {
+    <p class="session-reason" role="status" data-testid="session-reason">{{ message }}</p>
+  }
+
   @if (formError(); as message) {
     <p class="form-error" role="alert" data-testid="form-error">{{ message }}</p>
   }

@@ -15,6 +15,7 @@ import type { AuthRole, AuthUser, AuthenticatedRequest } from '../auth/auth-user
 import { IS_PUBLIC_KEY } from '../auth/public.decorator.js';
 import { ROLES_KEY } from '../auth/roles.decorator.js';
 import { SessionValidator } from '../auth/session-validator.js';
+import { revokeSessionApart } from '../auth/sessions.service.js';
 import { ProblemException } from '../common/problem-details.filter.js';
 import { tenantStorage } from './tenant-context.js';
 
@@ -51,6 +52,7 @@ export class TenantTransactionInterceptor implements NestInterceptor {
 
     return defer(async () => {
       const runner = this.dataSource.createQueryRunner();
+      let revokeExpiredTemporary = false;
       try {
         await runner.connect();
         await runner.startTransaction();
@@ -66,9 +68,14 @@ export class TenantTransactionInterceptor implements NestInterceptor {
         return result;
       } catch (error) {
         if (runner.isTransactionActive) await runner.rollbackTransaction();
+        revokeExpiredTemporary = isTemporaryPasswordExpired(error);
         throw error;
       } finally {
         await runner.release();
+        // Research R7: committed apart, after the rollback released the row of the session.
+        if (revokeExpiredTemporary) {
+          await revokeSessionApart(this.dataSource, tokenUser, 'temp_password_expired');
+        }
       }
     });
   }
@@ -106,4 +113,9 @@ export class TenantTransactionInterceptor implements NestInterceptor {
       context.getClass(),
     ]);
   }
+}
+
+/** 401 TEMPORARY_PASSWORD_EXPIRED: from SessionValidator or from POST /auth/password (R7). */
+function isTemporaryPasswordExpired(error: unknown): boolean {
+  return error instanceof ProblemException && error.code === 'TEMPORARY_PASSWORD_EXPIRED';
 }

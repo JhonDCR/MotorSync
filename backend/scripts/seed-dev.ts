@@ -21,6 +21,7 @@ import {
   type BodyType,
 } from '../src/common/identifiers/plate.js';
 import { isValidVin } from '../src/common/identifiers/vin.js';
+import { assertSeedAllowed } from './seed-guard.js';
 import {
   isValidEmail,
   normalizeEmail,
@@ -376,6 +377,8 @@ async function seedTenant(
 
 async function main(): Promise<void> {
   loadRootEnvFile();
+  // Before connecting: a production database never gets the development accounts (T031-3).
+  assertSeedAllowed();
   assertSeedIsValid(TENANTS);
   const db = new pg.Client({
     connectionString: requireEnv('DATABASE_MIGRATOR_URL'),

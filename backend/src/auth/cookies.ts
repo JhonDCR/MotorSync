@@ -1,10 +1,15 @@
 import type { CookieOptions, Response } from 'express';
 import { API_PREFIX } from '../app.setup.js';
+import { ProblemException } from '../common/problem-details.filter.js';
 import { readAuthFlags } from '../config/env.js';
 
 /** Refresh cookie of the contract (research R5, R11). */
 export const REFRESH_COOKIE_NAME = 'ms_refresh';
 export const REFRESH_COOKIE_PATH = `/${API_PREFIX}/auth`;
+
+/** CSRF header required by POST /auth/refresh and /auth/logout (research R11). */
+const REQUESTED_WITH_HEADER = 'x-requested-with';
+const REQUESTED_WITH_VALUE = 'motorsync';
 
 /**
  * `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth`, without Max-Age nor Expires: the session
@@ -25,22 +30,51 @@ export function setRefreshCookie(res: Response, token: string): void {
 }
 
 /**
- * Value of a cookie from a raw `Cookie` header, or undefined (own parser, no cookie-parser,
- * research R11). Malformed percent-encoding leaves the value as sent.
+ * Clears ms_refresh with the same attributes and `Max-Age=0` (contract ClearRefreshCookie).
+ * Written with res.cookie because Express 5 clearCookie() sets Expires but no Max-Age.
  */
-export function readCookie(header: string | undefined, name: string): string | undefined {
-  if (!header) return undefined;
+export function clearRefreshCookie(res: Response): void {
+  res.cookie(REFRESH_COOKIE_NAME, '', { ...refreshCookieOptions(), maxAge: 0 });
+}
+
+/**
+ * Cookies of a raw `Cookie` header (own parser, no cookie-parser, research R11). Splits each pair
+ * on its first `=`, drops surrounding double quotes and decodes percent-encoding; a malformed
+ * encoding leaves the value as sent. If a name repeats, the first one wins. Never throws.
+ */
+export function parseCookies(header: string | undefined): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  if (!header) return cookies;
   for (const part of header.split(';')) {
     const separator = part.indexOf('=');
     if (separator < 0) continue;
-    if (part.slice(0, separator).trim() !== name) continue;
+    const name = part.slice(0, separator).trim();
+    // `__proto__` would replace the prototype of the result instead of adding a key.
+    if (name === '' || name === '__proto__' || Object.hasOwn(cookies, name)) continue;
     const raw = part.slice(separator + 1).trim();
-    const value = raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2 ? raw.slice(1, -1) : raw;
-    try {
-      return decodeURIComponent(value);
-    } catch {
-      return value;
-    }
+    const value = raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"') ? raw.slice(1, -1) : raw;
+    cookies[name] = decodeOrKeep(value);
   }
-  return undefined;
+  return cookies;
+}
+
+function decodeOrKeep(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+/** Value of the ms_refresh cookie of a request, or undefined. */
+export function readRefreshCookie(header: string | undefined): string | undefined {
+  const value = parseCookies(header)[REFRESH_COOKIE_NAME];
+  return value === undefined || value === '' ? undefined : value;
+}
+
+/** 400 VALIDATION_ERROR unless the request carries exactly `X-Requested-With: motorsync` (R11). */
+export function assertRequestedWith(headers: Record<string, string | string[] | undefined>): void {
+  if (headers[REQUESTED_WITH_HEADER] !== REQUESTED_WITH_VALUE) {
+    throw new ProblemException(400, 'VALIDATION_ERROR');
+  }
 }

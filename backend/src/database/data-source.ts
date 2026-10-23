@@ -12,6 +12,7 @@ import { CreateUsers1761000000500 } from './migrations/1761000000500-CreateUsers
 import { CreateSessions1761000000600 } from './migrations/1761000000600-CreateSessions.js';
 import { CreateLoginAttempts1761000000700 } from './migrations/1761000000700-CreateLoginAttempts.js';
 import { CreateAuthFunctions1761000000800 } from './migrations/1761000000800-CreateAuthFunctions.js';
+import { FixLoginFailurePruneLocking1761000000850 } from './migrations/1761000000850-FixLoginFailurePruneLocking.js';
 
 // Registered by class reference, never by glob: TypeORM's path loading does not work in ESM.
 export const ENTITIES: (new () => object)[] = [Client, Vehicle, AuditLog];
@@ -25,6 +26,7 @@ export const MIGRATIONS: (new () => object)[] = [
   CreateSessions1761000000600,
   CreateLoginAttempts1761000000700,
   CreateAuthFunctions1761000000800,
+  FixLoginFailurePruneLocking1761000000850,
 ];
 
 /** Options of the runtime connection of the API as motorsync_app (no BYPASSRLS). */

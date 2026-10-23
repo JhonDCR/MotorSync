@@ -45,7 +45,8 @@ SELECT s.revoked_at, u.status AS user_status,
  * Validates the session of the token on every authenticated request (research R6): refreshes
  * last_activity_at and returns the current role, name and temporary-password state. Runs on the
  * manager of the request transaction, after set_config. Throws 401 SESSION_EXPIRED when the only
- * problem is inactivity, 401 SESSION_REVOKED otherwise (revoked, account inactive or not found).
+ * problem is inactivity, 401 SESSION_REVOKED otherwise (revoked, account inactive or not found),
+ * and 401 TEMPORARY_PASSWORD_EXPIRED if the temporary password of the account expired (R7).
  */
 @Injectable()
 export class SessionValidator {
@@ -54,7 +55,7 @@ export class SessionValidator {
     // TypeORM over pg resolves an UPDATE ... RETURNING to [rows, affectedCount].
     const [rows] = (await manager.query(TOUCH_SESSION_SQL, params)) as [ActiveSessionRow[], number];
     const row = rows[0];
-    if (row) return toSessionState(row);
+    if (row) return assertTemporaryPasswordValid(toSessionState(row));
 
     const diagnostic = (await manager.query(DIAGNOSE_SESSION_SQL, params)) as DiagnosticRow[];
     const session = diagnostic[0];
@@ -65,6 +66,19 @@ export class SessionValidator {
       session.inactive === true;
     throw new ProblemException(401, expired ? 'SESSION_EXPIRED' : 'SESSION_REVOKED');
   }
+}
+
+/**
+ * A temporary password that expired during the session (research R7, US5-AC9): 401
+ * TEMPORARY_PASSWORD_EXPIRED. TenantTransactionInterceptor revokes the session
+ * ('temp_password_expired') in its own transaction, after rolling the request back.
+ */
+function assertTemporaryPasswordValid(state: SessionState): SessionState {
+  const expiresAt = state.temporaryPasswordExpiresAt;
+  if (state.mustChangePassword && expiresAt !== null && expiresAt.getTime() <= Date.now()) {
+    throw new ProblemException(401, 'TEMPORARY_PASSWORD_EXPIRED');
+  }
+  return state;
 }
 
 function toSessionState(row: ActiveSessionRow): SessionState {

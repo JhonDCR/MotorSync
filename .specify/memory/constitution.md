@@ -34,7 +34,7 @@ Reglas no negociables del proyecto. Todo `plan.md` debe pasar el "Constitution C
 
 ### IV. Auditoría inmutable
 
-- Estos eventos se registran en `audit_log`: cambio de precio en un presupuesto aprobado, salida manual de inventario, anulación de OT, cambio de estado de OT, aceptación o rechazo de presupuesto por el cliente, cambios de rol de usuarios, transferencia de un vehículo a otro propietario, y modificación de identificadores (placa, VIN, documento del cliente).
+- Estos eventos se registran en `audit_log`: cambio de precio en un presupuesto aprobado, salida manual de inventario, anulación de OT, cambio de estado de OT, aceptación o rechazo de presupuesto por el cliente, cambios de rol de usuarios, desactivación y reactivación de cuentas de usuario, restablecimiento de contraseñas por un administrador, transferencia de un vehículo a otro propietario, y modificación de identificadores (placa, VIN, documento del cliente).
 - Cada registro guarda `tenant_id`, actor y su rol, acción, entidad, id, valores antes y después (JSON), fecha y hora (UTC), IP o canal, y el motivo cuando la acción lo exige.
 - `audit_log` es append-only: el rol de aplicación solo tiene `INSERT` y `SELECT`. No existe endpoint para editar ni borrar registros.
 - La auditoría se escribe en la misma transacción que el cambio auditado.
@@ -72,4 +72,4 @@ Reglas no negociables del proyecto. Todo `plan.md` debe pasar el "Constitution C
 - Una enmienda requiere un PR propio (`docs: amend constitution …`) aprobado por ambos integrantes, con la versión incrementada según SemVer: MAJOR si elimina o redefine un principio, MINOR si agrega uno o lo amplía, PATCH si solo aclara redacción.
 - Todo PR se revisa contra esta constitución. Una violación se justifica en el plan ("Complexity Tracking") o bloquea el merge.
 
-**Version**: 1.1.0 | **Ratified**: 2026-10-21 | **Last Amended**: 2026-10-21
+**Version**: 1.2.0 | **Ratified**: 2026-10-21 | **Last Amended**: 2026-10-23

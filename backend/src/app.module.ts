@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
+import { SessionValidator } from './auth/session-validator.js';
 import { ClientsModule } from './clients/clients.module.js';
 import { requireEnv } from './config/env.js';
 import { appDataSourceOptions } from './database/data-source.js';
@@ -27,6 +28,8 @@ import { VehiclesModule } from './vehicles/vehicles.module.js';
   controllers: [AppController],
   providers: [
     AppService,
+    // Always available to the global interceptor: a token with sid is never accepted without it.
+    SessionValidator,
     // Guards run before interceptors: the transaction always sees a verified user.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantTransactionInterceptor },

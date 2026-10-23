@@ -99,7 +99,7 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
 
 **Purpose**: configuración, identificadores, hasher, guard, interceptor con validación de sesión y errores. Bloquea US1 y US2.
 
-- [ ] T006 [P] Pruebas de configuración en `backend/src/config/env.spec.ts` (archivo nuevo):
+- [x] T006 [P] Pruebas de configuración en `backend/src/config/env.spec.ts` (archivo nuevo):
   - **FR-T01**: `loadEnv` lanza un error que nombra `AUTH_ALLOW_SESSIONLESS_TOKENS` si es `true` y `NODE_ENV=production`; arranca con `true` y `NODE_ENV` igual a `development`, `test` o ausente.
   - `AUTH_ALLOW_SESSIONLESS_TOKENS` vale `false` por defecto.
   - `AUTH_COOKIE_SECURE` vale `true` por defecto.
@@ -107,8 +107,8 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
   - Las validaciones existentes (`JWT_SECRET` ≥ 32 caracteres y demás) no cambian.
 
   — tester
-- [ ] T007 Implementar en `backend/src/config/env.ts` los campos `allowSessionlessTokens` y `cookieSecure` en `AppEnv`, la regla FR-T01 y una función `readAuthFlags(source = process.env)` que usan el guard y `cookies.ts`. Fijar `AUTH_ALLOW_SESSIONLESS_TOKENS=true` como valor por defecto **solo en las pruebas**: `test.env` en `backend/vitest.config.ts`, y `process.env.AUTH_ALLOW_SESSIONLESS_TOKENS ??= 'true'` en `backend/vitest.config.e2e.ts` y `backend/vitest.config.perf.ts`, para que las suites de la 001 sigan con tokens sin `sid` (research R9). Deja T006 en verde — implementer-backend
-- [ ] T008 [P] Pruebas de identificadores en `backend/src/common/identifiers/email.spec.ts`:
+- [x] T007 Implementar en `backend/src/config/env.ts` los campos `allowSessionlessTokens` y `cookieSecure` en `AppEnv`, la regla FR-T01 y una función `readAuthFlags(source = process.env)` que usan el guard y `cookies.ts`. Fijar `AUTH_ALLOW_SESSIONLESS_TOKENS=true` como valor por defecto **solo en las pruebas**: `test.env` en `backend/vitest.config.ts`, y `process.env.AUTH_ALLOW_SESSIONLESS_TOKENS ??= 'true'` en `backend/vitest.config.e2e.ts` y `backend/vitest.config.perf.ts`, para que las suites de la 001 sigan con tokens sin `sid` (research R9). Deja T006 en verde — implementer-backend
+- [x] T008 [P] Pruebas de identificadores en `backend/src/common/identifiers/email.spec.ts`:
   - `normalizeEmail(' Ana.Perez@Taller.EC ')` → `ana.perez@taller.ec`; no toca puntos ni `+`.
   - `isValidEmail` acepta y rechaza vectores fijos, con máximo 254 caracteres.
   - `emailHash('ana@taller.ec')` es igual al SHA-256 hex calculado en la prueba con `createHash`.
@@ -119,8 +119,8 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
   - con menos de 8 da `PASSWORD_TOO_SHORT` y con más de 128 `PASSWORD_TOO_LONG`.
 
   Cubre la base de US1-AC2, US1-AC6, US2-AC2 y FR-005 — tester
-- [ ] T009 Implementar `backend/src/common/identifiers/email.ts`, `backend/src/common/validation/is-password.ts` y `backend/src/common/validation/is-email-normalized.ts` (transform + validación, como `transforms.ts` de la 001) — implementer-backend
-- [ ] T010 [P] Pruebas del hasher en `backend/src/auth/password-hasher.spec.ts`:
+- [x] T009 Implementar `backend/src/common/identifiers/email.ts`, `backend/src/common/validation/is-password.ts` y `backend/src/common/validation/is-email-normalized.ts` (transform + validación, como `transforms.ts` de la 001) — implementer-backend
+- [x] T010 [P] Pruebas del hasher en `backend/src/auth/password-hasher.spec.ts`:
   - `hash()` produce `scrypt$32768$8$1$<sal>$<hash>` con una sal distinta en cada llamada.
   - `verify()` da `true` con la contraseña correcta y `false` con una incorrecta, con mayúsculas cambiadas o con espacios agregados (US2-AC2).
   - Un hash con formato inválido o alterado devuelve `false` sin lanzar.
@@ -128,8 +128,8 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
   - Los parámetros se pueden bajar (`N = 2^10`) por inyección para que la prueba sea rápida.
 
   FR-005, FR-006, FR-008 — tester
-- [ ] T011 Implementar `backend/src/auth/password-hasher.ts` (research R3): `scrypt` asíncrono, `N = 2^15`, `r = 8`, `p = 1`, `keylen = 64`, `maxmem = 64 MiB`, sal de 16 bytes, `timingSafeEqual`, y un hash ficticio calculado una vez al arrancar — implementer-backend
-- [ ] T012 [P] Pruebas del guard en un archivo **nuevo**, `backend/src/auth/jwt-auth.guard.sessions.spec.ts`. La spec de la 001 no se toca y debe seguir pasando.
+- [x] T011 Implementar `backend/src/auth/password-hasher.ts` (research R3): `scrypt` asíncrono, `N = 2^15`, `r = 8`, `p = 1`, `keylen = 64`, `maxmem = 64 MiB`, sal de 16 bytes, `timingSafeEqual`, y un hash ficticio calculado una vez al arrancar — implementer-backend
+- [x] T012 [P] Pruebas del guard en un archivo **nuevo**, `backend/src/auth/jwt-auth.guard.sessions.spec.ts`. La spec de la 001 no se toca y debe seguir pasando.
   - Un handler o clase con `@Public()` pasa sin token y sin `request.user`.
   - Los claims `sid` (uuid) y `pwd_change` (booleano) son opcionales y se exponen como `sessionId` y `mustChangePassword`.
   - `sid` no uuid → 401.
@@ -138,13 +138,13 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
   - Cubre US2-AC12 y FR-010.
 
   Y en `backend/src/auth/decorators.spec.ts`: `@Public()`, `@Roles('admin')` y `@AllowPendingPasswordChange()` dejan su metadata leíble con `Reflector` — tester
-- [ ] T013 Implementar:
+- [x] T013 Implementar:
   - `backend/src/auth/public.decorator.ts`, `roles.decorator.ts` y `allow-pending-password-change.decorator.ts`;
   - `backend/src/auth/jwt-auth.guard.ts` (`Reflector.getAllAndOverride` sobre handler y clase, `readAuthFlags`, `TOKEN_EXPIRED`);
   - `backend/src/auth/auth-user.ts` (`sessionId?: string`, `mustChangePassword?: boolean`).
 
   **Mantener compatible** el `Test.createTestingModule({ providers: [JwtAuthGuard] })` de la spec de la 001: inyectar `Reflector` (que Nest provee siempre) y leer las banderas con `readAuthFlags()`, sin un proveedor nuevo obligatorio — implementer-backend
-- [ ] T014 [P] Pruebas del interceptor en un archivo **nuevo**, `backend/src/database/tenant-transaction.interceptor.sessions.spec.ts`, más `backend/src/auth/session-validator.spec.ts`.
+- [x] T014 [P] Pruebas del interceptor en un archivo **nuevo**, `backend/src/database/tenant-transaction.interceptor.sessions.spec.ts`, más `backend/src/auth/session-validator.spec.ts`.
   - Una ruta `@Public()` no abre transacción ni ejecuta `set_config`.
   - Un usuario con `sessionId`:
     - el `SessionValidator` se llama **después** de `set_config` y **antes** del handler;
@@ -155,15 +155,15 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
   - Un usuario sin `sessionId` (token de la 001) no llama al validador.
 
   El validador ejecuta la sentencia de research R6 y distingue los dos códigos con una consulta de diagnóstico — tester
-- [ ] T015 Implementar `backend/src/auth/session-validator.ts` y ampliar `backend/src/database/tenant-transaction.interceptor.ts` con `@Public`, el validador, `@Roles` y `@AllowPendingPasswordChange`. **Mantener compatible** `new TenantTransactionInterceptor(dataSource)`, que usa la spec de la 001: `Reflector` y `SessionValidator` como parámetros `@Optional()`; sin ellos, el comportamiento es el de la 001 — implementer-backend
-- [ ] T016 [P] Pruebas de errores en archivos **nuevos**:
+- [x] T015 Implementar `backend/src/auth/session-validator.ts` y ampliar `backend/src/database/tenant-transaction.interceptor.ts` con `@Public`, el validador, `@Roles` y `@AllowPendingPasswordChange`. **Mantener compatible** `new TenantTransactionInterceptor(dataSource)`, que usa la spec de la 001: `Reflector` y `SessionValidator` como parámetros `@Optional()`; sin ellos, el comportamiento es el de la 001 — implementer-backend
+- [x] T016 [P] Pruebas de errores en archivos **nuevos**:
   - `backend/src/common/problem-details.filter.auth.spec.ts`: 403 sin `code` → `FORBIDDEN`; 429 sin `code` → `ACCOUNT_LOCKED`.
   - `backend/src/database/pg-errors.auth.spec.ts`: `23505` en `tenants_ruc_key` → 409 `RUC_ALREADY_REGISTERED`; `23505` en `users_email_key` → 409 `EMAIL_UNAVAILABLE`; `23514` en `users_last_admin` → 409 `LAST_ADMIN`.
   - Los códigos de la 001 no cambian.
 
   — tester
-- [ ] T017 Implementar los cambios en `backend/src/common/problem-details.filter.ts` (`codeForStatus`) y en `backend/src/database/pg-errors.ts` (traducciones nuevas) — implementer-backend
-- [ ] T018 **Regresión de la 001 con el guard y el interceptor nuevos**. Con T001 a T017 en verde:
+- [x] T017 Implementar los cambios en `backend/src/common/problem-details.filter.ts` (`codeForStatus`) y en `backend/src/database/pg-errors.ts` (traducciones nuevas) — implementer-backend
+- [x] T018 **Regresión de la 001 con el guard y el interceptor nuevos**. Con T001 a T017 en verde:
   - correr `cd backend && npm run lint && npm test && npm run build && npm run db:bootstrap && npm run db:migrate && npm run test:e2e`;
   - confirmar que **todas** las suites de la 001 pasan sin cambios: `jwt-auth.guard.spec.ts`, `tenant-transaction.interceptor.spec.ts`, `problem-details.filter.spec.ts`, `pg-errors.spec.ts`, `test/*.e2e-spec.ts`, `test/db/rls.e2e-spec.ts` y `test/db/smoke.e2e-spec.ts`;
   - confirmar que el truncado de `db-fixtures.ts` limpia las tablas nuevas entre suites (correr dos veces seguidas `npm run test:e2e`);

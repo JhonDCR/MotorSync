@@ -44,6 +44,8 @@ function titleOf(status: number): string {
 /** Contract code for an HttpException that does not carry one (thrown by Nest or by guards). */
 function codeForStatus(status: number): string {
   if (status === 401) return 'UNAUTHORIZED';
+  if (status === 403) return 'FORBIDDEN';
+  if (status === 429) return 'ACCOUNT_LOCKED';
   if (status === 404 || status === 405) return 'NOT_FOUND';
   if (status >= 400 && status < 500) return 'VALIDATION_ERROR';
   return INTERNAL_ERROR_CODE;

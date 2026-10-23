@@ -16,6 +16,8 @@ interface ActiveSessionRow {
   name: unknown;
   must_change_password: unknown;
   temp_password_expires_at: unknown;
+  /** temp_password_expires_at <= now() with the clock of PostgreSQL (null without a temporary). */
+  temp_password_expired: unknown;
 }
 
 interface DiagnosticRow {
@@ -24,14 +26,17 @@ interface DiagnosticRow {
   inactive: boolean;
 }
 
-// Research R6, literal: one statement by primary key, under RLS (app.tenant_id already pinned).
+// Research R6: one statement by primary key, under RLS (app.tenant_id already pinned). Besides the
+// columns of R6 it returns whether the temporary password expired, computed by PostgreSQL as in
+// the login and in POST /auth/password (research R7), so the three use the same clock.
 const TOUCH_SESSION_SQL = `
 UPDATE user_sessions s SET last_activity_at = now()
   FROM users u
  WHERE s.id = $1 AND s.user_id = $2 AND u.id = s.user_id
    AND s.revoked_at IS NULL AND u.status = 'active'
    AND s.last_activity_at > now() - interval '30 minutes'
-RETURNING u.role, u.name, u.must_change_password, u.temp_password_expires_at`;
+RETURNING u.role, u.name, u.must_change_password, u.temp_password_expires_at,
+          u.temp_password_expires_at <= now() AS temp_password_expired`;
 
 // Read-only diagnostic, only when the UPDATE matched nothing. The clock is PostgreSQL's.
 const DIAGNOSE_SESSION_SQL = `
@@ -55,7 +60,11 @@ export class SessionValidator {
     // TypeORM over pg resolves an UPDATE ... RETURNING to [rows, affectedCount].
     const [rows] = (await manager.query(TOUCH_SESSION_SQL, params)) as [ActiveSessionRow[], number];
     const row = rows[0];
-    if (row) return assertTemporaryPasswordValid(toSessionState(row));
+    if (row) {
+      const state = toSessionState(row);
+      assertTemporaryPasswordValid(state, row.temp_password_expired === true);
+      return state;
+    }
 
     const diagnostic = (await manager.query(DIAGNOSE_SESSION_SQL, params)) as DiagnosticRow[];
     const session = diagnostic[0];
@@ -73,12 +82,10 @@ export class SessionValidator {
  * TEMPORARY_PASSWORD_EXPIRED. TenantTransactionInterceptor revokes the session
  * ('temp_password_expired') in its own transaction, after rolling the request back.
  */
-function assertTemporaryPasswordValid(state: SessionState): SessionState {
-  const expiresAt = state.temporaryPasswordExpiresAt;
-  if (state.mustChangePassword && expiresAt !== null && expiresAt.getTime() <= Date.now()) {
+function assertTemporaryPasswordValid(state: SessionState, expired: boolean): void {
+  if (state.mustChangePassword && expired) {
     throw new ProblemException(401, 'TEMPORARY_PASSWORD_EXPIRED');
   }
-  return state;
 }
 
 function toSessionState(row: ActiveSessionRow): SessionState {

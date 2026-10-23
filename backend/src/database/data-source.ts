@@ -29,6 +29,17 @@ export const MIGRATIONS: (new () => object)[] = [
   FixLoginFailurePruneLocking1761000000850,
 ];
 
+/**
+ * Connections of the API pool: pg's default, made explicit. A request holds ONE connection for its
+ * whole transaction; work committed apart runs after releasing it (after-release.ts, T049).
+ */
+export const APP_POOL_SIZE = 10;
+/**
+ * Upper bound to open a connection or to wait for a free one in the pool (pg
+ * connectionTimeoutMillis): an exhausted pool fails the request instead of waiting forever.
+ */
+export const APP_CONNECT_TIMEOUT_MS = 10_000;
+
 /** Options of the runtime connection of the API as motorsync_app (no BYPASSRLS). */
 export function appDataSourceOptions(
   url: string = requireEnv('DATABASE_URL'),
@@ -39,6 +50,8 @@ export function appDataSourceOptions(
     synchronize: false,
     migrationsRun: false,
     entities: ENTITIES,
+    connectTimeoutMS: APP_CONNECT_TIMEOUT_MS,
+    extra: { max: APP_POOL_SIZE },
   };
 }
 

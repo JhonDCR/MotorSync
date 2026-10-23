@@ -2,6 +2,7 @@ import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { DataSource, QueryFailedError, type EntityManager } from 'typeorm';
 import { emailHash } from '../common/identifiers/email.js';
 import { ProblemException } from '../common/problem-details.filter.js';
+import { AfterReleaseError } from '../database/after-release.js';
 import { getManager, getTenantContext } from '../database/tenant-context.js';
 import { AccessTokenService, ACCESS_TOKEN_TTL_SECONDS } from './access-token.service.js';
 import { withAuthTransaction } from './auth-transaction.js';
@@ -312,8 +313,9 @@ export class AuthService {
 
   /**
    * POST /auth/password (US5): lock check, current password (a wrong one counts as a login
-   * failure, committed apart), SAME_PASSWORD, new hash, end of the temporary password, revocation
-   * of the OTHER sessions (FR-027) and a new access token of the same session. An expired
+   * failure, committed apart once the request released its connection), SAME_PASSWORD, new hash,
+   * end of the temporary password, revocation of the OTHER sessions (FR-027) and a new access
+   * token of the same session. An expired
    * temporary password gives 401 TEMPORARY_PASSWORD_EXPIRED; TenantTransactionInterceptor revokes
    * the session after the rollback (research R7).
    */
@@ -338,11 +340,13 @@ export class AuthService {
       throw new ProblemException(429, 'ACCOUNT_LOCKED');
     }
     if (!(await this.hasher.verify(dto.currentPassword, account.password_hash))) {
-      // Committed on its own: the failure counts although the request rolls back (US5-AC4).
-      await withAuthTransaction(this.dataSource, ip, (tx) =>
-        this.throttle.recordFailure(tx.manager, hash),
+      // Committed on its own so the failure counts although the request rolls back (US5-AC4),
+      // and only once the interceptor released the connection of the request (T049).
+      throw new AfterReleaseError(currentPasswordIncorrect(), () =>
+        withAuthTransaction(this.dataSource, ip, (tx) =>
+          this.throttle.recordFailure(tx.manager, hash),
+        ),
       );
-      throw currentPasswordIncorrect();
     }
     if (dto.newPassword === dto.currentPassword) throw samePassword();
 

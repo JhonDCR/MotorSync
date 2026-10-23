@@ -89,7 +89,7 @@ El login busca la cuenta por correo sin saber el taller, el registro crea un tal
   4. Si acierta: `auth_record_login_success(hash)` hace `SELECT … FOR UPDATE` y, si en ese momento hay un bloqueo vigente (otro intento lo creó en paralelo), devuelve `false` y el login responde 429. Si no, borra la fila (contador a cero, US2-AC6, US2-AC7).
 - Los fallos de la contraseña actual en `POST /auth/password` usan el mismo par de funciones con el correo de la sesión (US5-AC4). Por la clarificación, no se cierra la sesión en curso.
 - Restablecer la contraseña llama a `auth_clear_login_failures(user_id)` (US4-AC21).
-- Las filas vencidas se borran de forma oportunista en `auth_record_login_failure` (`DELETE … WHERE locked_until < now() - interval '1 day'`, como máximo 100 por llamada). No hay tarea programada.
+- Las filas vencidas se borran de forma oportunista en `auth_record_login_failure` (`DELETE … WHERE updated_at < now() - interval '1 day'`, como máximo 100 por llamada; ver data-model.md). No hay tarea programada.
 
 **Razón**: la spec exige bloqueo por correo exista o no, robusto ante concurrencia y sin Redis. Una sola fila por correo con upsert atómico es lo más simple que lo garantiza en PostgreSQL.
 

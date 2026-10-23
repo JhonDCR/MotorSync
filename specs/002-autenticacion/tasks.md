@@ -44,7 +44,7 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
 
 **Purpose**: rol `motorsync_auth`, migraciones y funciones `SECURITY DEFINER`, fixtures y variables de entorno.
 
-- [ ] T001 Escribir la e2e de BD que demuestra el diseño de `motorsync_auth` (research R1, data-model) en `backend/test/db/auth-roles.e2e-spec.ts`. Usa conexiones como `motorsync_app` (`DATABASE_URL`) y como `motorsync_migrator`. Las cuentas se siembran con los fixtures de T002. Debe comprobar:
+- [x] T001 Escribir la e2e de BD que demuestra el diseño de `motorsync_auth` (research R1, data-model) en `backend/test/db/auth-roles.e2e-spec.ts`. Usa conexiones como `motorsync_app` (`DATABASE_URL`) y como `motorsync_migrator`. Las cuentas se siembran con los fixtures de T002. Debe comprobar:
   - (a) En `pg_roles`, `motorsync_auth` tiene `rolcanlogin = false`, `rolbypassrls = false` y `rolinherit = false`. `pg_has_role('motorsync_app', 'motorsync_auth', 'MEMBER')` es `false`. `SET ROLE motorsync_auth` como app falla con *permission denied*.
   - (b) Las 7 funciones `auth_*`:
     - tienen `prosecdef = true`, dueño `motorsync_auth` y `proconfig` con `search_path=pg_catalog, public, pg_temp`;
@@ -73,7 +73,7 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
   - (h) `auth_record_login_failure`: 5 llamadas → `locked_until` no nulo; 10 llamadas concurrentes desde 10 conexiones → `failed_count = 10` y bloqueo (US2-AC9).
 
   Cubre el principio I, FR-004, FR-022 y US1-AC7 — tester
-- [ ] T002 [P] Ampliar el arnés e2e (justificar en el PR1: única edición de archivos de prueba existentes).
+- [x] T002 [P] Ampliar el arnés e2e (justificar en el PR1: única edición de archivos de prueba existentes).
   - `backend/test/setup/db-fixtures.ts`:
     - agregar `users`, `user_sessions`, `refresh_tokens` y `login_attempts` a `BUSINESS_TABLES`; `truncateBusinessTables` ya tolera tablas inexistentes;
     - `createTenant(name, ruc?)`;
@@ -82,7 +82,7 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
   - `backend/test/setup/auth.ts`: `loginAs(app, email, password)`, que devuelve `{ accessToken, refreshCookie, body }`; `refreshCookieFrom(response)`; `withRefreshCookie(cookie)`, que pone los headers `Cookie` y `X-Requested-With: motorsync`; `decodeJwtPayload(token)`.
 
   — tester
-- [ ] T003 [P] Añadir a `.env.example`: `AUTH_ALLOW_SESSIONLESS_TOKENS=true`, con el comentario "solo desarrollo y pruebas; la API no arranca con true y NODE_ENV=production (FR-T01)", y `AUTH_COOKIE_SECURE=true` — leader
+- [x] T003 [P] Añadir a `.env.example`: `AUTH_ALLOW_SESSIONLESS_TOKENS=true`, con el comentario "solo desarrollo y pruebas; la API no arranca con true y NODE_ENV=production (FR-T01)", y `AUTH_COOKIE_SECURE=true` — leader
 - [ ] T004 Ampliar `backend/db/bootstrap.sql` con el bloque del rol `motorsync_auth` de data-model.md, "Bootstrap", **literal**: `NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOINHERIT`, `GRANT USAGE ON SCHEMA public TO motorsync_auth`, `GRANT motorsync_auth TO motorsync_migrator WITH INHERIT FALSE, SET TRUE`. Debe seguir siendo idempotente — implementer-backend
 - [ ] T005 Crear las migraciones con el DDL de data-model.md **literal**:
   - `backend/src/database/migrations/1761000000400-AddTenantRuc.ts`: `ruc text COLLATE "C"` con `CHECK (ruc IS NULL OR ruc ~ '^[0-9]{10}001$')`, `tenants_ruc_key`, RLS `ENABLE` sin `FORCE`, políticas `tenants_self` y `tenants_auth_register`, grants.

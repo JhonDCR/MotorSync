@@ -314,6 +314,10 @@ REVOKE CREATE ON SCHEMA public FROM motorsync_auth;
 
 GRANT EXECUTE ON FUNCTION app_current_tenant() TO motorsync_auth;
 
+-- Los privilegios de las funciones solo los puede cambiar su dueño. Con INHERIT FALSE,
+-- después del ALTER ... OWNER el migrator ya no lo es: hacer el REVOKE/GRANT sin SET ROLE
+-- solo emite WARNING y PUBLIC conserva EXECUTE (defecto detectado por T001, 2026-10-23).
+SET ROLE motorsync_auth;
 REVOKE ALL ON FUNCTION auth_register_workshop(text, text, text, text, text),
                        auth_find_user_for_login(text), auth_find_refresh_token(text),
                        auth_login_locked_until(text), auth_record_login_failure(text),
@@ -324,6 +328,8 @@ GRANT EXECUTE ON FUNCTION auth_register_workshop(text, text, text, text, text),
                           auth_login_locked_until(text), auth_record_login_failure(text),
                           auth_record_login_success(text), auth_clear_login_failures(uuid)
   TO motorsync_app;
+RESET ROLE;
+-- Resultado esperado del ACL: {motorsync_auth=X/motorsync_auth,motorsync_app=X/motorsync_auth}
 ```
 
 **Mantenimiento**: por `INHERIT FALSE`, el migrator no tiene los privilegios de dueño de estas funciones. Toda migración posterior que las reemplace (`CREATE OR REPLACE`) o las borre (`down`) debe envolverse así: `GRANT CREATE ON SCHEMA public TO motorsync_auth; SET ROLE motorsync_auth; …; RESET ROLE; REVOKE CREATE ON SCHEMA public FROM motorsync_auth;`.

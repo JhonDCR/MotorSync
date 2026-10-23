@@ -171,3 +171,50 @@ a:focus-visible {
     padding: 2rem;
   }
 }
+
+// US4: actions, ownership history and visually hidden text.
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.ownership-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ownership-change {
+  padding: 0.75rem 0;
+  border-top: 1px solid #d0d0d0;
+
+  &:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .facts div + div {
+    margin-top: 0.5rem;
+  }
+}
+
+.ownership-date {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.document {
+  margin-left: 0.5rem;
+  color: $muted;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

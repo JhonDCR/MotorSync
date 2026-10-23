@@ -49,12 +49,33 @@
 // Al cambiar body-type se revalida la placa con el formato de la nueva carrocería (US3-AC14).
 // Cuerpo enviado (VehicleCreate): plate y vin normalizados (vin vacío → null), brand/model/color sin espacios al
 // inicio ni al final, year e initialMileage como number, sin tenantId.
+//
+// T080 (PR3, US4): modo edición, contrato para el implementer (T081).
+//   Ruta `vehicles/:id/edit` en app.routes.ts (loadComponent de VehicleFormPage, title "Editar vehículo"), declarada
+//   ANTES de `vehicles/:id`. El id sale del parámetro de ruta `id`. En `vehicles/new` nada cambia.
+//   Al abrir: VehiclesApiService.getById(id) y precarga plate, vin (null → ''), brand, model, year, color, body-type
+//   e initial-mileage. El <h1> dice "Editar vehículo". El propietario se muestra en owner-selected (displayName y
+//   documento) pero NO se cambia aquí (se usa la transferencia de la ficha): no se renderizan owner-search,
+//   owner-change ni register-new-client.
+//   Guardar llama a VehiclesApiService.update(id, body: VehicleUpdate) (nunca a create) y navega a /vehicles/{id}.
+//   body: version = la cargada; campos normalizados como en el alta (plate y vin normalizados, vin '' → null, year e
+//   initialMileage como number). Puede llevar campos sin cambios, pero nunca ownerClientId ni tenantId. Si plate o
+//   vin van en el body y no cambiaron, son los valores guardados.
+//   Motivo (FR-019): el campo `reason` (<textarea>, label con "Motivo" y "obligatorio"/"opcional") aparece SOLO si la
+//   placa o el VIN, comparados ya normalizados, difieren de lo guardado (pba-1234 = PBA1234; '' = null; quitar un VIN
+//   guardado sí es un cambio). Reglas del rol (current-session), recorte, error-reason y mensaje: iguales que en
+//   client-form.page.spec.ts (asesor o sin sesión: obligatorio; admin: opcional; si se informa, 10 a 500).
+//   La placa se revalida con la carrocería elegida (US3-AC14) igual que en el alta.
+//   409 VERSION_CONFLICT: version-conflict (role="alert") con "El registro cambió", el formulario se rellena con
+//   problem.current y el siguiente guardado usa esa versión. 409 PLATE/VIN_ALREADY_EXISTS: como en el alta.
+//   404 al cargar: load-error con "No se encontró ningún vehículo" y sin botón save.
+//   US4-AC17: ningún botón ni enlace para eliminar, borrar ni desactivar.
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { of, throwError } from 'rxjs';
+import { of, throwError, type Observable } from 'rxjs';
 import type {
   ClientDetail,
   ClientSearchResponse,
@@ -62,9 +83,11 @@ import type {
   Problem,
   VehicleCreate,
   VehicleDetail,
+  VehicleUpdate,
 } from '../../core/api/api.models';
 import { ClientsApiService } from '../../core/api/clients-api.service';
 import { VehiclesApiService } from '../../core/api/vehicles-api.service';
+import { signInAs, signOut } from '../../../testing/fake-jwt';
 import { VehicleFormPage } from './vehicle-form.page';
 
 @Component({ template: '' })
@@ -982,5 +1005,493 @@ describe('VehicleFormPage (T049)', () => {
     expect(text('duplicate-message')).toMatch(/placa ya está registrada/i);
     expect(get<HTMLAnchorElement>('open-existing-vehicle').getAttribute('href')).toBe(`/vehicles/${EXISTING_ID}`);
     expect(query('network-error')).toBeNull();
+  });
+});
+
+describe('VehicleFormPage en modo edición, vehicles/:id/edit (T080, US4)', () => {
+  type UpdateVehicle = (vehicleId: string, body: VehicleUpdate) => Observable<VehicleDetail>;
+
+  const REASON_MESSAGE = 'El motivo es obligatorio (entre 10 y 500 caracteres)';
+  const VALID_REASON = 'Cambio de placa por pérdida de la anterior';
+  const STORED_VIN = '1HGCM82633A004352';
+  const OTHER_VIN = '2HGFG12688H500123';
+
+  const STORED: VehicleDetail = { ...VEHICLE, version: 4 };
+
+  let harness: RouterTestingHarness;
+  let vehiclesApi: {
+    create: ReturnType<typeof vi.fn<VehiclesApiService['create']>>;
+    getById: ReturnType<typeof vi.fn<VehiclesApiService['getById']>>;
+    search: ReturnType<typeof vi.fn<VehiclesApiService['search']>>;
+    update: ReturnType<typeof vi.fn<UpdateVehicle>>;
+  };
+  let clientsApi: {
+    create: ReturnType<typeof vi.fn<ClientsApiService['create']>>;
+    getById: ReturnType<typeof vi.fn<ClientsApiService['getById']>>;
+    search: ReturnType<typeof vi.fn<ClientsApiService['search']>>;
+  };
+
+  beforeEach(async () => {
+    sessionStorage.clear();
+    localStorage.clear();
+    signInAs('asesor');
+    vehiclesApi = {
+      create: vi.fn<VehiclesApiService['create']>(() => of(VEHICLE)),
+      getById: vi.fn<VehiclesApiService['getById']>(() => of(STORED)),
+      search: vi.fn<VehiclesApiService['search']>(() => of({ items: [], hasMore: false })),
+      update: vi.fn<UpdateVehicle>((_id, body) => of({ ...STORED, version: body.version + 1 })),
+    };
+    clientsApi = {
+      create: vi.fn<ClientsApiService['create']>(() => of(clientDetail())),
+      getById: vi.fn<ClientsApiService['getById']>(() => of(clientDetail())),
+      search: vi.fn<ClientsApiService['search']>(() => of(SEARCH_RESULTS)),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          { path: 'clients/:id', component: StubPage },
+          { path: 'vehicles/:id/edit', component: VehicleFormPage },
+          { path: 'vehicles/:id', component: StubPage },
+        ]),
+        { provide: VehiclesApiService, useValue: vehiclesApi },
+        { provide: ClientsApiService, useValue: clientsApi },
+      ],
+    });
+    harness = await RouterTestingHarness.create();
+  });
+
+  afterEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+  });
+
+  // --- utilidades (comportamiento observable en el DOM) ---
+
+  async function settle(): Promise<void> {
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+  }
+
+  async function openEdit(vehicleId = VEHICLE_ID): Promise<void> {
+    await harness.navigateByUrl(`/vehicles/${vehicleId}/edit`);
+    await settle();
+  }
+
+  function root(): HTMLElement {
+    return harness.routeNativeElement ?? (harness.fixture.nativeElement as HTMLElement);
+  }
+
+  function query<T extends HTMLElement = HTMLElement>(testId: string): T | null {
+    return root().querySelector<T>(`[data-testid="${testId}"]`);
+  }
+
+  function get<T extends HTMLElement = HTMLElement>(testId: string): T {
+    const element = query<T>(testId);
+    if (element === null) {
+      throw new Error(`No existe [data-testid="${testId}"]`);
+    }
+    return element;
+  }
+
+  function text(testId: string): string {
+    return get(testId).textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  }
+
+  function value(testId: string): string {
+    return get<HTMLInputElement>(testId).value;
+  }
+
+  async function type(testId: string, input: string): Promise<void> {
+    const element = get<HTMLInputElement | HTMLTextAreaElement>(testId);
+    element.value = input;
+    element.dispatchEvent(new Event('input'));
+    await settle();
+  }
+
+  async function click(testId: string): Promise<void> {
+    get(testId).click();
+    await settle();
+  }
+
+  function bodyTypeLabels(): string[] {
+    return Array.from(get<HTMLSelectElement>('body-type').options).map((option) => option.textContent?.trim() ?? '');
+  }
+
+  async function chooseBodyType(label: string): Promise<void> {
+    const select = get<HTMLSelectElement>('body-type');
+    const index = bodyTypeLabels().indexOf(label);
+    if (index < 0) {
+      throw new Error(`No existe la carrocería "${label}"`);
+    }
+    select.selectedIndex = index;
+    select.dispatchEvent(new Event('change'));
+    await settle();
+  }
+
+  function selectedBodyTypeLabel(): string {
+    const select = get<HTMLSelectElement>('body-type');
+    return select.options[select.selectedIndex]?.textContent?.trim() ?? '';
+  }
+
+  function sentUpdate(call = 0): [string, VehicleUpdate] {
+    return vehiclesApi.update.mock.calls[call];
+  }
+
+  function currentUrl(): string {
+    return TestBed.inject(Router).url;
+  }
+
+  function reasonLabel(): string {
+    const label = root().querySelector('label[for="reason"]') ?? get('reason').closest('label');
+    return label?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  }
+
+  // --- US4-AC6: carga y edición de datos no identificadores ---
+
+  it('[US4-AC6] carga el vehículo del parámetro de ruta y precarga el formulario', async () => {
+    vehiclesApi.getById.mockReturnValue(of({ ...STORED, vin: STORED_VIN }));
+    await openEdit();
+
+    expect(vehiclesApi.getById).toHaveBeenCalledWith(VEHICLE_ID);
+    expect(root().querySelector('h1')?.textContent).toMatch(/editar vehículo/i);
+    expect(value('plate')).toBe('PBA1234');
+    expect(value('vin')).toBe(STORED_VIN);
+    expect(value('brand')).toBe('Toyota');
+    expect(value('model')).toBe('Hilux');
+    expect(value('year')).toBe('2022');
+    expect(value('color')).toBe('Blanco');
+    expect(selectedBodyTypeLabel()).toBe('Pickup');
+    expect(value('initial-mileage')).toBe('45000');
+  });
+
+  it('[US4-AC6] un VIN null se precarga vacío', async () => {
+    await openEdit();
+
+    expect(value('plate')).toBe('PBA1234');
+    expect(value('vin')).toBe('');
+  });
+
+  it('[US4-AC6] muestra el propietario pero no permite cambiarlo desde la edición', async () => {
+    await openEdit();
+
+    expect(text('owner-selected')).toContain('Ana Pérez');
+    expect(query('owner-search')).toBeNull();
+    expect(query('owner-change')).toBeNull();
+    expect(query('register-new-client')).toBeNull();
+  });
+
+  it('[US4-AC6] edita marca, modelo, año, color, carrocería y kilometraje: llama a update y navega a la ficha', async () => {
+    await openEdit();
+    await type('brand', ' Toyota ');
+    await type('model', 'Fortuner');
+    await type('year', '2023');
+    await type('color', '  Rojo  ');
+    await chooseBodyType('SUV');
+    await type('initial-mileage', '46000');
+    await click('save');
+
+    expect(vehiclesApi.create).not.toHaveBeenCalled();
+    expect(vehiclesApi.update).toHaveBeenCalledTimes(1);
+    const [id, body] = sentUpdate();
+    expect(id).toBe(VEHICLE_ID);
+    expect(body).toEqual(
+      expect.objectContaining({
+        version: 4,
+        brand: 'Toyota',
+        model: 'Fortuner',
+        year: 2023,
+        color: 'Rojo',
+        bodyType: 'suv',
+        initialMileage: 46000,
+      }),
+    );
+    expect(Object.keys(body)).not.toContain('ownerClientId');
+    expect(Object.keys(body)).not.toContain('tenantId');
+    expect(Object.keys(body)).not.toContain('reason');
+    if (body.plate !== undefined) {
+      expect(body.plate).toBe('PBA1234');
+    }
+    if (body.vin !== undefined) {
+      expect(body.vin).toBeNull();
+    }
+    expect(currentUrl()).toBe(`/vehicles/${VEHICLE_ID}`);
+  });
+
+  // --- US4-AC11: solo placa y VIN piden motivo ---
+
+  it('[US4-AC11] editar el color no muestra el campo "Motivo"', async () => {
+    await openEdit();
+    expect(value('plate')).toBe('PBA1234');
+    await type('color', 'Negro');
+
+    expect(query('reason')).toBeNull();
+  });
+
+  it('[US4-AC11] la misma placa escrita de otra forma (pba-1234) no cuenta como cambio', async () => {
+    await openEdit();
+    await type('plate', 'pba-1234');
+
+    expect(query('reason')).toBeNull();
+    await click('save');
+
+    expect(vehiclesApi.update).toHaveBeenCalledTimes(1);
+    expect(Object.keys(sentUpdate()[1])).not.toContain('reason');
+  });
+
+  it('[US4-AC11] el mismo VIN en minúsculas no cuenta como cambio', async () => {
+    vehiclesApi.getById.mockReturnValue(of({ ...STORED, vin: STORED_VIN }));
+    await openEdit();
+    await type('vin', STORED_VIN.toLowerCase());
+
+    expect(query('reason')).toBeNull();
+  });
+
+  it('[US4-AC11] cambiar la placa muestra el campo "Motivo" y volver a la guardada lo oculta', async () => {
+    await openEdit();
+    await type('plate', 'PBB4321');
+
+    expect(query('reason')).not.toBeNull();
+    expect(reasonLabel()).toMatch(/motivo/i);
+
+    await type('plate', 'PBA1234');
+    expect(query('reason')).toBeNull();
+  });
+
+  it('[US4-AC11] informar un VIN donde no había pide motivo', async () => {
+    await openEdit();
+    await type('vin', OTHER_VIN);
+
+    expect(query('reason')).not.toBeNull();
+  });
+
+  // --- US4-AC15: asesor, motivo obligatorio ---
+
+  it('[US4-AC15] asesor: cambiar la placa sin motivo no guarda e indica el mensaje junto al campo', async () => {
+    await openEdit();
+    await type('plate', 'PBB4321');
+    await click('save');
+
+    expect(vehiclesApi.update).not.toHaveBeenCalled();
+    expect(text('error-reason')).toBe(REASON_MESSAGE);
+    expect(get('reason').getAttribute('aria-invalid')).toBe('true');
+    expect(reasonLabel()).toMatch(/obligatorio/i);
+    expect(currentUrl()).toBe(`/vehicles/${VEHICLE_ID}/edit`);
+  });
+
+  it('[US4-AC15] asesor: cambiar el VIN sin motivo no guarda', async () => {
+    vehiclesApi.getById.mockReturnValue(of({ ...STORED, vin: STORED_VIN }));
+    await openEdit();
+    await type('vin', OTHER_VIN);
+    await click('save');
+
+    expect(vehiclesApi.update).not.toHaveBeenCalled();
+    expect(text('error-reason')).toBe(REASON_MESSAGE);
+  });
+
+  it('[US4-AC15][US4-AC11] asesor: quitar el VIN guardado pide motivo y, con motivo, envía vin null', async () => {
+    vehiclesApi.getById.mockReturnValue(of({ ...STORED, vin: STORED_VIN }));
+    await openEdit();
+    await type('vin', '');
+
+    expect(query('reason')).not.toBeNull();
+    await type('reason', 'VIN registrado por error en otro vehículo');
+    await click('save');
+
+    expect(vehiclesApi.update).toHaveBeenCalledTimes(1);
+    expect(sentUpdate()[1]).toEqual(
+      expect.objectContaining({ version: 4, vin: null, reason: 'VIN registrado por error en otro vehículo' }),
+    );
+  });
+
+  it.each([
+    ['solo espacios', '            '],
+    ['9 caracteres sin contar los espacios de los extremos', '   123456789   '],
+    ['501 caracteres', 'x'.repeat(501)],
+  ])('[US4-AC15] asesor: un motivo de %s no guarda', async (_label, reason) => {
+    await openEdit();
+    await type('plate', 'PBB4321');
+    await type('reason', reason);
+    await click('save');
+
+    expect(vehiclesApi.update).not.toHaveBeenCalled();
+    expect(text('error-reason')).toBe(REASON_MESSAGE);
+  });
+
+  it('[US4-AC15][US4-AC11] asesor: con motivo válido envía la placa normalizada y el motivo recortado', async () => {
+    await openEdit();
+    await type('plate', 'pbb-4321');
+    await type('reason', `  ${VALID_REASON}  `);
+    await click('save');
+
+    expect(vehiclesApi.update).toHaveBeenCalledTimes(1);
+    expect(sentUpdate()[1]).toEqual(expect.objectContaining({ version: 4, plate: 'PBB4321', reason: VALID_REASON }));
+    expect(currentUrl()).toBe(`/vehicles/${VEHICLE_ID}`);
+  });
+
+  it('[US4-AC15] sin sesión se aplica la regla del asesor (motivo obligatorio)', async () => {
+    signOut();
+    await openEdit();
+    await type('plate', 'PBB4321');
+    await click('save');
+
+    expect(vehiclesApi.update).not.toHaveBeenCalled();
+    expect(text('error-reason')).toBe(REASON_MESSAGE);
+  });
+
+  it('[US4-AC15] un 400 REASON_REQUIRED del servidor se muestra en error-reason', async () => {
+    vehiclesApi.update.mockReturnValueOnce(
+      throwError(() =>
+        problem(400, 'VALIDATION_ERROR', { errors: [{ field: 'reason', code: 'REASON_REQUIRED', message: 'x' }] }),
+      ),
+    );
+    await openEdit();
+    await type('plate', 'PBB4321');
+    await type('reason', VALID_REASON);
+    await click('save');
+
+    expect(text('error-reason')).toBe(REASON_MESSAGE);
+    expect(currentUrl()).toBe(`/vehicles/${VEHICLE_ID}/edit`);
+  });
+
+  // --- US4-AC16: administrador, motivo opcional ---
+
+  it('[US4-AC16] admin: cambia la placa sin motivo y se envía sin reason', async () => {
+    signInAs('admin');
+    await openEdit();
+    await type('plate', 'PBB4321');
+
+    expect(reasonLabel()).toMatch(/opcional/i);
+    await click('save');
+
+    expect(vehiclesApi.update).toHaveBeenCalledTimes(1);
+    expect(sentUpdate()[1].plate).toBe('PBB4321');
+    expect(sentUpdate()[1].reason).toBeUndefined();
+  });
+
+  it('[US4-AC16] admin: un motivo de solo espacios cuenta como omitido', async () => {
+    signInAs('admin');
+    await openEdit();
+    await type('vin', OTHER_VIN);
+    await type('reason', '      ');
+    await click('save');
+
+    expect(vehiclesApi.update).toHaveBeenCalledTimes(1);
+    expect(sentUpdate()[1].vin).toBe(OTHER_VIN);
+    expect(sentUpdate()[1].reason).toBeUndefined();
+  });
+
+  it.each([
+    ['5 caracteres', 'corto'],
+    ['501 caracteres', 'x'.repeat(501)],
+  ])('[US4-AC16] admin: un motivo de %s se rechaza con el mismo mensaje que para el asesor', async (_label, reason) => {
+    signInAs('admin');
+    await openEdit();
+    await type('plate', 'PBB4321');
+    await type('reason', reason);
+    await click('save');
+
+    expect(vehiclesApi.update).not.toHaveBeenCalled();
+    expect(text('error-reason')).toBe(REASON_MESSAGE);
+  });
+
+  // --- US4-AC5: mismas reglas que en el registro ---
+
+  it('[US4-AC5] una placa con formato inválido muestra el mensaje de autos y no llama a update', async () => {
+    await openEdit();
+    await type('plate', 'PB1234');
+    await type('reason', VALID_REASON);
+    await click('save');
+
+    expect(vehiclesApi.update).not.toHaveBeenCalled();
+    expect(text('error-plate')).toBe(CAR_PLATE_MESSAGE);
+  });
+
+  it('[US4-AC5][US3-AC14] cambiar la carrocería a Moto revalida la placa guardada', async () => {
+    await openEdit();
+    await chooseBodyType('Moto');
+
+    expect(text('error-plate')).toBe(MOTORCYCLE_PLATE_MESSAGE);
+    await click('save');
+    expect(vehiclesApi.update).not.toHaveBeenCalled();
+  });
+
+  it('[US4-AC5] un VIN inválido muestra "VIN inválido" y no llama a update', async () => {
+    await openEdit();
+    await type('vin', '1HGCM82633A00435');
+    await type('reason', VALID_REASON);
+    await click('save');
+
+    expect(vehiclesApi.update).not.toHaveBeenCalled();
+    expect(text('error-vin')).toBe('VIN inválido');
+  });
+
+  it('[US4-AC5] un 409 PLATE_ALREADY_EXISTS ofrece abrir el vehículo existente', async () => {
+    vehiclesApi.update.mockReturnValueOnce(
+      throwError(() => problem(409, 'PLATE_ALREADY_EXISTS', { existingId: EXISTING_ID })),
+    );
+    await openEdit();
+    await type('plate', 'GYE0123');
+    await type('reason', VALID_REASON);
+    await click('save');
+
+    expect(text('duplicate-message')).toMatch(/placa ya está registrada/i);
+    expect(get<HTMLAnchorElement>('open-existing-vehicle').getAttribute('href')).toBe(`/vehicles/${EXISTING_ID}`);
+    expect(currentUrl()).toBe(`/vehicles/${VEHICLE_ID}/edit`);
+  });
+
+  // --- US4-AC12: concurrencia ---
+
+  it('[US4-AC12] un 409 VERSION_CONFLICT avisa "El registro cambió" y muestra los datos actuales', async () => {
+    const current: VehicleDetail = { ...STORED, color: 'Gris', initialMileage: 47000, version: 5 };
+    vehiclesApi.update.mockReturnValueOnce(throwError(() => problem(409, 'VERSION_CONFLICT', { current })));
+    await openEdit();
+    await type('color', 'Rojo');
+    await click('save');
+
+    expect(text('version-conflict')).toMatch(/el registro cambió/i);
+    expect(get('version-conflict').getAttribute('role')).toBe('alert');
+    expect(value('color')).toBe('Gris');
+    expect(value('initial-mileage')).toBe('47000');
+    expect(currentUrl()).toBe(`/vehicles/${VEHICLE_ID}/edit`);
+  });
+
+  it('[US4-AC12] tras el conflicto se puede repetir la edición con la versión actual', async () => {
+    const current: VehicleDetail = { ...STORED, color: 'Gris', version: 5 };
+    vehiclesApi.update.mockReturnValueOnce(throwError(() => problem(409, 'VERSION_CONFLICT', { current })));
+    await openEdit();
+    await type('color', 'Rojo');
+    await click('save');
+    await type('color', 'Rojo');
+    await click('save');
+
+    expect(vehiclesApi.update).toHaveBeenCalledTimes(2);
+    expect(sentUpdate(0)[1].version).toBe(4);
+    expect(sentUpdate(1)[1]).toEqual(expect.objectContaining({ version: 5, color: 'Rojo' }));
+    expect(currentUrl()).toBe(`/vehicles/${VEHICLE_ID}`);
+  });
+
+  // --- US4-AC13: vehículo de otro taller o inexistente ---
+
+  it('[US4-AC13] un 404 al cargar indica "No se encontró ningún vehículo" y no ofrece guardar', async () => {
+    vehiclesApi.getById.mockReturnValue(throwError(() => problem(404, 'NOT_FOUND')));
+    await openEdit();
+
+    expect(text('load-error')).toContain('No se encontró ningún vehículo');
+    expect(query('save')).toBeNull();
+  });
+
+  // --- US4-AC17: sin eliminación ---
+
+  it.each(['asesor', 'admin'] as const)('[US4-AC17] %s: la edición no ofrece eliminar ni desactivar el vehículo', async (role) => {
+    signInAs(role);
+    await openEdit();
+    expect(value('plate')).toBe('PBA1234');
+
+    const labels = Array.from(root().querySelectorAll('button, a, [role="button"]')).map(
+      (element) => `${element.textContent ?? ''} ${element.getAttribute('aria-label') ?? ''}`,
+    );
+    expect(labels.join(' ')).not.toMatch(/eliminar|borrar|desactivar|dar de baja/i);
+    expect(root().querySelector('[data-testid*="delete"], [data-testid*="deactivate"]')).toBeNull();
   });
 });

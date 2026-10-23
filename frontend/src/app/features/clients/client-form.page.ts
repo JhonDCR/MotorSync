@@ -3,6 +3,7 @@ import {
   afterNextRender,
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   ElementRef,
   inject,
@@ -10,24 +11,52 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, type AbstractControl, type ValidationErrors, type ValidatorFn } from '@angular/forms';
+import {
+  FormBuilder,
+  FormControl,
+  ReactiveFormsModule,
+  type AbstractControl,
+  type ValidationErrors,
+  type ValidatorFn,
+} from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink, type UrlTree } from '@angular/router';
 import type { Subscription } from 'rxjs';
-import type { ClientCreate, ClientType, DocumentType, FieldErrorCode } from '../../core/api/api.models';
+import type {
+  ClientCreate,
+  ClientDetail,
+  ClientType,
+  ClientUpdate,
+  DocumentType,
+  FieldErrorCode,
+  Problem,
+} from '../../core/api/api.models';
 import { ClientsApiService } from '../../core/api/clients-api.service';
 import { fieldErrorMessage, fieldErrorMessages, isProblem, problemMessage } from '../../core/api/problem';
+import { readCurrentSession } from '../../core/auth/current-session';
 import { isValidCedula, isValidRuc } from '../../shared/identifiers/ec-document';
 import { normalizeEmail } from '../../shared/identifiers/email';
 import { normalizeDocument } from '../../shared/identifiers/normalize';
 import { normalizePhone } from '../../shared/identifiers/phone';
 import { documentNumberValidator, emailValidator, phoneValidator } from '../../shared/validators/client.validators';
+import {
+  isReasonAcceptable,
+  isReasonRequired,
+  normalizeReason,
+  REASON_MAX_LENGTH,
+  REASON_REQUIRED_MESSAGE,
+} from '../../shared/validators/reason';
 
 /** Contract field names of ClientCreate shown in the form. */
 export type ClientFormField = 'documentNumber' | 'firstNames' | 'lastNames' | 'businessName' | 'phone' | 'email';
 
+/** Edit mode load state; in clients/new it is always 'ready'. */
+export type ClientLoadState = { kind: 'loading' } | { kind: 'ready' } | { kind: 'error'; message: string; canRetry: boolean };
+
 const CEDULA_LENGTH = 10;
 const RUC_SUFFIX = '001';
+const NOT_FOUND_STATUS = 404;
 const UNEXPECTED_ERROR = 'No se pudo guardar el cliente. Inténtelo de nuevo';
+const LOAD_FAILED = 'No se pudo cargar el cliente. Revise la conexión e inténtelo de nuevo';
 
 /** Required text: empty or whitespace-only values are missing (US2-AC8). */
 const requiredText: ValidatorFn = (control: AbstractControl): ValidationErrors | null =>
@@ -59,7 +88,15 @@ function counterpartOf(documentType: DocumentType, documentNumber: string): stri
   return null;
 }
 
-/** New client (US2): natural person or company, Ecuadorian documents, phone and optional email. */
+function isClientDetail(value: Problem['current']): value is ClientDetail {
+  return value !== undefined && 'clientType' in value;
+}
+
+/**
+ * New client (US2) at clients/new: natural person or company, Ecuadorian documents, phone and optional email.
+ * Edit mode (US4) at clients/:id/edit: same rules, optimistic locking with version, the client type locked and a
+ * reason when the document or its type change (FR-019).
+ */
 @Component({
   selector: 'app-client-form-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -74,6 +111,13 @@ export class ClientFormPage {
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
 
+  /** Id of the client being edited (clients/:id/edit); null in clients/new. */
+  protected readonly clientId: string | null = inject(ActivatedRoute).snapshot.paramMap.get('id');
+  protected readonly editing = this.clientId !== null;
+  /** UI only (FR-019): the backend decides with the verified token. Without a session the asesor rule applies. */
+  protected readonly reasonRequired = isReasonRequired(readCurrentSession());
+  protected readonly reasonMaxLength = REASON_MAX_LENGTH;
+
   protected readonly form = inject(FormBuilder).nonNullable.group({
     clientType: 'natural' as ClientType,
     documentType: 'cedula' as DocumentType,
@@ -84,6 +128,7 @@ export class ClientFormPage {
     phone: ['', [requiredText, phoneValidator]],
     email: ['', emailValidator],
   });
+  protected readonly reason = new FormControl('', { nonNullable: true });
 
   protected readonly clientType = signal<ClientType>('natural');
   protected readonly documentType = signal<DocumentType>('cedula');
@@ -94,23 +139,52 @@ export class ClientFormPage {
   protected readonly networkError = signal(false);
   protected readonly generalError = signal<string | null>(null);
   protected readonly possibleDuplicate = signal<{ displayName: string; documentNumber: string } | null>(null);
+  protected readonly loadState = signal<ClientLoadState>({ kind: this.editing ? 'loading' : 'ready' });
+  protected readonly versionConflict = signal(false);
+
+  /** Stored client in edit mode: the base to compare the identifiers and the version to send. */
+  private readonly stored = signal<ClientDetail | null>(null);
+  private readonly documentNumberValue = signal('');
+
+  /** The reason field is shown only when the document or its type really change (compared normalized). */
+  protected readonly documentChanged = computed(() => {
+    const stored = this.stored();
+    return (
+      stored !== null &&
+      (this.documentType() !== stored.documentType ||
+        normalizeDocument(this.documentNumberValue()) !== stored.documentNumber)
+    );
+  });
 
   /** Internal page to come back to after creating the client (for example, the new vehicle form). */
-  protected readonly returnTo: UrlTree | null = this.readReturnTo();
+  protected readonly returnTo: UrlTree | null = this.editing ? null : this.readReturnTo();
 
   /** Last body sent: "Reintentar" resends exactly the same data. */
-  private lastBody: ClientCreate | null = null;
+  private lastBody: ClientCreate | ClientUpdate | null = null;
   private duplicateCheck: Subscription | null = null;
+  private loadRequest: Subscription | null = null;
 
   constructor() {
     const { controls } = this.form;
     controls.clientType.valueChanges.pipe(takeUntilDestroyed()).subscribe((type) => this.onClientTypeChange(type));
     controls.documentType.valueChanges.pipe(takeUntilDestroyed()).subscribe((type) => this.onDocumentTypeChange(type));
-    controls.documentNumber.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.clearPossibleDuplicate());
+    controls.documentNumber.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+      this.documentNumberValue.set(value);
+      this.clearPossibleDuplicate();
+    });
     for (const field of ['documentNumber', 'firstNames', 'lastNames', 'businessName', 'phone', 'email'] as const) {
       controls[field].valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.clearServerError(field));
     }
-    this.destroyRef.onDestroy(() => this.duplicateCheck?.unsubscribe());
+    this.reason.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.clearServerError('reason'));
+    this.destroyRef.onDestroy(() => {
+      this.duplicateCheck?.unsubscribe();
+      this.loadRequest?.unsubscribe();
+    });
+    if (this.editing) {
+      // clientType is not part of ClientUpdate: it cannot change.
+      controls.clientType.disable({ emitEvent: false });
+      this.load();
+    }
   }
 
   /** Message next to a field: the server's errors[] first, then the client validators after a save attempt. */
@@ -126,15 +200,28 @@ export class ClientFormPage {
     return validationMessage(control.errors);
   }
 
+  /** Message under the reason: the server's REASON_REQUIRED first, then the local rule after a save attempt. */
+  protected reasonError(): string | null {
+    const server = this.serverErrors()['reason'];
+    if (server !== undefined) {
+      return server;
+    }
+    if (!this.submitted() || !this.documentChanged() || this.isReasonValid()) {
+      return null;
+    }
+    return REASON_REQUIRED_MESSAGE;
+  }
+
   protected save(): void {
     this.submitted.set(true);
     this.clearNotices();
-    if (this.form.invalid) {
+    const reasonInvalid = this.documentChanged() && !this.isReasonValid();
+    if (this.form.invalid || reasonInvalid) {
       this.form.markAllAsTouched();
       this.focusFirstInvalid();
       return;
     }
-    this.send(this.buildBody());
+    this.send(this.editing ? this.buildUpdate() : this.buildBody());
   }
 
   protected retry(): void {
@@ -145,9 +232,16 @@ export class ClientFormPage {
     this.send(this.lastBody);
   }
 
+  protected retryLoad(): void {
+    this.load();
+  }
+
   /** On blur of the document: looks for the cedula ↔ RUC counterpart without blocking the save. */
   protected checkPossibleDuplicate(): void {
     this.clearPossibleDuplicate();
+    if (this.editing && !this.documentChanged()) {
+      return;
+    }
     const documentNumber = normalizeDocument(this.form.controls.documentNumber.value);
     const counterpart = counterpartOf(this.documentType(), documentNumber);
     if (counterpart === null) {
@@ -155,17 +249,19 @@ export class ClientFormPage {
     }
     this.duplicateCheck = this.api.search(documentNumber.slice(0, CEDULA_LENGTH)).subscribe({
       next: (response) => {
-        const match = response.items.find((item) => item.documentNumber === counterpart);
+        const match = response.items.find((item) => item.documentNumber === counterpart && item.id !== this.clientId);
         this.possibleDuplicate.set(match ? { displayName: match.displayName, documentNumber: match.documentNumber } : null);
       },
       error: () => this.possibleDuplicate.set(null),
     });
   }
 
-  private send(body: ClientCreate): void {
+  private send(body: ClientCreate | ClientUpdate): void {
     this.lastBody = body;
     this.saving.set(true);
-    this.api.create(body).subscribe({
+    const request =
+      this.clientId !== null && 'version' in body ? this.api.update(this.clientId, body) : this.api.create(body as ClientCreate);
+    request.subscribe({
       next: (detail) => {
         this.saving.set(false);
         if (this.returnTo !== null) {
@@ -185,6 +281,10 @@ export class ClientFormPage {
 
   private handleError(error: unknown): void {
     if (isProblem(error)) {
+      if (error.code === 'VERSION_CONFLICT' && this.editing) {
+        this.onVersionConflict(error);
+        return;
+      }
       if (error.code === 'DOCUMENT_ALREADY_EXISTS') {
         this.duplicate.set({ message: problemMessage(error), existingId: error.existingId ?? null });
         return;
@@ -202,6 +302,95 @@ export class ClientFormPage {
       return;
     }
     this.generalError.set(UNEXPECTED_ERROR);
+  }
+
+  /** US4-AC12: shows the current data (from the 409, or a new GET) and the next save uses its version. */
+  private onVersionConflict(problem: Problem): void {
+    this.versionConflict.set(true);
+    if (isClientDetail(problem.current)) {
+      this.fill(problem.current);
+      return;
+    }
+    this.load(false);
+  }
+
+  /** Loads the client to edit; showLoading false keeps the form on screen (reload after a conflict). */
+  private load(showLoading = true): void {
+    if (this.clientId === null) {
+      return;
+    }
+    if (showLoading) {
+      this.loadState.set({ kind: 'loading' });
+    }
+    this.loadRequest?.unsubscribe();
+    this.loadRequest = this.api.getById(this.clientId).subscribe({
+      next: (client) => {
+        this.fill(client);
+        this.loadState.set({ kind: 'ready' });
+      },
+      error: (error: unknown) => {
+        const notFound = isProblem(error) && error.status === NOT_FOUND_STATUS;
+        this.loadState.set({
+          kind: 'error',
+          message: notFound ? problemMessage(error, { resource: 'client' }) : LOAD_FAILED,
+          canRetry: !notFound,
+        });
+      },
+    });
+  }
+
+  /** Puts the stored client in the form; the reason starts empty again. */
+  private fill(client: ClientDetail): void {
+    this.stored.set(client);
+    this.submitted.set(false);
+    this.form.patchValue({
+      clientType: client.clientType,
+      documentType: client.documentType,
+      documentNumber: client.documentNumber,
+      firstNames: client.firstNames ?? '',
+      lastNames: client.lastNames ?? '',
+      businessName: client.businessName ?? '',
+      phone: client.phone,
+      email: client.email ?? '',
+    });
+    this.reason.setValue('');
+    this.serverErrors.set({});
+  }
+
+  private isReasonValid(): boolean {
+    return isReasonAcceptable(this.reason.value, this.reasonRequired);
+  }
+
+  /** ClientUpdate: the loaded version plus the fields that change; never clientType nor tenantId. */
+  private buildUpdate(): ClientUpdate {
+    const stored = this.stored();
+    if (stored === null) {
+      throw new Error('The client to edit is not loaded');
+    }
+    const value = this.form.getRawValue();
+    const body: ClientUpdate = { version: stored.version };
+    if (this.documentChanged()) {
+      body.documentType = value.documentType;
+      body.documentNumber = normalizeDocument(value.documentNumber);
+      const reason = normalizeReason(this.reason.value);
+      if (reason !== null) {
+        body.reason = reason;
+      }
+    }
+    if (stored.clientType === 'company') {
+      const businessName = value.businessName.trim();
+      if (businessName !== (stored.businessName ?? '')) body.businessName = businessName;
+    } else {
+      const firstNames = value.firstNames.trim();
+      const lastNames = value.lastNames.trim();
+      if (firstNames !== (stored.firstNames ?? '')) body.firstNames = firstNames;
+      if (lastNames !== (stored.lastNames ?? '')) body.lastNames = lastNames;
+    }
+    const phone = normalizePhone(value.phone);
+    if (phone !== stored.phone) body.phone = phone;
+    const email = value.email.trim() === '' ? null : normalizeEmail(value.email.trim());
+    if (email !== stored.email) body.email = email;
+    return body;
   }
 
   private buildBody(): ClientCreate {
@@ -266,9 +455,10 @@ export class ClientFormPage {
     this.duplicate.set(null);
     this.networkError.set(false);
     this.generalError.set(null);
+    this.versionConflict.set(false);
   }
 
-  private clearServerError(field: ClientFormField): void {
+  private clearServerError(field: ClientFormField | 'reason'): void {
     const errors = this.serverErrors();
     if (errors[field] !== undefined) {
       const rest = { ...errors };

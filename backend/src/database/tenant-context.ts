@@ -8,6 +8,8 @@ export interface TenantContext {
   manager: EntityManager;
   tenantId: string;
   user: AuthUser;
+  /** Client IP of the request (Express req.ip), stored in audit_log.ip; null if unknown. */
+  ip: string | null;
 }
 
 export const tenantStorage = new AsyncLocalStorage<TenantContext>();

@@ -1,0 +1,161 @@
+<div class="backdrop">
+  <div
+    class="dialog"
+    role="dialog"
+    aria-modal="true"
+    data-testid="transfer-dialog"
+    [attr.aria-labelledby]="titleId"
+    (keydown.escape)="cancel()"
+    (keydown)="trapFocus($event)"
+  >
+    <h2 [id]="titleId">Transferir propietario del vehículo {{ vehicle().plate }}</h2>
+    <p class="current">
+      Propietario actual:
+      <strong data-testid="transfer-current-owner">{{ currentOwner().displayName }}</strong>
+      <span class="document">{{ currentOwner().documentNumber }}</span>
+    </p>
+
+    @if (operationError(); as message) {
+      <p class="notice notice-error" role="alert" tabindex="-1" data-testid="transfer-error">{{ message }}</p>
+    }
+
+    @if (step() === 'form') {
+      <div class="field">
+        @if (selected(); as client) {
+          <p class="label">Nuevo propietario</p>
+          <div class="selected">
+            <p data-testid="transfer-selected">
+              <strong>{{ client.displayName }}</strong>
+              <span class="document">{{ client.documentNumber }}</span>
+            </p>
+            <button type="button" class="action" data-testid="transfer-change-client" (click)="changeClient()">
+              Elegir otro cliente
+            </button>
+          </div>
+        } @else {
+          <label for="transfer-search">Nuevo propietario: documento o nombre del cliente</label>
+          <div class="search-row">
+            <input
+              id="transfer-search"
+              type="search"
+              data-testid="transfer-search"
+              autocomplete="off"
+              enterkeyhint="search"
+              maxlength="100"
+              [formControl]="searchTerm"
+              [attr.aria-invalid]="clientError() ? 'true' : null"
+              [attr.aria-describedby]="clientError() ? 'error-transfer-client' : null"
+              (keydown.enter)="searchClients($event)"
+            />
+            <button
+              type="button"
+              class="action"
+              data-testid="transfer-search-button"
+              [disabled]="searching()"
+              [attr.aria-busy]="searching()"
+              (click)="searchClients()"
+            >
+              {{ searching() ? 'Buscando…' : 'Buscar' }}
+            </button>
+          </div>
+
+          <div aria-live="polite">
+            @if (searchError(); as message) {
+              <p class="field-error" role="alert">{{ message }}</p>
+            }
+            @if (results(); as found) {
+              @if (found.items.length === 0) {
+                <p data-testid="transfer-no-results">No se encontró ningún cliente</p>
+              } @else {
+                <ul class="options" aria-label="Clientes encontrados">
+                  @for (client of found.items; track client.id) {
+                    <li>
+                      <button type="button" class="option" data-testid="transfer-option" (click)="choose(client)">
+                        <span class="name">{{ client.displayName }}</span>
+                        <span class="document">{{ client.documentNumber }}</span>
+                      </button>
+                    </li>
+                  }
+                </ul>
+                @if (found.hasMore) {
+                  <p class="help">Hay más resultados: afine la búsqueda.</p>
+                }
+              }
+            }
+          </div>
+        }
+        @if (clientError(); as message) {
+          <p class="field-error" id="error-transfer-client" data-testid="error-transfer-client">{{ message }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="transfer-reason">
+          Motivo de la transferencia
+          <span class="hint-inline">{{ reasonRequired ? '(obligatorio)' : '(opcional)' }}</span>
+        </label>
+        <p class="help" id="transfer-reason-hint">Entre 10 y 500 caracteres. Queda registrado en el historial.</p>
+        <textarea
+          id="transfer-reason"
+          data-testid="transfer-reason"
+          rows="3"
+          [formControl]="reason"
+          [attr.maxlength]="reasonMaxLength"
+          [attr.aria-required]="reasonRequired"
+          [attr.aria-invalid]="reasonError() ? 'true' : null"
+          [attr.aria-describedby]="reasonError() ? 'transfer-reason-hint error-transfer-reason' : 'transfer-reason-hint'"
+        ></textarea>
+        @if (reasonError(); as message) {
+          <p class="field-error" id="error-transfer-reason" data-testid="error-transfer-reason">{{ message }}</p>
+        }
+      </div>
+
+      <div class="actions">
+        <button type="button" class="primary" data-testid="transfer-continue" (click)="continue()">Continuar</button>
+        <button type="button" class="action" data-testid="transfer-cancel" (click)="cancel()">Cancelar</button>
+      </div>
+    } @else {
+      <div class="confirmation" data-testid="transfer-confirmation">
+        <p>Confirme la transferencia:</p>
+        <dl class="facts">
+          <div>
+            <dt>Vehículo</dt>
+            <dd>{{ vehicle().plate }} · {{ vehicle().brand }} {{ vehicle().model }}</dd>
+          </div>
+          <div>
+            <dt>Propietario actual</dt>
+            <dd>{{ currentOwner().displayName }} ({{ currentOwner().documentNumber }})</dd>
+          </div>
+          @if (selected(); as client) {
+            <div>
+              <dt>Nuevo propietario</dt>
+              <dd>{{ client.displayName }} ({{ client.documentNumber }})</dd>
+            </div>
+          }
+          <div>
+            <dt>Motivo</dt>
+            <dd>{{ reasonToSend() ?? 'Sin motivo' }}</dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="actions">
+        <button
+          type="button"
+          class="primary"
+          data-testid="transfer-confirm"
+          [disabled]="saving()"
+          [attr.aria-busy]="saving()"
+          (click)="confirm()"
+        >
+          {{ saving() ? 'Transfiriendo…' : 'Confirmar transferencia' }}
+        </button>
+        <button type="button" class="action" data-testid="transfer-back" [disabled]="saving()" (click)="back()">
+          Volver
+        </button>
+        <button type="button" class="action" data-testid="transfer-cancel" (click)="cancel()">Cancelar</button>
+      </div>
+    }
+    <p class="sr-only" role="status" aria-live="polite">{{ saving() ? 'Transfiriendo vehículo' : '' }}</p>
+  </div>
+</div>

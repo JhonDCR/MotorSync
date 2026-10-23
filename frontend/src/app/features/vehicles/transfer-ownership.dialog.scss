@@ -1,0 +1,259 @@
+@use '../../shared/styles/touch' as touch;
+
+// Mobile-first (FR-025): full screen on phones, a centered card from 48rem.
+$text: #1a1a1a;
+$muted: #4a4a4a;
+$border: #595959;
+$primary: #0b5394;
+$error: #b00020;
+$focus: #f1c232;
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background: rgb(0 0 0 / 55%);
+}
+
+.dialog {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 100vh;
+  overflow-y: auto;
+  padding: 1rem;
+  color: $text;
+  background: #ffffff;
+}
+
+h2 {
+  font-size: 1.25rem;
+  margin: 0 0 0.75rem;
+}
+
+.current {
+  margin: 0 0 1rem;
+}
+
+.document {
+  margin-left: 0.5rem;
+  color: $muted;
+}
+
+.field {
+  margin-bottom: 1rem;
+}
+
+label,
+.label {
+  display: block;
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+}
+
+.hint-inline {
+  font-weight: 400;
+}
+
+.help {
+  margin: 0.25rem 0 0.5rem;
+  color: $muted;
+}
+
+input,
+textarea {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  color: $text;
+  background: #ffffff;
+  border: 1px solid $border;
+  border-radius: 4px;
+}
+
+input {
+  @include touch.touch-target;
+  padding: 0 0.75rem;
+}
+
+textarea {
+  min-height: 6rem;
+  padding: 0.5rem 0.75rem;
+  resize: vertical;
+}
+
+input[aria-invalid='true'],
+textarea[aria-invalid='true'] {
+  border: 2px solid $error;
+}
+
+.search-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.options {
+  margin: 0 0 0.5rem;
+  padding: 0;
+  list-style: none;
+
+  li + li {
+    margin-top: 0.5rem;
+  }
+}
+
+.option {
+  @include touch.touch-target;
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font: inherit;
+  text-align: left;
+  color: $text;
+  background: #ffffff;
+  border: 1px solid $border;
+  border-radius: 4px;
+  cursor: pointer;
+
+  .document {
+    margin-left: 0;
+  }
+}
+
+.selected {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+
+  p {
+    margin: 0;
+  }
+}
+
+.field-error {
+  margin: 0.25rem 0 0;
+  color: $error;
+}
+
+.notice {
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  border-radius: 4px;
+}
+
+.notice-error {
+  color: $error;
+  background: #fdecee;
+  border: 1px solid $error;
+}
+
+.confirmation {
+  margin-bottom: 1rem;
+
+  p {
+    margin: 0 0 0.5rem;
+    font-weight: 600;
+  }
+}
+
+.facts {
+  margin: 0;
+
+  div + div {
+    margin-top: 0.5rem;
+  }
+
+  dt {
+    font-weight: 600;
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.action,
+.primary {
+  @include touch.touch-target;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  font-size: 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.action {
+  color: $primary;
+  background: #ffffff;
+  border: 1px solid $primary;
+}
+
+.primary {
+  color: #ffffff;
+  background: $primary;
+  border: 0;
+}
+
+button:disabled {
+  cursor: progress;
+  opacity: 0.8;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+.notice:focus-visible {
+  outline: 3px solid $focus;
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (min-width: 48rem) {
+  .backdrop {
+    align-items: center;
+    padding: 2rem;
+  }
+
+  .dialog {
+    max-width: 36rem;
+    max-height: calc(100vh - 4rem);
+    padding: 1.5rem;
+    border-radius: 6px;
+  }
+
+  .search-row,
+  .actions {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .search-row input {
+    flex: 1;
+  }
+}

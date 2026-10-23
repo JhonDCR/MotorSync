@@ -8,10 +8,15 @@
 // Errores: si el cuerpo de la respuesta es un Problem (isProblem), el observable falla con ESE Problem
 // (tipado, no con el HttpErrorResponse). Si no hay Problem (por ejemplo, fallo de red con status 0),
 // falla con el HttpErrorResponse original para que la pantalla pueda ofrecer "Reintentar".
+//
+// T076 (PR3, US4), métodos nuevos para el implementer (T077):
+//     update(clientId: string, body: ClientUpdate): Observable<ClientDetail>   // PATCH /api/v1/clients/{clientId}
+//   El cuerpo se envía tal cual (version obligatoria, solo los campos que cambian, reason opcional); el id va con
+//   encodeURIComponent. Errores igual que arriba: 409 VERSION_CONFLICT llega como el Problem con `current`.
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import type { ClientCreate, ClientDetail, ClientSearchResponse, Problem } from './api.models';
+import type { ClientCreate, ClientDetail, ClientSearchResponse, ClientUpdate, Problem } from './api.models';
 import { ClientsApiService } from './clients-api.service';
 
 const CLIENT_ID = '7d1f0c1e-3b8a-4a52-9a43-2f1d8e0b6c11';
@@ -205,5 +210,130 @@ describe('ClientsApiService (T025)', () => {
 
       expect(received).toEqual(body);
     });
+  });
+});
+
+describe('ClientsApiService.update (T076)', () => {
+  let service: ClientsApiService;
+  let httpMock: HttpTestingController;
+
+  const UPDATE_BODY: ClientUpdate = { version: 1, phone: '0987654321', email: 'ana@example.com' };
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    service = TestBed.inject(ClientsApiService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('[US4-AC4] hace PATCH /api/v1/clients/{clientId} con el cuerpo ClientUpdate y devuelve el ClientDetail', () => {
+    const updated: ClientDetail = { ...DETAIL, phone: '0987654321', email: 'ana@example.com', version: 2 };
+    let result: ClientDetail | undefined;
+    service.update(CLIENT_ID, UPDATE_BODY).subscribe((detail: ClientDetail) => (result = detail));
+
+    const req = httpMock.expectOne(`/api/v1/clients/${CLIENT_ID}`);
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual(UPDATE_BODY);
+    req.flush(updated);
+
+    expect(result).toEqual(updated);
+    expect(result?.version).toBe(2);
+  });
+
+  it('[US4-AC11][US4-AC15] envía documentNumber y reason cuando cambia el documento', () => {
+    const body: ClientUpdate = {
+      version: 3,
+      documentType: 'cedula',
+      documentNumber: '0912345675',
+      reason: 'Corrección del documento según cédula física',
+    };
+    service.update(CLIENT_ID, body).subscribe();
+
+    const req = httpMock.expectOne(`/api/v1/clients/${CLIENT_ID}`);
+    expect(req.request.body).toEqual(body);
+    req.flush({ ...DETAIL, documentNumber: '0912345675', version: 4 });
+  });
+
+  it('[US4-AC13] codifica el id en la URL y no añade tenantId ni X-Tenant-Id', () => {
+    service.update('a/b c', UPDATE_BODY).subscribe();
+
+    const req = httpMock.expectOne('/api/v1/clients/a%2Fb%20c');
+    expect(Object.keys(req.request.body as object)).not.toContain('tenantId');
+    expect(Object.keys(req.request.body as object)).not.toContain('tenant_id');
+    expect(req.request.headers.has('X-Tenant-Id')).toBe(false);
+    req.flush(DETAIL);
+  });
+
+  it('[US4-AC12] un 409 VERSION_CONFLICT se propaga como Problem con los datos actuales en current', () => {
+    const current: ClientDetail = { ...DETAIL, phone: '0911111111', version: 2, updatedByName: 'Otra Persona' };
+    const body = problem(409, 'VERSION_CONFLICT', { current });
+    let received: Problem | undefined;
+    service.update(CLIENT_ID, UPDATE_BODY).subscribe({ error: (err: Problem) => (received = err) });
+
+    httpMock
+      .expectOne(`/api/v1/clients/${CLIENT_ID}`)
+      .flush(body, { status: 409, statusText: 'Conflict', headers: PROBLEM_HEADERS });
+
+    expect(received?.code).toBe('VERSION_CONFLICT');
+    expect(received?.current).toEqual(current);
+    expect(received).not.toBeInstanceOf(HttpErrorResponse);
+  });
+
+  it('[US4-AC15] un 400 VALIDATION_ERROR con REASON_REQUIRED en reason se propaga como el Problem tipado', () => {
+    const body = problem(400, 'VALIDATION_ERROR', {
+      errors: [{ field: 'reason', code: 'REASON_REQUIRED', message: 'x' }],
+    });
+    let received: unknown;
+    service.update(CLIENT_ID, { version: 1, documentNumber: '0912345675' }).subscribe({
+      error: (err: unknown) => (received = err),
+    });
+
+    httpMock
+      .expectOne(`/api/v1/clients/${CLIENT_ID}`)
+      .flush(body, { status: 400, statusText: 'Bad Request', headers: PROBLEM_HEADERS });
+
+    expect(received).toEqual(body);
+  });
+
+  it('[US4-AC5] un 409 DOCUMENT_ALREADY_EXISTS se propaga como Problem con existingId', () => {
+    const body = problem(409, 'DOCUMENT_ALREADY_EXISTS', { existingId: EXISTING_ID });
+    let received: Problem | undefined;
+    service.update(CLIENT_ID, { version: 1, documentNumber: '0912345675', reason: 'Corrección de documento' }).subscribe({
+      error: (err: Problem) => (received = err),
+    });
+
+    httpMock
+      .expectOne(`/api/v1/clients/${CLIENT_ID}`)
+      .flush(body, { status: 409, statusText: 'Conflict', headers: PROBLEM_HEADERS });
+
+    expect(received?.code).toBe('DOCUMENT_ALREADY_EXISTS');
+    expect(received?.existingId).toBe(EXISTING_ID);
+  });
+
+  it('[US4-AC13] un 404 NOT_FOUND (de otro taller o inexistente) se propaga como el Problem tipado', () => {
+    const body = problem(404, 'NOT_FOUND');
+    let received: unknown;
+    service.update(CLIENT_ID, UPDATE_BODY).subscribe({ error: (err: unknown) => (received = err) });
+
+    httpMock
+      .expectOne(`/api/v1/clients/${CLIENT_ID}`)
+      .flush(body, { status: 404, statusText: 'Not Found', headers: PROBLEM_HEADERS });
+
+    expect(received).toEqual(body);
+  });
+
+  it('[edge case conexión inestable] un fallo de red se propaga como HttpErrorResponse con status 0', () => {
+    let received: unknown;
+    service.update(CLIENT_ID, UPDATE_BODY).subscribe({ error: (err: unknown) => (received = err) });
+
+    httpMock.expectOne(`/api/v1/clients/${CLIENT_ID}`).error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+
+    expect(received).toBeInstanceOf(HttpErrorResponse);
+    expect((received as HttpErrorResponse).status).toBe(0);
   });
 });

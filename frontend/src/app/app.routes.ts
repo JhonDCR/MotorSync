@@ -31,6 +31,12 @@ export const routes: Routes = [
     title: 'Nuevo cliente',
     loadComponent: () => import('./features/clients/client-form.page').then((m) => m.ClientFormPage),
   },
+  // clients/:id/edit va antes de clients/:id (US4).
+  {
+    path: 'clients/:id/edit',
+    title: 'Editar cliente',
+    loadComponent: () => import('./features/clients/client-form.page').then((m) => m.ClientFormPage),
+  },
   {
     path: 'clients/:id',
     title: 'Ficha del cliente',
@@ -40,6 +46,12 @@ export const routes: Routes = [
   {
     path: 'vehicles/new',
     title: 'Nuevo vehículo',
+    loadComponent: () => import('./features/vehicles/vehicle-form.page').then((m) => m.VehicleFormPage),
+  },
+  // vehicles/:id/edit va antes de vehicles/:id (US4).
+  {
+    path: 'vehicles/:id/edit',
+    title: 'Editar vehículo',
     loadComponent: () => import('./features/vehicles/vehicle-form.page').then((m) => m.VehicleFormPage),
   },
   {

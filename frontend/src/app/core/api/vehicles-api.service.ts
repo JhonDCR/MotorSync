@@ -1,10 +1,21 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import type { Observable } from 'rxjs';
-import type { VehicleCreate, VehicleDetail, VehicleSearchResponse } from './api.models';
+import type {
+  OwnershipHistoryResponse,
+  OwnershipTransferRequest,
+  VehicleCreate,
+  VehicleDetail,
+  VehicleSearchResponse,
+  VehicleUpdate,
+} from './api.models';
 import { toProblem } from './problem-operator';
 
 const VEHICLES_URL = '/api/v1/vehicles';
+
+function vehicleUrl(vehicleId: string): string {
+  return `${VEHICLES_URL}/${encodeURIComponent(vehicleId)}`;
+}
 
 /** Vehicles endpoints of contracts/openapi.yaml. */
 @Injectable({ providedIn: 'root' })
@@ -16,7 +27,21 @@ export class VehiclesApiService {
   }
 
   getById(vehicleId: string): Observable<VehicleDetail> {
-    return this.http.get<VehicleDetail>(`${VEHICLES_URL}/${encodeURIComponent(vehicleId)}`).pipe(toProblem);
+    return this.http.get<VehicleDetail>(vehicleUrl(vehicleId)).pipe(toProblem);
+  }
+
+  /** PATCH with optimistic locking (version) and optional reason (FR-019). */
+  update(vehicleId: string, body: VehicleUpdate): Observable<VehicleDetail> {
+    return this.http.patch<VehicleDetail>(vehicleUrl(vehicleId), body).pipe(toProblem);
+  }
+
+  transferOwnership(vehicleId: string, body: OwnershipTransferRequest): Observable<VehicleDetail> {
+    return this.http.post<VehicleDetail>(`${vehicleUrl(vehicleId)}/ownership-transfers`, body).pipe(toProblem);
+  }
+
+  /** Items come newest first from the API; they are not reordered. */
+  getOwnershipHistory(vehicleId: string): Observable<OwnershipHistoryResponse> {
+    return this.http.get<OwnershipHistoryResponse>(`${vehicleUrl(vehicleId)}/ownership-history`).pipe(toProblem);
   }
 
   search(q: string): Observable<VehicleSearchResponse> {

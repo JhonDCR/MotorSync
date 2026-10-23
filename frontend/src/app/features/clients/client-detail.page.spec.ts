@@ -20,6 +20,11 @@
 //   not-found             404: "Cliente no encontrado" (problemMessage con resource 'client'); no se muestra la ficha
 //   back-to-search        <a> de vuelta a la búsqueda, href /clients (en el 404)
 //   load-error + retry    fallo de red: mensaje y botón "Reintentar" que vuelve a pedir la ficha
+//
+// T078 (PR3, US4), para el implementer (T079):
+//   edit-client           <a> "Editar" con routerLink a /clients/{id}/edit (href /clients/{id}/edit). Solo con la
+//                         ficha cargada; no se renderiza en not-found ni en load-error.
+//   Ningún botón ni enlace para eliminar, borrar ni desactivar, para cualquier rol (US4-AC17).
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
@@ -28,6 +33,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { of, throwError } from 'rxjs';
 import type { ClientDetail, Problem, VehicleSummary } from '../../core/api/api.models';
 import { ClientsApiService } from '../../core/api/clients-api.service';
+import { signInAs, signOut } from '../../../testing/fake-jwt';
 import { ClientDetailPage } from './client-detail.page';
 
 @Component({ template: '' })
@@ -272,5 +278,51 @@ describe('ClientDetailPage (T033)', () => {
 
     expect(api.getById).toHaveBeenLastCalledWith(OTHER_CLIENT_ID);
     expect(text('client-name')).toContain('Maria Nunez');
+  });
+
+  // --- T078 (PR3): acceso a la edición y sin eliminación ---
+
+  it('[US4-AC4] con la ficha cargada ofrece "Editar" con un enlace a /clients/{id}/edit', async () => {
+    await open();
+
+    const link = get<HTMLAnchorElement>('edit-client');
+    expect(link.tagName).toBe('A');
+    expect(link.getAttribute('href')).toBe(`/clients/${CLIENT_ID}/edit`);
+  });
+
+  it('[US4-AC4] el enlace de edición apunta al cliente de la ruta actual', async () => {
+    await open();
+    api.getById.mockReturnValue(of(detail({ id: OTHER_CLIENT_ID, displayName: 'Maria Nunez' })));
+    await open(OTHER_CLIENT_ID);
+
+    expect(get<HTMLAnchorElement>('edit-client').getAttribute('href')).toBe(`/clients/${OTHER_CLIENT_ID}/edit`);
+  });
+
+  it('[US4-AC4] sin ficha (404 o fallo de red) no se ofrece editar', async () => {
+    api.getById.mockReturnValueOnce(throwError(() => problem(404, 'NOT_FOUND')));
+    await open(OTHER_CLIENT_ID);
+    expect(query('not-found')).not.toBeNull();
+    expect(query('edit-client')).toBeNull();
+
+    api.getById.mockReturnValueOnce(throwError(networkError));
+    await open();
+    expect(query('load-error')).not.toBeNull();
+    expect(query('edit-client')).toBeNull();
+  });
+
+  it.each(['asesor', 'admin'] as const)('[US4-AC17] %s: la ficha del cliente no ofrece eliminar ni desactivar', async (role) => {
+    signInAs(role);
+    try {
+      await open();
+      expect(query('edit-client')).not.toBeNull();
+
+      const labels = Array.from(root().querySelectorAll('button, a, [role="button"]')).map(
+        (element) => `${element.textContent ?? ''} ${element.getAttribute('aria-label') ?? ''}`,
+      );
+      expect(labels.join(' ')).not.toMatch(/eliminar|borrar|desactivar|dar de baja/i);
+      expect(root().querySelector('[data-testid*="delete"], [data-testid*="deactivate"]')).toBeNull();
+    } finally {
+      signOut();
+    }
   });
 });

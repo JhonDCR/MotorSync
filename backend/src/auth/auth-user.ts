@@ -13,6 +13,8 @@ export interface AuthUser {
 /** Shape of the HTTP request once JwtAuthGuard has run. */
 export interface AuthenticatedRequest {
   user?: AuthUser;
+  /** Set by Express (honours the trust proxy setting). */
+  ip?: string;
 }
 
 export function isAuthRole(value: unknown): value is AuthRole {

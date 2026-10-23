@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { isUUID } from 'class-validator';
+import { AuditService } from '../audit/audit.service.js';
 import { Client, type ClientType, type DocumentType } from '../clients/client.entity.js';
 import {
   escapeLike,
@@ -7,12 +8,19 @@ import {
   SEARCH_PAGE_SIZE,
   type ClientSummary,
 } from '../clients/clients.service.js';
-import { normalizePlateForSearch, type BodyType } from '../common/identifiers/plate.js';
+import {
+  isValidPlate,
+  normalizePlateForSearch,
+  type BodyType,
+} from '../common/identifiers/plate.js';
 import { isValidVin } from '../common/identifiers/vin.js';
 import { ProblemException } from '../common/problem-details.filter.js';
-import { translatePgError } from '../database/pg-errors.js';
+import { changedIdentifiers, checkReason } from '../common/reason-policy.js';
+import { CAR_PLATE_MESSAGE, MOTORCYCLE_PLATE_MESSAGE } from '../common/validation/is-ec-plate.js';
+import { translatePgError, type FieldError } from '../database/pg-errors.js';
 import { getManager, getTenantContext } from '../database/tenant-context.js';
 import type { CreateVehicleDto } from './dto/create-vehicle.dto.js';
+import type { UpdateVehicleDto } from './dto/update-vehicle.dto.js';
 import { Vehicle } from './vehicle.entity.js';
 
 /** Contract `VehicleDetail` (never exposes tenant_id nor owner_client_id). */
@@ -99,6 +107,24 @@ interface VehicleIdRow {
 }
 
 const CREATE_SAVEPOINT = 'vehicle_create';
+const UPDATE_SAVEPOINT = 'vehicle_update';
+
+/** Raw result of an UPDATE: TypeORM returns [rows, rowCount] for an UPDATE on PostgreSQL. */
+export type UpdateResultRaw = [{ id: string }[], number];
+
+/**
+ * Optimistic update (research R5): only the row of the tenant with the version the user edited.
+ * No row affected means a missing (or foreign, under RLS) vehicle or a stale version.
+ */
+const UPDATE_SQL = `
+UPDATE vehicles
+   SET plate = $3, vin = $4, brand = $5, model = $6, year = $7, color = $8, body_type = $9,
+       initial_mileage = $10,
+       version = version + 1, updated_at = now(), updated_by = $11, updated_by_name = $12
+ WHERE tenant_id = app_current_tenant()
+   AND id = $1
+   AND version = $2
+RETURNING id`;
 
 /**
  * Vehicle with its current owner (FR-014). The explicit tenant filter is the first barrier
@@ -160,6 +186,35 @@ const ID_BY_VIN_SQL = 'SELECT id FROM vehicles WHERE tenant_id = app_current_ten
 
 function notFound(): ProblemException {
   return new ProblemException(404, 'NOT_FOUND');
+}
+
+function validationError(errors: FieldError[]): ProblemException {
+  return new ProblemException(400, 'VALIDATION_ERROR', { errors });
+}
+
+export function versionConflict(current: VehicleDetail): ProblemException {
+  return new ProblemException(409, 'VERSION_CONFLICT', { current });
+}
+
+/** Stored values after applying the sent fields. */
+function mergeUpdate(vehicle: Vehicle, dto: UpdateVehicleDto) {
+  return {
+    plate: dto.plate ?? vehicle.plate,
+    vin: dto.vin === undefined ? vehicle.vin : dto.vin,
+    brand: dto.brand ?? vehicle.brand,
+    model: dto.model ?? vehicle.model,
+    year: dto.year ?? vehicle.year,
+    color: dto.color ?? vehicle.color,
+    bodyType: dto.bodyType ?? vehicle.bodyType,
+    initialMileage: dto.initialMileage ?? vehicle.initialMileage,
+  };
+}
+
+/** US3-AC14: the resulting plate must match the format of the resulting body type (FR-007). */
+function plateError(plate: string, bodyType: BodyType): FieldError | null {
+  if (isValidPlate(plate, bodyType)) return null;
+  const message = bodyType === 'motorcycle' ? MOTORCYCLE_PLATE_MESSAGE : CAR_PLATE_MESSAGE;
+  return { field: 'plate', code: 'INVALID_PLATE', message };
 }
 
 function clientNotFound(): ProblemException {
@@ -229,6 +284,8 @@ function toDetail(row: VehicleDetailRow): VehicleDetail {
  */
 @Injectable()
 export class VehiclesService {
+  constructor(@Inject(AuditService) private readonly audit: AuditService) {}
+
   async create(dto: CreateVehicleDto): Promise<VehicleDetail> {
     const { manager, user } = getTenantContext();
 
@@ -264,7 +321,7 @@ export class VehiclesService {
       await manager.query<unknown>(`RELEASE SAVEPOINT ${CREATE_SAVEPOINT}`);
     } catch (error: unknown) {
       await manager.query<unknown>(`ROLLBACK TO SAVEPOINT ${CREATE_SAVEPOINT}`);
-      throw await this.translateCreateError(error, values.plate, values.vin);
+      throw await this.translateWriteError(error, values.plate, values.vin);
     }
     return this.getById(id);
   }
@@ -300,7 +357,81 @@ export class VehiclesService {
     return toDetail(row);
   }
 
-  private async translateCreateError(
+  /**
+   * PATCH /vehicles/{id} (US4-AC5, AC6, AC11, AC12, AC15, AC16; US3-AC14). Order: existence
+   * (404), resulting plate (400), version (409), reason (400), then the UPDATE and one audit
+   * record per changed identifier in the request transaction (principle IV).
+   */
+  async update(vehicleId: string, dto: UpdateVehicleDto): Promise<VehicleDetail> {
+    if (!isUUID(vehicleId)) throw notFound();
+    const { manager, user, tenantId } = getTenantContext();
+    const vehicle = await manager.getRepository(Vehicle).findOneBy({ id: vehicleId, tenantId });
+    if (!vehicle) throw notFound();
+
+    const next = mergeUpdate(vehicle, dto);
+    const invalidPlate = plateError(next.plate, next.bodyType);
+    if (invalidPlate) throw validationError([invalidPlate]);
+
+    if (vehicle.version !== dto.version) throw versionConflict(await this.getById(vehicleId));
+
+    const changed = changedIdentifiers(
+      { plate: vehicle.plate, vin: vehicle.vin },
+      { plate: dto.plate, vin: dto.vin },
+    );
+    const reasonError = checkReason(user.role, changed, dto.reason);
+    if (reasonError) throw validationError([reasonError]);
+
+    // The unique indexes decide duplicates; the savepoint keeps the transaction usable to look
+    // up existingId under RLS after a unique violation.
+    await manager.query<unknown>(`SAVEPOINT ${UPDATE_SAVEPOINT}`);
+    let updated: number;
+    try {
+      [, updated] = await manager.query<UpdateResultRaw>(UPDATE_SQL, [
+        vehicleId,
+        dto.version,
+        next.plate,
+        next.vin,
+        next.brand,
+        next.model,
+        next.year,
+        next.color,
+        next.bodyType,
+        next.initialMileage,
+        user.userId,
+        user.name,
+      ]);
+      await manager.query<unknown>(`RELEASE SAVEPOINT ${UPDATE_SAVEPOINT}`);
+    } catch (error: unknown) {
+      await manager.query<unknown>(`ROLLBACK TO SAVEPOINT ${UPDATE_SAVEPOINT}`);
+      throw await this.translateWriteError(error, next.plate, next.vin);
+    }
+    // Lost a race after the check above: gone (404) or edited by someone else (409).
+    if (updated === 0) throw versionConflict(await this.getById(vehicleId));
+
+    if (changed.includes('plate')) {
+      await this.audit.record({
+        action: 'vehicle.plate_changed',
+        entityType: 'vehicle',
+        entityId: vehicleId,
+        before: { plate: vehicle.plate },
+        after: { plate: next.plate },
+        reason: dto.reason,
+      });
+    }
+    if (changed.includes('vin')) {
+      await this.audit.record({
+        action: 'vehicle.vin_changed',
+        entityType: 'vehicle',
+        entityId: vehicleId,
+        before: { vin: vehicle.vin },
+        after: { vin: next.vin },
+        reason: dto.reason,
+      });
+    }
+    return this.getById(vehicleId);
+  }
+
+  private async translateWriteError(
     error: unknown,
     plate: string,
     vin: string | null,

@@ -176,10 +176,10 @@ Rama sugerida: `feat/001-clientes-vehiculos` (o una rama de PR por corte, según
 
 ## Phase 9: Base del PR3
 
-- [ ] T064 Ampliar `backend/test/db/rls.e2e-spec.ts` con `audit_log`: aislamiento por tenant; `motorsync_app` puede hacer `INSERT` y `SELECT` pero `UPDATE` y `DELETE` → `permission denied`; con `motorsync_migrator`, `UPDATE` y `DELETE` fallan por el trigger `audit_log_no_update_delete`; `CHECK audit_log_asesor_reason` rechaza `actor_role = 'asesor'` sin `reason`; `reason` de 9 caracteres → rechazado. Cubre el principio IV y US4-AC10 ("nadie puede editar ni borrar") — tester
-- [ ] T065 Crear la migración `backend/src/database/migrations/1761000000300-CreateAuditLog.ts` con el DDL de `audit_log` de data-model.md **literal** (columnas, `CHECK`, índices `audit_log_tenant_id_idx` y `audit_log_entity_idx`, política, `GRANT SELECT, INSERT`, función y trigger) y `backend/src/audit/audit-log.entity.ts`, `backend/src/audit/audit.service.ts` (`record()` con el manager de `tenant-context`; toma `actor_*`, `ip` y `channel = 'web'` del contexto del request) y `backend/src/audit/audit.module.ts` — implementer-backend
-- [ ] T066 [P] Pruebas unitarias en `backend/src/common/reason-policy.spec.ts` (FR-019): el asesor necesita un `reason` de 10 a 500 caracteres tras `trim` para transferir o cambiar placa, VIN o documento; el admin puede omitirlo; editar campos que no son identificadores nunca lo exige; un valor normalizado igual al guardado no cuenta como cambio — tester
-- [ ] T067 Implementar `backend/src/common/reason-policy.ts` — implementer-backend
+- [x] T064 Ampliar `backend/test/db/rls.e2e-spec.ts` con `audit_log`: aislamiento por tenant; `motorsync_app` puede hacer `INSERT` y `SELECT` pero `UPDATE` y `DELETE` → `permission denied`; con `motorsync_migrator`, `UPDATE` y `DELETE` fallan por el trigger `audit_log_no_update_delete`; `CHECK audit_log_asesor_reason` rechaza `actor_role = 'asesor'` sin `reason`; `reason` de 9 caracteres → rechazado. Cubre el principio IV y US4-AC10 ("nadie puede editar ni borrar") — tester
+- [x] T065 Crear la migración `backend/src/database/migrations/1761000000300-CreateAuditLog.ts` con el DDL de `audit_log` de data-model.md **literal** (columnas, `CHECK`, índices `audit_log_tenant_id_idx` y `audit_log_entity_idx`, política, `GRANT SELECT, INSERT`, función y trigger) y `backend/src/audit/audit-log.entity.ts`, `backend/src/audit/audit.service.ts` (`record()` con el manager de `tenant-context`; toma `actor_*`, `ip` y `channel = 'web'` del contexto del request) y `backend/src/audit/audit.module.ts` — implementer-backend
+- [x] T066 [P] Pruebas unitarias en `backend/src/common/reason-policy.spec.ts` (FR-019): el asesor necesita un `reason` de 10 a 500 caracteres tras `trim` para transferir o cambiar placa, VIN o documento; el admin puede omitirlo; editar campos que no son identificadores nunca lo exige; un valor normalizado igual al guardado no cuenta como cambio — tester
+- [x] T067 Implementar `backend/src/common/reason-policy.ts` — implementer-backend
 
 ## Phase 10: User Story 4 — Editar y cambiar propietario (P2) (PR3)
 
@@ -187,7 +187,7 @@ Rama sugerida: `feat/001-clientes-vehiculos` (o una rama de PR por corte, según
 
 **Independent Test**: quickstart §2, filas 11 a 15; e2e `backend/test/clients-update.e2e-spec.ts`, `backend/test/vehicles-update.e2e-spec.ts`, `backend/test/ownership.e2e-spec.ts` y `backend/test/no-delete.e2e-spec.ts`.
 
-- [ ] T068 [US4] E2E en `backend/test/clients-update.e2e-spec.ts`. Cubre:
+- [x] T068 [US4] E2E en `backend/test/clients-update.e2e-spec.ts`. Cubre:
   - US4-AC4: teléfono, correo o nombre válidos → 200, `version + 1` y `updatedByName` del token.
   - US4-AC5: documento duplicado → 409 `DOCUMENT_ALREADY_EXISTS`; documento inválido → 400.
   - US4-AC11: cambio de documento → un registro `client.document_changed` con `before` y `after` `{documentType, documentNumber}`, `reason`, `actor_role`, `ip` y `occurred_at` UTC.
@@ -197,8 +197,8 @@ Rama sugerida: `feat/001-clientes-vehiculos` (o una rama de PR por corte, según
   - US4-AC16: admin sin motivo → 200 y auditoría con `reason = null`; admin con motivo → se audita el motivo.
   - `clientType` en el body → 400.
   - tester
-- [ ] T069 [US4] Implementar `backend/src/clients/dto/update-client.dto.ts` (`version` obligatorio; resto opcional; `reason` de 10 a 500), `update` en `backend/src/clients/clients.service.ts` (`UPDATE … WHERE id AND version RETURNING *`; 0 filas → 404 o 409 con `current`; aplica `reason-policy`; `audit.record('client.document_changed')` en la misma transacción) y `PATCH /clients/:clientId` — implementer-backend
-- [ ] T070 [US4] E2E en `backend/test/vehicles-update.e2e-spec.ts`. Cubre:
+- [x] T069 [US4] Implementar `backend/src/clients/dto/update-client.dto.ts` (`version` obligatorio; resto opcional; `reason` de 10 a 500), `update` en `backend/src/clients/clients.service.ts` (`UPDATE … WHERE id AND version RETURNING *`; 0 filas → 404 o 409 con `current`; aplica `reason-policy`; `audit.record('client.document_changed')` en la misma transacción) y `PATCH /clients/:clientId` — implementer-backend
+- [x] T070 [US4] E2E en `backend/test/vehicles-update.e2e-spec.ts`. Cubre:
   - US4-AC5: placa o VIN duplicados → 409; placa con formato inválido → 400.
   - US4-AC6: marca, modelo, año, color, carrocería y kilometraje → 200 sin motivo ni auditoría.
   - US3-AC14: cambiar `bodyType` a `motorcycle` dejando `PBA1234` → 400 `INVALID_PLATE`.
@@ -208,8 +208,8 @@ Rama sugerida: `feat/001-clientes-vehiculos` (o una rama de PR por corte, según
   - US4-AC15 y US4-AC16 sobre placa y VIN.
   - `ownerClientId` en el body del `PATCH` → 400.
   - tester
-- [ ] T071 [US4] Implementar `backend/src/vehicles/dto/update-vehicle.dto.ts`, `update` en `backend/src/vehicles/vehicles.service.ts` (revalida la placa contra la carrocería resultante; auditoría por identificador cambiado) y `PATCH /vehicles/:vehicleId` — implementer-backend
-- [ ] T072 [US4] E2E en `backend/test/ownership.e2e-spec.ts`. Cubre:
+- [x] T071 [US4] Implementar `backend/src/vehicles/dto/update-vehicle.dto.ts`, `update` en `backend/src/vehicles/vehicles.service.ts` (revalida la placa contra la carrocería resultante; auditoría por identificador cambiado) y `PATCH /vehicles/:vehicleId` — implementer-backend
+- [x] T072 [US4] E2E en `backend/test/ownership.e2e-spec.ts`. Cubre:
   - US4-AC7: asesor con motivo → 200; el vehículo sale de la ficha de Ana y aparece en la de Carlos.
   - US4-AC8: exactamente un `vehicle.owner_changed` con `tenant_id`, actor, rol, `before` y `after` (`ownerClientId`, `ownerDisplayName`, `ownerDocumentNumber`), `reason`, `occurred_at` UTC e `ip` o `channel`.
   - US4-AC9: cliente destino inexistente → 404 `CLIENT_NOT_FOUND` sin cambios ni auditoría; con `AuditService.record` forzado a lanzar (override del provider en el módulo de prueba) → el propietario no cambia.
@@ -221,22 +221,22 @@ Rama sugerida: `feat/001-clientes-vehiculos` (o una rama de PR por corte, según
   - Edge case: transferir al propietario actual → 422 `SAME_OWNER` sin auditoría.
   - `version` antigua → 409 `VERSION_CONFLICT`.
   - tester
-- [ ] T073 [US4] Implementar `backend/src/vehicles/ownership.service.ts` (verifica el destino bajo RLS, `SAME_OWNER`, `reason-policy`, `UPDATE` con versión y `audit.record('vehicle.owner_changed')` en la misma transacción; historial desde `audit_log` con `audit_log_entity_idx`) y los endpoints `POST /vehicles/:vehicleId/ownership-transfers` y `GET /vehicles/:vehicleId/ownership-history` en `backend/src/vehicles/vehicles.controller.ts` — implementer-backend
-- [ ] T074 [P] [US4] E2E en `backend/test/no-delete.e2e-spec.ts` (US4-AC17, FR-021): `DELETE /api/v1/clients/{id}` y `DELETE /api/v1/vehicles/{id}` → 404 y el registro sigue existiendo; ningún controlador declara `@Delete` (comprobado recorriendo las rutas registradas en la app) — tester
-- [ ] T075 [US4] Confirmar que T074 está en verde sin código nuevo. Si alguna ruta `DELETE` existiera, eliminarla de `backend/src/` — implementer-backend
-- [ ] T076 [P] [US4] Pruebas en `frontend/src/app/core/api/clients-api.service.spec.ts` y `frontend/src/app/core/api/vehicles-api.service.spec.ts` (`update`, `transferOwnership`, `getOwnershipHistory`) y en `frontend/src/app/core/auth/current-session.spec.ts` (lee `role` y `name` del payload del JWT guardado, sin verificar la firma, solo para la UI; token ausente o mal formado → sin sesión) — tester
-- [ ] T077 [US4] Implementar los métodos nuevos en `frontend/src/app/core/api/clients-api.service.ts` y `frontend/src/app/core/api/vehicles-api.service.ts`, y `frontend/src/app/core/auth/current-session.ts` — implementer-frontend
-- [ ] T078 [US4] Pruebas del modo edición en `frontend/src/app/features/clients/client-form.page.spec.ts` (`clients/:id/edit`). Cubre US4-AC4, US4-AC5, US4-AC11 y US4-AC15 (si cambia el documento y el rol es asesor, aparece el campo "Motivo" obligatorio de 10 a 500), US4-AC16 (admin: motivo opcional), US4-AC12 (409 → aviso "El registro cambió", muestra los datos actuales y permite repetir la edición) y US4-AC17 (sin acción de eliminar ni desactivar) — tester
-- [ ] T079 [US4] Implementar el modo edición en `frontend/src/app/features/clients/client-form.page.ts` y la ruta `clients/:id/edit` — implementer-frontend
-- [ ] T080 [US4] Pruebas en `frontend/src/app/features/vehicles/vehicle-form.page.spec.ts` (modo edición `vehicles/:id/edit`: US4-AC6, US4-AC11 y US4-AC15/AC16 al cambiar placa o VIN, US4-AC12, US4-AC17), `frontend/src/app/features/vehicles/transfer-ownership.dialog.spec.ts` (US4-AC7: elegir cliente destino con la búsqueda y confirmar explícitamente; US4-AC15/AC16: motivo obligatorio u opcional según el rol; `SAME_OWNER` → "El vehículo ya pertenece a este cliente"; `VERSION_CONFLICT`) y `frontend/src/app/features/vehicles/vehicle-detail.page.spec.ts` (US4-AC10: historial del más reciente al más antiguo con anterior, nuevo, fecha, usuario y motivo; sin acciones de editar ni borrar el historial; US4-AC17) — tester
-- [ ] T081 [US4] Implementar el modo edición en `frontend/src/app/features/vehicles/vehicle-form.page.ts`, `frontend/src/app/features/vehicles/transfer-ownership.dialog.ts` y la sección de historial en `frontend/src/app/features/vehicles/vehicle-detail.page.ts` — implementer-frontend
-- [ ] T082 [P] [US4] Ampliar `frontend/src/app/core/api/mock-api.interceptor.spec.ts` con `PATCH /clients/{id}`, `PATCH /vehicles/{id}` (200, 409 `VERSION_CONFLICT`, 400 `REASON_REQUIRED` según el rol del token), `POST /vehicles/{id}/ownership-transfers` (200, 404, 409, 422) y `GET /vehicles/{id}/ownership-history` — tester
-- [ ] T083 [US4] Implementar esas rutas en `frontend/src/app/core/api/mock-api.interceptor.ts` — implementer-frontend
+- [x] T073 [US4] Implementar `backend/src/vehicles/ownership.service.ts` (verifica el destino bajo RLS, `SAME_OWNER`, `reason-policy`, `UPDATE` con versión y `audit.record('vehicle.owner_changed')` en la misma transacción; historial desde `audit_log` con `audit_log_entity_idx`) y los endpoints `POST /vehicles/:vehicleId/ownership-transfers` y `GET /vehicles/:vehicleId/ownership-history` en `backend/src/vehicles/vehicles.controller.ts` — implementer-backend
+- [x] T074 [P] [US4] E2E en `backend/test/no-delete.e2e-spec.ts` (US4-AC17, FR-021): `DELETE /api/v1/clients/{id}` y `DELETE /api/v1/vehicles/{id}` → 404 y el registro sigue existiendo; ningún controlador declara `@Delete` (comprobado recorriendo las rutas registradas en la app) — tester
+- [x] T075 [US4] Confirmar que T074 está en verde sin código nuevo. Si alguna ruta `DELETE` existiera, eliminarla de `backend/src/` — implementer-backend
+- [x] T076 [P] [US4] Pruebas en `frontend/src/app/core/api/clients-api.service.spec.ts` y `frontend/src/app/core/api/vehicles-api.service.spec.ts` (`update`, `transferOwnership`, `getOwnershipHistory`) y en `frontend/src/app/core/auth/current-session.spec.ts` (lee `role` y `name` del payload del JWT guardado, sin verificar la firma, solo para la UI; token ausente o mal formado → sin sesión) — tester
+- [x] T077 [US4] Implementar los métodos nuevos en `frontend/src/app/core/api/clients-api.service.ts` y `frontend/src/app/core/api/vehicles-api.service.ts`, y `frontend/src/app/core/auth/current-session.ts` — implementer-frontend
+- [x] T078 [US4] Pruebas del modo edición en `frontend/src/app/features/clients/client-form.page.spec.ts` (`clients/:id/edit`). Cubre US4-AC4, US4-AC5, US4-AC11 y US4-AC15 (si cambia el documento y el rol es asesor, aparece el campo "Motivo" obligatorio de 10 a 500), US4-AC16 (admin: motivo opcional), US4-AC12 (409 → aviso "El registro cambió", muestra los datos actuales y permite repetir la edición) y US4-AC17 (sin acción de eliminar ni desactivar) — tester
+- [x] T079 [US4] Implementar el modo edición en `frontend/src/app/features/clients/client-form.page.ts` y la ruta `clients/:id/edit` — implementer-frontend
+- [x] T080 [US4] Pruebas en `frontend/src/app/features/vehicles/vehicle-form.page.spec.ts` (modo edición `vehicles/:id/edit`: US4-AC6, US4-AC11 y US4-AC15/AC16 al cambiar placa o VIN, US4-AC12, US4-AC17), `frontend/src/app/features/vehicles/transfer-ownership.dialog.spec.ts` (US4-AC7: elegir cliente destino con la búsqueda y confirmar explícitamente; US4-AC15/AC16: motivo obligatorio u opcional según el rol; `SAME_OWNER` → "El vehículo ya pertenece a este cliente"; `VERSION_CONFLICT`) y `frontend/src/app/features/vehicles/vehicle-detail.page.spec.ts` (US4-AC10: historial del más reciente al más antiguo con anterior, nuevo, fecha, usuario y motivo; sin acciones de editar ni borrar el historial; US4-AC17) — tester
+- [x] T081 [US4] Implementar el modo edición en `frontend/src/app/features/vehicles/vehicle-form.page.ts`, `frontend/src/app/features/vehicles/transfer-ownership.dialog.ts` y la sección de historial en `frontend/src/app/features/vehicles/vehicle-detail.page.ts` — implementer-frontend
+- [x] T082 [P] [US4] Ampliar `frontend/src/app/core/api/mock-api.interceptor.spec.ts` con `PATCH /clients/{id}`, `PATCH /vehicles/{id}` (200, 409 `VERSION_CONFLICT`, 400 `REASON_REQUIRED` según el rol del token), `POST /vehicles/{id}/ownership-transfers` (200, 404, 409, 422) y `GET /vehicles/{id}/ownership-history` — tester
+- [x] T083 [US4] Implementar esas rutas en `frontend/src/app/core/api/mock-api.interceptor.ts` — implementer-frontend
 
 ## Cierre PR3
 
-- [ ] T084 Revisar el diff del PR3 contra la spec y la constitución 1.1.0 (principio IV ampliado). Foco: auditoría en la misma transacción, append-only, motivo según el rol tomado solo del JWT, bloqueo optimista en todas las escrituras, ningún endpoint ni botón de borrado, y pruebas con ID para US4-AC4 a AC17 — reviewer
-- [ ] T085 Verificar el PR3: lo mismo que en T063; quickstart §2 completo (filas 1 a 15) y §4 (diálogo de transferencia con token asesor y admin). CI en verde — leader
+- [x] T084 Revisar el diff del PR3 contra la spec y la constitución 1.1.0 (principio IV ampliado). Foco: auditoría en la misma transacción, append-only, motivo según el rol tomado solo del JWT, bloqueo optimista en todas las escrituras, ningún endpoint ni botón de borrado, y pruebas con ID para US4-AC4 a AC17 — reviewer
+- [x] T085 Verificar el PR3: lo mismo que en T063; quickstart §2 completo (filas 1 a 15) y §4 (diálogo de transferencia con token asesor y admin). CI en verde — leader
 
 ---
 

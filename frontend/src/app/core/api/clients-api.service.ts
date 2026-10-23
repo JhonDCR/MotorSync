@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import type { Observable } from 'rxjs';
-import type { ClientCreate, ClientDetail, ClientSearchResponse } from './api.models';
+import type { ClientCreate, ClientDetail, ClientSearchResponse, ClientUpdate } from './api.models';
 import { toProblem } from './problem-operator';
 
 const CLIENTS_URL = '/api/v1/clients';
@@ -17,6 +17,11 @@ export class ClientsApiService {
 
   getById(clientId: string): Observable<ClientDetail> {
     return this.http.get<ClientDetail>(`${CLIENTS_URL}/${encodeURIComponent(clientId)}`).pipe(toProblem);
+  }
+
+  /** PATCH with optimistic locking (version) and optional reason (FR-019). */
+  update(clientId: string, body: ClientUpdate): Observable<ClientDetail> {
+    return this.http.patch<ClientDetail>(`${CLIENTS_URL}/${encodeURIComponent(clientId)}`, body).pipe(toProblem);
   }
 
   search(q: string): Observable<ClientSearchResponse> {

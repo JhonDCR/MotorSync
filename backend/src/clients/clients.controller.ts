@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, Inject, Param, Post, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { API_PREFIX } from '../app.setup.js';
 import {
@@ -7,6 +18,7 @@ import {
   type ClientSearchResponse,
 } from './clients.service.js';
 import { CreateClientDto } from './dto/create-client.dto.js';
+import { UpdateClientDto } from './dto/update-client.dto.js';
 
 @Controller('clients')
 export class ClientsController {
@@ -37,5 +49,14 @@ export class ClientsController {
   @Get(':clientId')
   getById(@Param('clientId') clientId: string): Promise<ClientDetail> {
     return this.clients.getById(clientId);
+  }
+
+  /**
+   * PATCH /api/v1/clients/{clientId} (US4-AC4, AC5, AC11, AC12): 200 ClientDetail with
+   * version + 1; 409 VERSION_CONFLICT with current; 404 NOT_FOUND for missing or foreign ids.
+   */
+  @Patch(':clientId')
+  update(@Param('clientId') clientId: string, @Body() dto: UpdateClientDto): Promise<ClientDetail> {
+    return this.clients.update(clientId, dto);
   }
 }

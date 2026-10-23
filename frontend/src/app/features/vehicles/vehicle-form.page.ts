@@ -1,5 +1,15 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { afterNextRender, ChangeDetectionStrategy, Component, ElementRef, inject, Injector, signal } from '@angular/core';
+import {
+  afterNextRender,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  ElementRef,
+  inject,
+  Injector,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   FormBuilder,
@@ -11,12 +21,29 @@ import {
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import type { Subscription } from 'rxjs';
-import type { BodyType, ClientDetail, ClientSummary, FieldError, VehicleCreate } from '../../core/api/api.models';
+import type {
+  BodyType,
+  ClientDetail,
+  ClientSummary,
+  FieldError,
+  Problem,
+  VehicleCreate,
+  VehicleDetail,
+  VehicleUpdate,
+} from '../../core/api/api.models';
 import { ClientsApiService } from '../../core/api/clients-api.service';
 import { fieldErrorMessage, isProblem, problemMessage } from '../../core/api/problem';
 import { VehiclesApiService } from '../../core/api/vehicles-api.service';
+import { readCurrentSession } from '../../core/auth/current-session';
 import { isBodyType, normalizePlateForWrite } from '../../shared/identifiers/plate';
 import { normalizeVin } from '../../shared/identifiers/vin';
+import {
+  isReasonAcceptable,
+  isReasonRequired,
+  normalizeReason,
+  REASON_MAX_LENGTH,
+  REASON_REQUIRED_MESSAGE,
+} from '../../shared/validators/reason';
 import { mileageValidator, plateValidator, vinValidator, yearValidator } from '../../shared/validators/vehicle.validators';
 import { BODY_TYPE_OPTIONS } from './body-type';
 
@@ -52,6 +79,29 @@ const OWNER_SEARCH_TOO_SHORT = 'Escriba al menos 2 caracteres';
 const OWNER_SEARCH_FAILED = 'No se pudo buscar clientes. Revise la conexión e inténtelo de nuevo';
 const OWNER_LOAD_FAILED = 'No se pudo cargar el cliente. Búsquelo de nuevo';
 const UNEXPECTED_ERROR = 'No se pudo guardar el vehículo. Inténtelo de nuevo';
+const LOAD_FAILED = 'No se pudo cargar el vehículo. Revise la conexión e inténtelo de nuevo';
+const NOT_FOUND_STATUS = 404;
+
+/** Edit mode load state; in vehicles/new it is always 'ready'. */
+export type VehicleLoadState =
+  | { kind: 'loading' }
+  | { kind: 'ready' }
+  | { kind: 'error'; message: string; canRetry: boolean };
+
+/** Plate as it would be stored: normalized when possible (invalid symbols are left to the validator). */
+function writePlate(raw: string): string {
+  return normalizePlateForWrite(raw) ?? raw;
+}
+
+/** VIN as it would be stored: '' → null, normalized when possible. */
+function writeVin(raw: string): string | null {
+  const vin = raw.trim();
+  return vin === '' ? null : (normalizeVin(vin) ?? vin);
+}
+
+function isVehicleDetail(value: Problem['current']): value is VehicleDetail {
+  return value !== undefined && 'plate' in value;
+}
 
 /** Required text: empty or whitespace-only values are missing. */
 const requiredText: ValidatorFn = (control: AbstractControl): ValidationErrors | null =>
@@ -116,7 +166,11 @@ function removeDraft(): void {
   }
 }
 
-/** New vehicle (US3): owner, Ecuadorian plate by body type, optional VIN, year and initial mileage. */
+/**
+ * New vehicle (US3) at vehicles/new: owner, Ecuadorian plate by body type, optional VIN, year and initial mileage.
+ * Edit mode (US4) at vehicles/:id/edit: same rules and optimistic locking; the owner is read-only (it changes only
+ * through the ownership transfer) and changing the plate or the VIN asks for a reason (FR-019).
+ */
 @Component({
   selector: 'app-vehicle-form-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -130,6 +184,14 @@ export class VehicleFormPage {
   private readonly router = inject(Router);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
+
+  /** Id of the vehicle being edited (vehicles/:id/edit); null in vehicles/new. */
+  protected readonly vehicleId: string | null = inject(ActivatedRoute).snapshot.paramMap.get('id');
+  protected readonly editing = this.vehicleId !== null;
+  /** UI only (FR-019): the backend decides with the verified token. Without a session the asesor rule applies. */
+  protected readonly reasonRequired = isReasonRequired(readCurrentSession());
+  protected readonly reasonMaxLength = REASON_MAX_LENGTH;
 
   protected readonly bodyTypeOptions = BODY_TYPE_OPTIONS;
 
@@ -144,6 +206,7 @@ export class VehicleFormPage {
     initialMileage: ['', [requiredText, mileageValidator]],
   });
 
+  protected readonly reason = new FormControl('', { nonNullable: true });
   protected readonly ownerTerm = new FormControl('', { nonNullable: true });
   protected readonly owner = signal<ClientSummary | null>(null);
   protected readonly ownerLoading = signal(false);
@@ -158,9 +221,26 @@ export class VehicleFormPage {
   protected readonly duplicate = signal<{ message: string; existingId: string | null } | null>(null);
   protected readonly networkError = signal(false);
   protected readonly generalError = signal<string | null>(null);
+  protected readonly loadState = signal<VehicleLoadState>({ kind: this.editing ? 'loading' : 'ready' });
+  protected readonly versionConflict = signal(false);
+  protected readonly reasonServerError = signal<string | null>(null);
+
+  /** Stored vehicle in edit mode: the base to compare plate and VIN, and the version to send. */
+  private readonly stored = signal<VehicleDetail | null>(null);
+  private readonly plateValue = signal('');
+  private readonly vinValue = signal('');
+
+  /** The reason field is shown only when the plate or the VIN really change (compared normalized). */
+  protected readonly identifiersChanged = computed(() => {
+    const stored = this.stored();
+    return (
+      stored !== null && (writePlate(this.plateValue()) !== stored.plate || writeVin(this.vinValue()) !== stored.vin)
+    );
+  });
 
   /** Last body sent: "Reintentar" resends exactly the same data. */
-  private lastBody: VehicleCreate | null = null;
+  private lastBody: VehicleCreate | VehicleUpdate | null = null;
+  private loadRequest: Subscription | null = null;
   private ownerLookup: Subscription | null = null;
   private ownerSearch: Subscription | null = null;
 
@@ -168,12 +248,26 @@ export class VehicleFormPage {
     const { controls } = this.form;
     // US3-AC14: the plate format depends on the body type, so the plate is revalidated on every change.
     controls.bodyType.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => {
+      if (this.editing && this.stored() !== null) {
+        // The stored plate was not typed now: its error for the new body type is shown right away.
+        controls.plate.markAsTouched();
+      }
       controls.plate.updateValueAndValidity();
       this.clearServerError('bodyType');
       this.clearServerError('plate');
     });
     for (const field of DRAFT_TEXT_FIELDS) {
       controls[field].valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.clearServerError(field));
+    }
+    controls.plate.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => this.plateValue.set(value));
+    controls.vin.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => this.vinValue.set(value));
+    this.reason.valueChanges.pipe(takeUntilDestroyed()).subscribe(() => this.reasonServerError.set(null));
+    this.destroyRef.onDestroy(() => this.loadRequest?.unsubscribe());
+
+    if (this.editing) {
+      // Neither the draft nor ?plate= / ?clientId= apply to an existing vehicle.
+      this.load();
+      return;
     }
 
     // The draft is restored once; ?plate= and ?clientId= take precedence over it (US3-AC9).
@@ -211,6 +305,22 @@ export class VehicleFormPage {
       return `Admite como máximo ${TEXT_MAX_LENGTH} caracteres`;
     }
     return fieldErrorMessage({ field, code, message: 'Valor inválido' }, { bodyType });
+  }
+
+  /** Message under the reason: the server's REASON_REQUIRED first, then the local rule after a save attempt. */
+  protected reasonError(): string | null {
+    const server = this.reasonServerError();
+    if (server !== null) {
+      return server;
+    }
+    if (!this.submitted() || !this.identifiersChanged() || this.isReasonValid()) {
+      return null;
+    }
+    return REASON_REQUIRED_MESSAGE;
+  }
+
+  protected retryLoad(): void {
+    this.load();
   }
 
   protected ownerErrorMessage(): string | null {
@@ -290,12 +400,13 @@ export class VehicleFormPage {
   protected save(): void {
     this.submitted.set(true);
     this.clearNotices();
-    if (this.form.invalid || this.owner() === null) {
+    const reasonInvalid = this.identifiersChanged() && !this.isReasonValid();
+    if (this.form.invalid || this.owner() === null || reasonInvalid) {
       this.form.markAllAsTouched();
       this.focusFirstInvalid();
       return;
     }
-    this.send(this.buildBody());
+    this.send(this.editing ? this.buildUpdate() : this.buildBody());
   }
 
   protected retry(): void {
@@ -306,10 +417,14 @@ export class VehicleFormPage {
     this.send(this.lastBody);
   }
 
-  private send(body: VehicleCreate): void {
+  private send(body: VehicleCreate | VehicleUpdate): void {
     this.lastBody = body;
     this.saving.set(true);
-    this.vehiclesApi.create(body).subscribe({
+    const request =
+      this.vehicleId !== null && 'version' in body
+        ? this.vehiclesApi.update(this.vehicleId, body)
+        : this.vehiclesApi.create(body as VehicleCreate);
+    request.subscribe({
       next: (detail) => {
         this.saving.set(false);
         removeDraft();
@@ -324,6 +439,10 @@ export class VehicleFormPage {
 
   private handleError(error: unknown): void {
     if (isProblem(error)) {
+      if (error.code === 'VERSION_CONFLICT' && this.editing) {
+        this.onVersionConflict(error);
+        return;
+      }
       if (error.code === 'PLATE_ALREADY_EXISTS' || error.code === 'VIN_ALREADY_EXISTS') {
         this.duplicate.set({ message: problemMessage(error), existingId: error.existingId ?? null });
         return;
@@ -336,6 +455,10 @@ export class VehicleFormPage {
         return;
       }
       const fieldErrors: Partial<Record<VehicleFormField, FieldError>> = {};
+      const reasonError = error.errors?.find((fieldError) => fieldError.field === 'reason');
+      if (reasonError !== undefined) {
+        this.reasonServerError.set(fieldErrorMessage(reasonError));
+      }
       for (const fieldError of error.errors ?? []) {
         const field = SERVER_FIELDS.find((name) => name === fieldError.field);
         if (field !== undefined && fieldErrors[field] === undefined) {
@@ -344,7 +467,7 @@ export class VehicleFormPage {
       }
       this.serverErrors.set(fieldErrors);
       this.generalError.set(problemMessage(error, { resource: 'vehicle' }));
-      if (Object.keys(fieldErrors).length > 0) {
+      if (Object.keys(fieldErrors).length > 0 || reasonError !== undefined) {
         this.focusFirstInvalid();
       }
       return;
@@ -356,13 +479,102 @@ export class VehicleFormPage {
     this.generalError.set(UNEXPECTED_ERROR);
   }
 
+  /** US4-AC12: shows the current data (from the 409, or a new GET) and the next save uses its version. */
+  private onVersionConflict(problem: Problem): void {
+    this.versionConflict.set(true);
+    if (isVehicleDetail(problem.current)) {
+      this.fill(problem.current);
+      return;
+    }
+    this.load(false);
+  }
+
+  /** Loads the vehicle to edit; showLoading false keeps the form on screen (reload after a conflict). */
+  private load(showLoading = true): void {
+    if (this.vehicleId === null) {
+      return;
+    }
+    if (showLoading) {
+      this.loadState.set({ kind: 'loading' });
+    }
+    this.loadRequest?.unsubscribe();
+    this.loadRequest = this.vehiclesApi.getById(this.vehicleId).subscribe({
+      next: (vehicle) => {
+        this.fill(vehicle);
+        this.loadState.set({ kind: 'ready' });
+      },
+      error: (error: unknown) => {
+        const notFound = isProblem(error) && error.status === NOT_FOUND_STATUS;
+        this.loadState.set({
+          kind: 'error',
+          message: notFound ? problemMessage(error, { resource: 'vehicle' }) : LOAD_FAILED,
+          canRetry: !notFound,
+        });
+      },
+    });
+  }
+
+  /** Puts the stored vehicle in the form; the owner is shown read-only and the reason starts empty again. */
+  private fill(vehicle: VehicleDetail): void {
+    // stored is set after patching, so that the body type change of the patch does not mark the plate as touched.
+    this.stored.set(null);
+    this.owner.set(vehicle.owner);
+    this.submitted.set(false);
+    this.form.patchValue({
+      bodyType: vehicle.bodyType,
+      plate: vehicle.plate,
+      vin: vehicle.vin ?? '',
+      brand: vehicle.brand,
+      model: vehicle.model,
+      year: String(vehicle.year),
+      color: vehicle.color,
+      initialMileage: String(vehicle.initialMileage),
+    });
+    this.form.markAsUntouched();
+    this.stored.set(vehicle);
+    this.reason.setValue('');
+    this.serverErrors.set({});
+    this.reasonServerError.set(null);
+  }
+
+  private isReasonValid(): boolean {
+    return isReasonAcceptable(this.reason.value, this.reasonRequired);
+  }
+
+  /** VehicleUpdate: the loaded version and the editable fields; never ownerClientId nor tenantId. */
+  private buildUpdate(): VehicleUpdate {
+    const stored = this.stored();
+    if (stored === null) {
+      throw new Error('The vehicle to edit is not loaded');
+    }
+    const { plate, vin, brand, model, year, color, bodyType, initialMileage } = this.buildBody();
+    const body: VehicleUpdate = {
+      version: stored.version,
+      plate,
+      vin,
+      brand,
+      model,
+      year,
+      color,
+      bodyType,
+      initialMileage,
+    };
+    if (this.identifiersChanged()) {
+      const reason = normalizeReason(this.reason.value);
+      if (reason !== null) {
+        body.reason = reason;
+      }
+    }
+    return body;
+  }
+
   private buildBody(): VehicleCreate {
     const value = this.form.getRawValue();
     const vin = value.vin.trim();
     return {
       ownerClientId: this.owner()?.id ?? '',
-      plate: normalizePlateForWrite(value.plate) ?? value.plate,
-      vin: vin === '' ? null : (normalizeVin(vin) ?? vin),
+      plate: writePlate(value.plate),
+      vin: writeVin(vin),
       brand: value.brand.trim(),
       model: value.model.trim(),
       year: Number(value.year.trim()),
@@ -403,6 +615,8 @@ export class VehicleFormPage {
     this.duplicate.set(null);
     this.networkError.set(false);
     this.generalError.set(null);
+    this.versionConflict.set(false);
+    this.reasonServerError.set(null);
   }
 
   private clearServerError(field: VehicleFormField): void {

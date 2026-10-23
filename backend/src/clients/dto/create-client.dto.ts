@@ -1,4 +1,4 @@
-import { Transform, type TransformFnParams } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import {
   IsDefined,
   IsEmail,
@@ -13,21 +13,16 @@ import { normalizeDocument } from '../../common/identifiers/normalize.js';
 import { normalizePhone } from '../../common/identifiers/phone.js';
 import { IsDocumentTypeAllowedFor, IsEcDocument } from '../../common/validation/is-ec-document.js';
 import { IsEcPhone } from '../../common/validation/is-ec-phone.js';
+import { onString, trim } from '../../common/validation/transforms.js';
 import type { ClientType, DocumentType } from '../client.entity.js';
 
 export const CLIENT_TYPES: readonly ClientType[] = ['natural', 'company'];
 export const DOCUMENT_TYPES: readonly DocumentType[] = ['cedula', 'ruc', 'passport'];
 
-const REQUIRED = 'Campo obligatorio';
-const MUST_BE_TEXT = 'Debe ser texto';
+export const REQUIRED = 'Campo obligatorio';
+export const MUST_BE_TEXT = 'Debe ser texto';
 
-/** Applies `fn` to strings only; other values reach the validators untouched. */
-function onString(fn: (value: string) => string): (params: TransformFnParams) => unknown {
-  return ({ value }: TransformFnParams): unknown => (typeof value === 'string' ? fn(value) : value);
-}
-
-const trim = (value: string): string => value.trim();
-const normalizeEmail = (value: string): string => value.trim().toLowerCase();
+export const normalizeEmail = (value: string): string => value.trim().toLowerCase();
 
 /** A name is validated when it applies to the client type, or when it is sent anyway. */
 function namesApply(clientType: ClientType, property: keyof CreateClientDto) {

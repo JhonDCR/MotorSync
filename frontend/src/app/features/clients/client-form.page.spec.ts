@@ -28,14 +28,47 @@
 //   ?returnTo= se acepta solo si es una ruta interna (empieza por "/" y no por "//"). Tras crear, navega a
 //   {returnTo}?clientId={id} en lugar de a /clients/{id}. Con returnTo válido se muestra cancel-return, un <a>
 //   con href {returnTo} para volver sin crear. Un returnTo no válido se ignora.
+//
+// T078 (PR3, US4): modo edición, contrato para el implementer (T079).
+//   Ruta `clients/:id/edit` en app.routes.ts (loadComponent de ClientFormPage, title "Editar cliente"), declarada
+//   ANTES de `clients/:id`. El id sale del parámetro de ruta `id` (ActivatedRoute). En `clients/new` nada cambia.
+//   Al abrir: ClientsApiService.getById(id) y precarga document-type-*, document-number, first-names, last-names
+//   (o business-name), phone y email (null → ''). El <h1> dice "Editar cliente". El tipo de cliente no se puede
+//   cambiar (contrato: clientType no está en ClientUpdate): client-type-natural / client-type-company no se
+//   renderizan o están disabled.
+//   Guardar llama a ClientsApiService.update(id, body: ClientUpdate) (nunca a create) y navega a /clients/{id}.
+//   body: version = la versión cargada; los campos editados normalizados como en el alta (phone sin espacios ni
+//   guiones, documentNumber normalizado, email '' → null). Puede llevar los campos sin cambios, pero nunca clientType
+//   ni tenantId. Si documentNumber va en el body y no cambió, debe ser el valor guardado.
+//   Motivo (FR-019): el campo `reason` (<textarea>, label con "Motivo") aparece SOLO si el documento (comparado ya
+//   normalizado: 171003406-5 = 1710034065) o el tipo de documento difieren de lo guardado; si se vuelve al valor
+//   guardado, desaparece. El rol sale de current-session (token de localStorage 'motorsync.token'):
+//     asesor (o sin sesión): obligatorio; admin: opcional. Se recorta (trim); vacío o solo espacios = omitido (no se
+//     envía `reason`). Si se informa, de 10 a 500 caracteres para ambos roles. Si no cumple: error-reason con
+//     "El motivo es obligatorio (entre 10 y 500 caracteres)", reason con aria-invalid="true" y no se llama a update.
+//     Un 400 del servidor con errors[{ field: 'reason', code: 'REASON_REQUIRED' }] también se muestra en error-reason.
+//   409 VERSION_CONFLICT (US4-AC12): version-conflict (role="alert") con el texto "El registro cambió"; el formulario
+//     se rellena con problem.current (o, si no viene current, con un nuevo getById(id)) y el siguiente guardado usa
+//     esa versión. No navega.
+//   409 DOCUMENT_ALREADY_EXISTS y errores de validación: igual que en el alta (duplicate-message, error-<campo>).
+//   404 al cargar (inexistente o de otro taller): load-error con "Cliente no encontrado" y sin botón save.
+//   US4-AC17: ningún botón ni enlace para eliminar, borrar ni desactivar.
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { of, throwError } from 'rxjs';
-import type { ClientCreate, ClientDetail, ClientSearchResponse, ClientSummary, Problem } from '../../core/api/api.models';
+import { of, throwError, type Observable } from 'rxjs';
+import type {
+  ClientCreate,
+  ClientDetail,
+  ClientSearchResponse,
+  ClientSummary,
+  ClientUpdate,
+  Problem,
+} from '../../core/api/api.models';
 import { ClientsApiService } from '../../core/api/clients-api.service';
+import { signInAs, signOut } from '../../../testing/fake-jwt';
 import { ClientFormPage } from './client-form.page';
 
 @Component({ template: '' })
@@ -648,5 +681,490 @@ describe('ClientFormPage con ?returnTo= (T049, US3-AC9)', () => {
     expect(root().querySelector('[data-testid="cancel-return"]')).toBeNull();
     await createValidNatural();
     expect(currentUrl()).toBe(`/clients/${CLIENT_ID}`);
+  });
+});
+
+describe('ClientFormPage en modo edición, clients/:id/edit (T078, US4)', () => {
+  type UpdateClient = (clientId: string, body: ClientUpdate) => Observable<ClientDetail>;
+
+  const REASON_MESSAGE = 'El motivo es obligatorio (entre 10 y 500 caracteres)';
+  const VALID_REASON = 'Corrección por error de digitación';
+  const NEW_CEDULA = '0912345675';
+
+  const STORED: ClientDetail = {
+    ...DETAIL,
+    email: 'ana.perez@example.com',
+    version: 3,
+  };
+
+  const COMPANY: ClientDetail = {
+    ...DETAIL,
+    clientType: 'company',
+    documentType: 'ruc',
+    documentNumber: '1790011674001',
+    displayName: 'Talleres Andinos S.A.',
+    firstNames: null,
+    lastNames: null,
+    businessName: 'Talleres Andinos S.A.',
+    phone: '022551234',
+    version: 5,
+  };
+
+  let harness: RouterTestingHarness;
+  let api: {
+    create: ReturnType<typeof vi.fn<ClientsApiService['create']>>;
+    getById: ReturnType<typeof vi.fn<ClientsApiService['getById']>>;
+    search: ReturnType<typeof vi.fn<ClientsApiService['search']>>;
+    update: ReturnType<typeof vi.fn<UpdateClient>>;
+  };
+
+  beforeEach(async () => {
+    localStorage.clear();
+    signInAs('asesor');
+    api = {
+      create: vi.fn<ClientsApiService['create']>(() => of(DETAIL)),
+      getById: vi.fn<ClientsApiService['getById']>(() => of(STORED)),
+      search: vi.fn<ClientsApiService['search']>(() => of(EMPTY_SEARCH)),
+      update: vi.fn<UpdateClient>((_id, body) => of({ ...STORED, version: body.version + 1 })),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([
+          { path: 'clients/:id/edit', component: ClientFormPage },
+          { path: 'clients/:id', component: ClientDetailStubPage },
+        ]),
+        { provide: ClientsApiService, useValue: api },
+      ],
+    });
+    harness = await RouterTestingHarness.create();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  // --- utilidades (comportamiento observable en el DOM) ---
+
+  async function settle(): Promise<void> {
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+  }
+
+  async function openEdit(clientId = CLIENT_ID): Promise<void> {
+    await harness.navigateByUrl(`/clients/${clientId}/edit`);
+    await settle();
+  }
+
+  function root(): HTMLElement {
+    return harness.routeNativeElement ?? (harness.fixture.nativeElement as HTMLElement);
+  }
+
+  function query<T extends HTMLElement = HTMLElement>(testId: string): T | null {
+    return root().querySelector<T>(`[data-testid="${testId}"]`);
+  }
+
+  function get<T extends HTMLElement = HTMLElement>(testId: string): T {
+    const element = query<T>(testId);
+    if (element === null) {
+      throw new Error(`No existe [data-testid="${testId}"]`);
+    }
+    return element;
+  }
+
+  function text(testId: string): string {
+    return get(testId).textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  }
+
+  function value(testId: string): string {
+    return get<HTMLInputElement>(testId).value;
+  }
+
+  async function type(testId: string, input: string): Promise<void> {
+    const element = get<HTMLInputElement | HTMLTextAreaElement>(testId);
+    element.value = input;
+    element.dispatchEvent(new Event('input'));
+    await settle();
+  }
+
+  async function click(testId: string): Promise<void> {
+    get(testId).click();
+    await settle();
+  }
+
+  function sentUpdate(call = 0): [string, ClientUpdate] {
+    return api.update.mock.calls[call];
+  }
+
+  function currentUrl(): string {
+    return TestBed.inject(Router).url;
+  }
+
+  function reasonLabel(): string {
+    const label = root().querySelector('label[for="reason"]') ?? get('reason').closest('label');
+    return label?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  }
+
+  // --- US4-AC4: carga y edición de datos de contacto ---
+
+  it('[US4-AC4] carga el cliente del parámetro de ruta y precarga el formulario', async () => {
+    await openEdit();
+
+    expect(api.getById).toHaveBeenCalledWith(CLIENT_ID);
+    expect(root().querySelector('h1')?.textContent).toMatch(/editar cliente/i);
+    expect(get<HTMLInputElement>('document-type-cedula').checked).toBe(true);
+    expect(value('document-number')).toBe('1710034065');
+    expect(value('first-names')).toBe('Ana María');
+    expect(value('last-names')).toBe('Pérez');
+    expect(value('phone')).toBe('0991234567');
+    expect(value('email')).toBe('ana.perez@example.com');
+  });
+
+  it('[US4-AC4] un correo null se precarga vacío, sin el texto "null"', async () => {
+    api.getById.mockReturnValue(of({ ...STORED, email: null }));
+    await openEdit();
+
+    expect(value('document-number')).toBe('1710034065');
+    expect(value('email')).toBe('');
+  });
+
+  it('[US4-AC4] el tipo de cliente no se puede cambiar en la edición', async () => {
+    await openEdit();
+
+    for (const testId of ['client-type-natural', 'client-type-company']) {
+      const radio = query<HTMLInputElement>(testId);
+      expect(radio === null || radio.disabled, testId).toBe(true);
+    }
+  });
+
+  it('[US4-AC4] edita teléfono, correo y nombres: llama a update con version y navega a la ficha', async () => {
+    await openEdit();
+    await type('phone', '098 765 4321');
+    await type('email', 'ana.nueva@example.com');
+    await type('first-names', '  Ana Lucía ');
+    await click('save');
+
+    expect(api.create).not.toHaveBeenCalled();
+    expect(api.update).toHaveBeenCalledTimes(1);
+    const [id, body] = sentUpdate();
+    expect(id).toBe(CLIENT_ID);
+    expect(body).toEqual(
+      expect.objectContaining({
+        version: 3,
+        phone: '0987654321',
+        email: 'ana.nueva@example.com',
+        firstNames: 'Ana Lucía',
+      }),
+    );
+    expect(Object.keys(body)).not.toContain('clientType');
+    expect(Object.keys(body)).not.toContain('tenantId');
+    expect(Object.keys(body)).not.toContain('reason');
+    if (body.documentNumber !== undefined) {
+      expect(body.documentNumber).toBe('1710034065');
+    }
+    expect(currentUrl()).toBe(`/clients/${CLIENT_ID}`);
+  });
+
+  it('[US4-AC4] vaciar el correo envía email null', async () => {
+    await openEdit();
+    await type('email', '   ');
+    await click('save');
+
+    expect(api.update).toHaveBeenCalledTimes(1);
+    expect(sentUpdate()[1].email).toBeNull();
+  });
+
+  it('[US4-AC4] edita la razón social de una empresa', async () => {
+    api.getById.mockReturnValue(of(COMPANY));
+    await openEdit();
+
+    expect(value('business-name')).toBe('Talleres Andinos S.A.');
+    expect(query('first-names')).toBeNull();
+    await type('business-name', 'Talleres Andinos Cía. Ltda.');
+    await click('save');
+
+    expect(api.update).toHaveBeenCalledTimes(1);
+    expect(sentUpdate()[1]).toEqual(
+      expect.objectContaining({ version: 5, businessName: 'Talleres Andinos Cía. Ltda.' }),
+    );
+    expect(Object.keys(sentUpdate()[1])).not.toContain('firstNames');
+  });
+
+  // --- US4-AC11: solo los identificadores piden motivo ---
+
+  it('[US4-AC11] editar teléfono o correo no muestra el campo "Motivo"', async () => {
+    await openEdit();
+    expect(value('document-number')).toBe('1710034065');
+    await type('phone', '0987654321');
+    await type('email', 'otra@example.com');
+
+    expect(query('reason')).toBeNull();
+  });
+
+  it('[US4-AC11] el mismo documento escrito con guion (171003406-5) no cuenta como cambio', async () => {
+    await openEdit();
+    await type('document-number', '171003406-5');
+
+    expect(query('reason')).toBeNull();
+    await click('save');
+
+    expect(api.update).toHaveBeenCalledTimes(1);
+    expect(Object.keys(sentUpdate()[1])).not.toContain('reason');
+    expect(query('error-reason')).toBeNull();
+  });
+
+  it('[US4-AC11] cambiar el documento muestra el campo "Motivo" y volver al valor guardado lo oculta', async () => {
+    await openEdit();
+    await type('document-number', NEW_CEDULA);
+
+    expect(query('reason')).not.toBeNull();
+    expect(reasonLabel()).toMatch(/motivo/i);
+
+    await type('document-number', '1710034065');
+    expect(query('reason')).toBeNull();
+  });
+
+  it('[US4-AC11] cambiar el tipo de documento también pide motivo', async () => {
+    await openEdit();
+    await click('document-type-passport');
+    await type('document-number', 'AB123456');
+
+    expect(query('reason')).not.toBeNull();
+  });
+
+  // --- US4-AC15: asesor, motivo obligatorio ---
+
+  it('[US4-AC15] asesor: cambiar el documento sin motivo no guarda e indica el mensaje junto al campo', async () => {
+    await openEdit();
+    await type('document-number', NEW_CEDULA);
+    await click('save');
+
+    expect(api.update).not.toHaveBeenCalled();
+    expect(text('error-reason')).toBe(REASON_MESSAGE);
+    expect(get('reason').getAttribute('aria-invalid')).toBe('true');
+    expect(currentUrl()).toBe(`/clients/${CLIENT_ID}/edit`);
+  });
+
+  it('[US4-AC15] asesor: el campo "Motivo" se presenta como obligatorio', async () => {
+    await openEdit();
+    await type('document-number', NEW_CEDULA);
+
+    expect(reasonLabel()).toMatch(/obligatorio/i);
+  });
+
+  it.each([
+    ['solo espacios', '            '],
+    ['9 caracteres sin contar los espacios de los extremos', '   123456789   '],
+    ['501 caracteres', 'x'.repeat(501)],
+  ])('[US4-AC15] asesor: un motivo de %s no guarda', async (_label, reason) => {
+    await openEdit();
+    await type('document-number', NEW_CEDULA);
+    await type('reason', reason);
+    await click('save');
+
+    expect(api.update).not.toHaveBeenCalled();
+    expect(text('error-reason')).toBe(REASON_MESSAGE);
+  });
+
+  it.each([
+    ['10 caracteres', '1234567890', '1234567890'],
+    ['500 caracteres', 'x'.repeat(500), 'x'.repeat(500)],
+    ['espacios en los extremos', `   ${VALID_REASON}   `, VALID_REASON],
+  ])('[US4-AC15][US4-AC11] asesor: con un motivo de %s envía documento normalizado y motivo recortado', async (_label, reason, sent) => {
+    await openEdit();
+    await type('document-number', '091234567-5');
+    await type('reason', reason);
+    await click('save');
+
+    expect(api.update).toHaveBeenCalledTimes(1);
+    expect(sentUpdate()[1]).toEqual(
+      expect.objectContaining({ version: 3, documentType: 'cedula', documentNumber: NEW_CEDULA, reason: sent }),
+    );
+    expect(currentUrl()).toBe(`/clients/${CLIENT_ID}`);
+  });
+
+  it('[US4-AC15] sin sesión se aplica la regla del asesor (motivo obligatorio)', async () => {
+    signOut();
+    await openEdit();
+    await type('document-number', NEW_CEDULA);
+    await click('save');
+
+    expect(api.update).not.toHaveBeenCalled();
+    expect(text('error-reason')).toBe(REASON_MESSAGE);
+  });
+
+  it('[US4-AC15] un 400 REASON_REQUIRED del servidor se muestra en error-reason', async () => {
+    api.update.mockReturnValueOnce(
+      throwError(() =>
+        problem(400, 'VALIDATION_ERROR', { errors: [{ field: 'reason', code: 'REASON_REQUIRED', message: 'x' }] }),
+      ),
+    );
+    await openEdit();
+    await type('document-number', NEW_CEDULA);
+    await type('reason', VALID_REASON);
+    await click('save');
+
+    expect(text('error-reason')).toBe(REASON_MESSAGE);
+    expect(currentUrl()).toBe(`/clients/${CLIENT_ID}/edit`);
+  });
+
+  // --- US4-AC16: administrador, motivo opcional ---
+
+  it('[US4-AC16] admin: cambia el documento sin motivo y se envía sin reason', async () => {
+    signInAs('admin');
+    await openEdit();
+    await type('document-number', NEW_CEDULA);
+
+    expect(query('reason')).not.toBeNull();
+    expect(reasonLabel()).toMatch(/opcional/i);
+    await click('save');
+
+    expect(api.update).toHaveBeenCalledTimes(1);
+    const body = sentUpdate()[1];
+    expect(body.documentNumber).toBe(NEW_CEDULA);
+    expect(body.reason).toBeUndefined();
+    expect(currentUrl()).toBe(`/clients/${CLIENT_ID}`);
+  });
+
+  it('[US4-AC16] admin: un motivo de solo espacios cuenta como omitido', async () => {
+    signInAs('admin');
+    await openEdit();
+    await type('document-number', NEW_CEDULA);
+    await type('reason', '     ');
+    await click('save');
+
+    expect(api.update).toHaveBeenCalledTimes(1);
+    expect(sentUpdate()[1].reason).toBeUndefined();
+  });
+
+  it('[US4-AC16] admin: si informa un motivo válido, se envía', async () => {
+    signInAs('admin');
+    await openEdit();
+    await type('document-number', NEW_CEDULA);
+    await type('reason', VALID_REASON);
+    await click('save');
+
+    expect(sentUpdate()[1].reason).toBe(VALID_REASON);
+  });
+
+  it.each([
+    ['5 caracteres', 'corto'],
+    ['501 caracteres', 'x'.repeat(501)],
+  ])('[US4-AC16] admin: un motivo de %s se rechaza con el mismo mensaje que para el asesor', async (_label, reason) => {
+    signInAs('admin');
+    await openEdit();
+    await type('document-number', NEW_CEDULA);
+    await type('reason', reason);
+    await click('save');
+
+    expect(api.update).not.toHaveBeenCalled();
+    expect(text('error-reason')).toBe(REASON_MESSAGE);
+  });
+
+  // --- US4-AC5: mismas reglas que en el registro ---
+
+  it('[US4-AC5] un documento inválido muestra "Cédula inválida" y no llama a update', async () => {
+    await openEdit();
+    await type('document-number', '1710034064');
+    await type('reason', VALID_REASON);
+    await click('save');
+
+    expect(api.update).not.toHaveBeenCalled();
+    expect(text('error-documentNumber')).toBe('Cédula inválida');
+  });
+
+  it('[US4-AC5] un teléfono inválido marca el campo y no llama a update', async () => {
+    await openEdit();
+    expect(value('first-names')).toBe('Ana María');
+    await type('phone', '123');
+    await click('save');
+
+    expect(api.update).not.toHaveBeenCalled();
+    expect(text('error-phone')).toMatch(/teléfono/i);
+  });
+
+  it('[US4-AC5] un 409 DOCUMENT_ALREADY_EXISTS ofrece abrir el cliente existente', async () => {
+    api.update.mockReturnValueOnce(throwError(() => problem(409, 'DOCUMENT_ALREADY_EXISTS', { existingId: EXISTING_ID })));
+    await openEdit();
+    await type('document-number', NEW_CEDULA);
+    await type('reason', VALID_REASON);
+    await click('save');
+
+    expect(text('duplicate-message')).toMatch(/documento ya está registrado/i);
+    expect(get<HTMLAnchorElement>('open-existing-client').getAttribute('href')).toBe(`/clients/${EXISTING_ID}`);
+    expect(currentUrl()).toBe(`/clients/${CLIENT_ID}/edit`);
+  });
+
+  // --- US4-AC12: concurrencia ---
+
+  it('[US4-AC12] un 409 VERSION_CONFLICT avisa "El registro cambió" y muestra los datos actuales', async () => {
+    const current: ClientDetail = { ...STORED, firstNames: 'Ana Lucía', phone: '0911111111', version: 4 };
+    api.update.mockReturnValueOnce(throwError(() => problem(409, 'VERSION_CONFLICT', { current })));
+    await openEdit();
+    await type('phone', '0987654321');
+    await click('save');
+
+    expect(text('version-conflict')).toMatch(/el registro cambió/i);
+    expect(get('version-conflict').getAttribute('role')).toBe('alert');
+    expect(value('first-names')).toBe('Ana Lucía');
+    expect(value('phone')).toBe('0911111111');
+    expect(currentUrl()).toBe(`/clients/${CLIENT_ID}/edit`);
+  });
+
+  it('[US4-AC12] tras el conflicto se puede repetir la edición: el nuevo guardado usa la versión actual', async () => {
+    const current: ClientDetail = { ...STORED, phone: '0911111111', version: 4 };
+    api.update.mockReturnValueOnce(throwError(() => problem(409, 'VERSION_CONFLICT', { current })));
+    await openEdit();
+    await type('phone', '0987654321');
+    await click('save');
+    await type('phone', '0987654321');
+    await click('save');
+
+    expect(api.update).toHaveBeenCalledTimes(2);
+    expect(sentUpdate(0)[1].version).toBe(3);
+    expect(sentUpdate(1)[1]).toEqual(expect.objectContaining({ version: 4, phone: '0987654321' }));
+    expect(currentUrl()).toBe(`/clients/${CLIENT_ID}`);
+  });
+
+  it('[US4-AC12] si el conflicto no trae current, vuelve a cargar el cliente', async () => {
+    const reloaded: ClientDetail = { ...STORED, phone: '0922222222', version: 7 };
+    api.update.mockReturnValueOnce(throwError(() => problem(409, 'VERSION_CONFLICT')));
+    await openEdit();
+    api.getById.mockReturnValue(of(reloaded));
+    await type('phone', '0987654321');
+    await click('save');
+
+    expect(api.getById).toHaveBeenCalledTimes(2);
+    expect(text('version-conflict')).toMatch(/el registro cambió/i);
+    expect(value('phone')).toBe('0922222222');
+
+    await type('phone', '0987654321');
+    await click('save');
+    expect(sentUpdate(1)[1].version).toBe(7);
+  });
+
+  // --- US4-AC13: cliente de otro taller o inexistente ---
+
+  it('[US4-AC13] un 404 al cargar indica "Cliente no encontrado" y no ofrece guardar', async () => {
+    api.getById.mockReturnValue(throwError(() => problem(404, 'NOT_FOUND')));
+    await openEdit();
+
+    expect(text('load-error')).toContain('Cliente no encontrado');
+    expect(query('save')).toBeNull();
+    expect(api.update).not.toHaveBeenCalled();
+  });
+
+  // --- US4-AC17: sin eliminación ---
+
+  it.each(['asesor', 'admin'] as const)('[US4-AC17] %s: la edición no ofrece eliminar ni desactivar el cliente', async (role) => {
+    signInAs(role);
+    await openEdit();
+    expect(value('document-number')).toBe('1710034065');
+
+    const labels = Array.from(root().querySelectorAll('button, a, [role="button"]')).map(
+      (element) => `${element.textContent ?? ''} ${element.getAttribute('aria-label') ?? ''}`,
+    );
+    expect(labels.join(' ')).not.toMatch(/eliminar|borrar|desactivar|dar de baja/i);
+    expect(root().querySelector('[data-testid*="delete"], [data-testid*="deactivate"]')).toBeNull();
   });
 });

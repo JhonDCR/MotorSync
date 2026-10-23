@@ -1,11 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { isUUID } from 'class-validator';
-import { ProblemException } from '../common/problem-details.filter.js';
-import { translatePgError } from '../database/pg-errors.js';
-import { getManager, getTenantContext } from '../database/tenant-context.js';
+import { AuditService } from '../audit/audit.service.js';
 import { normalizeDocument } from '../common/identifiers/normalize.js';
+import { ProblemException } from '../common/problem-details.filter.js';
+import { changedIdentifiers, checkReason } from '../common/reason-policy.js';
+import {
+  documentNumberError,
+  DOCUMENT_TYPE_NOT_ALLOWED_MESSAGE,
+  isDocumentTypeAllowed,
+} from '../common/validation/is-ec-document.js';
+import { translatePgError, type FieldError } from '../database/pg-errors.js';
+import { getManager, getTenantContext } from '../database/tenant-context.js';
 import { Client, type ClientType, type DocumentType } from './client.entity.js';
 import type { CreateClientDto } from './dto/create-client.dto.js';
+import type { UpdateClientDto } from './dto/update-client.dto.js';
 
 /** Contract `VehicleSummary`. */
 export interface VehicleSummary {
@@ -69,6 +77,24 @@ interface ClientSummaryRow {
 }
 
 const CREATE_SAVEPOINT = 'client_create';
+const UPDATE_SAVEPOINT = 'client_update';
+
+/** Raw result of UPDATE_SQL: TypeORM returns [rows, rowCount] for an UPDATE on PostgreSQL. */
+type UpdateResultRaw = [{ id: string }[], number];
+
+/**
+ * Optimistic update (research R5): only the row of the tenant with the version the user edited.
+ * No row back means a missing (or foreign, under RLS) client or a stale version.
+ */
+const UPDATE_SQL = `
+UPDATE clients
+   SET document_type = $3, document_number = $4, first_names = $5, last_names = $6,
+       business_name = $7, phone = $8, email = $9,
+       version = version + 1, updated_at = now(), updated_by = $10, updated_by_name = $11
+ WHERE tenant_id = app_current_tenant()
+   AND id = $1
+   AND version = $2
+RETURNING id`;
 
 /**
  * Vehicles whose current owner is the client (US4-AC3), ordered by plate. Raw row typed as
@@ -137,6 +163,50 @@ function notFound(): ProblemException {
   return new ProblemException(404, 'NOT_FOUND');
 }
 
+function validationError(errors: FieldError[]): ProblemException {
+  return new ProblemException(400, 'VALIDATION_ERROR', { errors });
+}
+
+function versionConflict(current: ClientDetail): ProblemException {
+  return new ProblemException(409, 'VERSION_CONFLICT', { current });
+}
+
+/** Stored values after applying the sent fields (names only where they apply to the type). */
+function mergeUpdate(client: Client, dto: UpdateClientDto) {
+  const isNatural = client.clientType === 'natural';
+  return {
+    documentType: dto.documentType ?? client.documentType,
+    documentNumber: dto.documentNumber ?? client.documentNumber,
+    firstNames: isNatural ? (dto.firstNames ?? client.firstNames) : client.firstNames,
+    lastNames: isNatural ? (dto.lastNames ?? client.lastNames) : client.lastNames,
+    businessName: isNatural ? client.businessName : (dto.businessName ?? client.businessName),
+    phone: dto.phone ?? client.phone,
+    email: dto.email === undefined ? client.email : dto.email,
+  };
+}
+
+/**
+ * The resulting document must be valid for its type and the type allowed for the client type,
+ * which never changes (US2-AC2..AC5). The DTO only sees the pair when both fields are sent.
+ */
+function documentErrors(
+  clientType: ClientType,
+  documentType: DocumentType,
+  documentNumber: string,
+): FieldError[] {
+  const errors: FieldError[] = [];
+  if (!isDocumentTypeAllowed(clientType, documentType)) {
+    errors.push({
+      field: 'documentType',
+      code: 'INVALID_DOCUMENT_TYPE',
+      message: DOCUMENT_TYPE_NOT_ALLOWED_MESSAGE,
+    });
+  }
+  const numberError = documentNumberError(documentType, documentNumber);
+  if (numberError) errors.push({ field: 'documentNumber', ...numberError });
+  return errors;
+}
+
 function toDetail(client: Client, vehicles: VehicleSummary[]): ClientDetail {
   return {
     id: client.id,
@@ -164,6 +234,8 @@ function toDetail(client: Client, vehicles: VehicleSummary[]): ClientDetail {
  */
 @Injectable()
 export class ClientsService {
+  constructor(@Inject(AuditService) private readonly audit: AuditService) {}
+
   async create(dto: CreateClientDto): Promise<ClientDetail> {
     const { manager, user } = getTenantContext();
     const isNatural = dto.clientType === 'natural';
@@ -191,7 +263,7 @@ export class ClientsService {
       await manager.query<unknown>(`RELEASE SAVEPOINT ${CREATE_SAVEPOINT}`);
     } catch (error: unknown) {
       await manager.query<unknown>(`ROLLBACK TO SAVEPOINT ${CREATE_SAVEPOINT}`);
-      throw await this.translateCreateError(error, dto.documentNumber);
+      throw await this.translateWriteError(error, dto.documentNumber);
     }
     return this.getById(id);
   }
@@ -250,7 +322,70 @@ export class ClientsService {
     );
   }
 
-  private async translateCreateError(error: unknown, documentNumber: string): Promise<unknown> {
+  /**
+   * PATCH /clients/{id} (US4-AC4, AC5, AC11, AC12, AC15, AC16). Order: existence (404), resulting
+   * document (400), version (409), reason (400), then the UPDATE and its audit record in the
+   * request transaction (principle IV).
+   */
+  async update(clientId: string, dto: UpdateClientDto): Promise<ClientDetail> {
+    if (!isUUID(clientId)) throw notFound();
+    const { manager, user, tenantId } = getTenantContext();
+    const client = await manager.getRepository(Client).findOneBy({ id: clientId, tenantId });
+    if (!client) throw notFound();
+
+    const next = mergeUpdate(client, dto);
+    const invalid = documentErrors(client.clientType, next.documentType, next.documentNumber);
+    if (invalid.length > 0) throw validationError(invalid);
+
+    if (client.version !== dto.version) throw versionConflict(await this.getById(clientId));
+
+    const changed = changedIdentifiers(
+      { documentType: client.documentType, documentNumber: client.documentNumber },
+      { documentType: dto.documentType, documentNumber: dto.documentNumber },
+    );
+    const reasonError = checkReason(user.role, changed, dto.reason);
+    if (reasonError) throw validationError([reasonError]);
+
+    // The unique index decides duplicates; the savepoint keeps the transaction usable to look
+    // up existingId under RLS after a unique violation.
+    await manager.query<unknown>(`SAVEPOINT ${UPDATE_SAVEPOINT}`);
+    let updated: number;
+    try {
+      [, updated] = await manager.query<UpdateResultRaw>(UPDATE_SQL, [
+        clientId,
+        dto.version,
+        next.documentType,
+        next.documentNumber,
+        next.firstNames,
+        next.lastNames,
+        next.businessName,
+        next.phone,
+        next.email,
+        user.userId,
+        user.name,
+      ]);
+      await manager.query<unknown>(`RELEASE SAVEPOINT ${UPDATE_SAVEPOINT}`);
+    } catch (error: unknown) {
+      await manager.query<unknown>(`ROLLBACK TO SAVEPOINT ${UPDATE_SAVEPOINT}`);
+      throw await this.translateWriteError(error, next.documentNumber);
+    }
+    // Lost a race after the check above: gone (404) or edited by someone else (409).
+    if (updated === 0) throw versionConflict(await this.getById(clientId));
+
+    if (changed.includes('document')) {
+      await this.audit.record({
+        action: 'client.document_changed',
+        entityType: 'client',
+        entityId: clientId,
+        before: { documentType: client.documentType, documentNumber: client.documentNumber },
+        after: { documentType: next.documentType, documentNumber: next.documentNumber },
+        reason: dto.reason,
+      });
+    }
+    return this.getById(clientId);
+  }
+
+  private async translateWriteError(error: unknown, documentNumber: string): Promise<unknown> {
     const translated = translatePgError(error);
     if (translated?.code !== 'DOCUMENT_ALREADY_EXISTS') return error;
     const existing = await getManager()

@@ -52,23 +52,30 @@ function siblingValue(args: ValidationArguments, property: string): unknown {
   return (args.object as Record<string, unknown>)[property];
 }
 
+/** Fixed document type, for fields that only accept one kind (the workshop RUC, feature 002). */
+export interface FixedDocumentKind {
+  kind: DocumentKind;
+}
+
 /**
  * Validates an already normalized document number (normalizeDocument) according to the
- * document type found in `typeProperty`. Emits INVALID_CEDULA, INVALID_RUC or INVALID_PASSPORT
- * through `context.code`. An unknown or missing type is left to the type's own validators.
+ * document type found in `typeProperty`, or to a fixed `{ kind }`. Emits INVALID_CEDULA,
+ * INVALID_RUC or INVALID_PASSPORT through `context.code`. An unknown or missing type is left to
+ * the type's own validators.
  */
-export function IsEcDocument(typeProperty: string): PropertyDecorator {
+export function IsEcDocument(type: string | FixedDocumentKind): PropertyDecorator {
   return (target: object, propertyName: string | symbol): void => {
     for (const [kind, rule] of Object.entries(DOCUMENT_RULES)) {
+      if (typeof type !== 'string' && type.kind !== kind) continue;
       registerDecorator({
         name: rule.name,
         target: target.constructor,
         propertyName: String(propertyName),
-        constraints: [typeProperty],
+        constraints: typeof type === 'string' ? [type] : [],
         options: { message: rule.message, context: { code: rule.code } },
         validator: {
           validate(value: unknown, args: ValidationArguments): boolean {
-            if (siblingValue(args, typeProperty) !== kind) return true;
+            if (typeof type === 'string' && siblingValue(args, type) !== kind) return true;
             return typeof value === 'string' && rule.isValid(value);
           },
         },

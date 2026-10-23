@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
+import { AuthModule } from './auth/auth.module.js';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
 import { SessionValidator } from './auth/session-validator.js';
 import { ClientsModule } from './clients/clients.module.js';
@@ -16,12 +17,15 @@ import { VehiclesModule } from './vehicles/vehicles.module.js';
   imports: [
     TypeOrmModule.forRootAsync({ useFactory: () => appDataSourceOptions() }),
     JwtModule.registerAsync({
+      // Global: the guard and AuthModule (AccessTokenService) share the same configuration.
+      global: true,
       useFactory: () => ({
         secret: requireEnv('JWT_SECRET'),
         signOptions: { algorithm: 'HS256' },
         verifyOptions: { algorithms: ['HS256'] },
       }),
     }),
+    AuthModule,
     ClientsModule,
     VehiclesModule,
   ],

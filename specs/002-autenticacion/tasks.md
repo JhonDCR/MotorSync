@@ -179,7 +179,7 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
 
 **Independent Test**: quickstart §2, filas "Registro", "RUC repetido" y "Correo repetido"; e2e `backend/test/auth-register.e2e-spec.ts`.
 
-- [ ] T019 [US1] E2e de registro en `backend/test/auth-register.e2e-spec.ts`:
+- [x] T019 [US1] E2e de registro en `backend/test/auth-register.e2e-spec.ts`:
   - **US1-AC1**: 201 con `accessToken`, cuyo JWT tiene `sid` y `pwd_change: false`, `user.role = admin`, `user.mustChangePassword = false` y `workshop.name`. Además `Set-Cookie: ms_refresh=…; Path=/api/v1/auth; HttpOnly; Secure; SameSite=Strict`, sin `Max-Age`. Con ese token, `GET /api/v1/clients/search?q=an` da 200.
   - **US1-AC2**: el correo ` Ana.Perez@Taller.EC ` se guarda como `ana.perez@taller.ec`.
   - **US1-AC3**: RUC inválido (12 dígitos, sin `001`, tercer dígito 7) → 400 `INVALID_RUC`, sin filas nuevas.
@@ -193,7 +193,7 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
   - Ninguna respuesta contiene la contraseña (FR-006).
 
   — tester
-- [ ] T020 [US1] Implementar:
+- [x] T020 [US1] Implementar:
   - `backend/src/auth/auth-transaction.ts` (`withAuthTransaction`, research R2, que publica `tenantStorage`);
   - `backend/src/auth/access-token.service.ts` (JWT HS256 de 15 minutos con `sub`, `tenant_id`, `role`, `name`, `sid` y `pwd_change`);
   - `backend/src/auth/sessions.service.ts` (crear la sesión y el refresh token: 32 bytes en base64url, guardado como SHA-256 hex);
@@ -211,7 +211,7 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
 
 **Independent Test**: quickstart §2, filas "Login", "Credenciales malas", "Bloqueo" y "Datos del taller"; e2e `backend/test/auth-login.e2e-spec.ts`.
 
-- [ ] T021 [US2] E2e de login en `backend/test/auth-login.e2e-spec.ts`:
+- [x] T021 [US2] E2e de login en `backend/test/auth-login.e2e-spec.ts`:
   - **US2-AC1**: 200; el token tiene el `tenant_id` y el `role` de la cuenta, y `sid` de una fila nueva en `user_sessions`.
   - **US2-AC2**: correo con espacios y mayúsculas → 200; la contraseña con otra capitalización o con espacios → 401.
   - **US2-AC3**: correo inexistente, contraseña incorrecta y cuenta `inactive` con su contraseña correcta → los tres dan 401 `INVALID_CREDENTIALS` con un body idéntico. Además, con 20 intentos de cada uno, la mediana del caso inexistente y la del caso contraseña incorrecta difieren menos del 25 % (SC-003; prueba marcada como estadística).
@@ -228,14 +228,14 @@ Al terminar, un taller se registra y su gente inicia sesión con correo y contra
   - **Validación por request (R6)**: si se desactiva la cuenta con el migrator, la siguiente petición con el mismo token da 401 `SESSION_REVOKED`; si se cambia el rol con el migrator, la siguiente petición ve el rol nuevo (base de US4-AC5 y US4-AC6).
 
   — tester
-- [ ] T022 [US2] Implementar:
+- [x] T022 [US2] Implementar:
   - `backend/src/auth/login-throttle.service.ts` (`auth_login_locked_until`, `auth_record_login_failure` y `auth_record_login_success`, con `emailHash`);
   - `backend/src/auth/dto/login.dto.ts`;
   - `AuthService.login`, en el orden de research R4: comprobar el bloqueo, buscar la cuenta, verificar siempre con scrypt (hash ficticio si no existe o está inactiva), registrar el fallo o el éxito, fijar el taller y crear la sesión;
   - `POST /auth/login` `@Public()`.
 
   — implementer-backend
-- [ ] T023 [P] [US2] Actualizar `backend/scripts/seed-dev.ts` (RUC válido para los talleres A y B, y un admin y un asesor por taller con contraseña de desarrollo impresa en consola; idempotente) y `backend/scripts/issue-dev-token.ts` (aviso si `AUTH_ALLOW_SESSIONLESS_TOKENS` no es `true`). Son scripts de desarrollo sin prueba propia: se verifican en T032 con quickstart §1 — implementer-backend
+- [x] T023 [P] [US2] Actualizar `backend/scripts/seed-dev.ts` (RUC válido para los talleres A y B, y un admin y un asesor por taller con contraseña de desarrollo impresa en consola; idempotente) y `backend/scripts/issue-dev-token.ts` (aviso si `AUTH_ALLOW_SESSIONLESS_TOKENS` no es `true`). Son scripts de desarrollo sin prueba propia: se verifican en T032 con quickstart §1 — implementer-backend
 - [x] T024 [P] [US1] [US2] Pruebas del frontend:
   - `frontend/src/app/core/api/auth-api.service.spec.ts`: `register` y `login` llaman a `POST /api/v1/auth/register` y `/login` con `withCredentials` y propagan el `Problem`.
   - `frontend/src/app/core/api/mock-api.interceptor.auth.spec.ts` (nuevo), para `register` y `login` del mock:

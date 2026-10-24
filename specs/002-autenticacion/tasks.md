@@ -539,7 +539,7 @@ Al terminar, el administrador gestiona las cuentas de su taller con auditoría, 
   - pruebas con ID para US4-AC1 a AC24.
 
   — reviewer
-- [ ] T063 Verificar el PR3: lo mismo que en T032, más quickstart §2 completo y §4 completo (pantallas de usuarios en 360 px y en una tablet). CI en verde — leader
+- [x] T063 Verificar el PR3: lo mismo que en T032, más quickstart §2 completo y §4 completo (pantallas de usuarios en 360 px y en una tablet). CI en verde — leader
 
 ---
 

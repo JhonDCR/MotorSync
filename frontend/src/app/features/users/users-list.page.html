@@ -1,0 +1,83 @@
+<div class="users-container">
+  <div class="header-row">
+    <div>
+      <h1>Usuarios del taller</h1>
+      <p class="subtitle">Gestione las cuentas de asesores y administradores de su taller.</p>
+    </div>
+    @if (isAdmin()) {
+      <a routerLink="/users/new" class="btn-create" data-testid="new-user-link">
+        + Nuevo usuario
+      </a>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state" role="status" data-testid="loading-indicator">
+      <p>Cargando usuarios...</p>
+    </div>
+  } @else if (error()) {
+    <div class="alert-error" role="alert" data-testid="error-message">
+      {{ error() }}
+    </div>
+  } @else if (users().length === 0) {
+    <div class="empty-state" data-testid="empty-users">
+      <p>No hay cuentas registradas en este taller.</p>
+    </div>
+  } @else {
+    <div class="table-wrapper">
+      <table class="users-table" role="table" aria-label="Usuarios del taller" data-testid="users-table">
+        <thead>
+          <tr>
+            <th scope="col">Nombre</th>
+            <th scope="col">Correo</th>
+            <th scope="col">Rol</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (user of users(); track user.id) {
+            <tr data-testid="user-row">
+              <td class="name-cell">
+                <a [routerLink]="['/users', user.id]" class="user-link" data-testid="user-name-link">
+                  {{ user.name }}
+                </a>
+              </td>
+              <td class="email-cell" data-testid="user-email">{{ user.email }}</td>
+              <td>
+                <span
+                  class="badge badge-role"
+                  [class.badge-admin]="user.role === 'admin'"
+                  [class.badge-asesor]="user.role === 'asesor'"
+                  data-testid="user-role-badge"
+                >
+                  {{ user.role === 'admin' ? 'Administrador' : 'Asesor' }}
+                </span>
+              </td>
+              <td>
+                <span
+                  class="badge badge-status"
+                  [class.badge-active]="user.status === 'active'"
+                  [class.badge-inactive]="user.status === 'inactive'"
+                  data-testid="user-status-badge"
+                >
+                  {{ user.status === 'active' ? 'Activo' : 'Inactivo' }}
+                </span>
+              </td>
+              <td>
+                <a
+                  [routerLink]="['/users', user.id]"
+                  class="btn-detail"
+                  data-testid="user-detail-link"
+                  aria-label="Ver ficha de {{ user.name }}"
+                >
+                  Ver ficha
+                </a>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

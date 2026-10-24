@@ -2,6 +2,7 @@ import { DataSource, type DataSourceOptions } from 'typeorm';
 import { AuditLog } from '../audit/audit-log.entity.js';
 import { Client } from '../clients/client.entity.js';
 import { requireEnv } from '../config/env.js';
+import { User } from '../users/user.entity.js';
 import { Vehicle } from '../vehicles/vehicle.entity.js';
 import { CreateTenantsAndHelpers1761000000000 } from './migrations/1761000000000-CreateTenantsAndHelpers.js';
 import { CreateClients1761000000100 } from './migrations/1761000000100-CreateClients.js';
@@ -13,9 +14,10 @@ import { CreateSessions1761000000600 } from './migrations/1761000000600-CreateSe
 import { CreateLoginAttempts1761000000700 } from './migrations/1761000000700-CreateLoginAttempts.js';
 import { CreateAuthFunctions1761000000800 } from './migrations/1761000000800-CreateAuthFunctions.js';
 import { FixLoginFailurePruneLocking1761000000850 } from './migrations/1761000000850-FixLoginFailurePruneLocking.js';
+import { AddLastAdminTrigger1761000000900 } from './migrations/1761000000900-AddLastAdminTrigger.js';
 
 // Registered by class reference, never by glob: TypeORM's path loading does not work in ESM.
-export const ENTITIES: (new () => object)[] = [Client, Vehicle, AuditLog];
+export const ENTITIES: (new () => object)[] = [Client, Vehicle, AuditLog, User];
 export const MIGRATIONS: (new () => object)[] = [
   CreateTenantsAndHelpers1761000000000,
   CreateClients1761000000100,
@@ -27,6 +29,7 @@ export const MIGRATIONS: (new () => object)[] = [
   CreateLoginAttempts1761000000700,
   CreateAuthFunctions1761000000800,
   FixLoginFailurePruneLocking1761000000850,
+  AddLastAdminTrigger1761000000900,
 ];
 
 /**

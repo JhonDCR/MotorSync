@@ -152,6 +152,56 @@ export interface OwnershipHistoryResponse {
 
 // --- Autenticación (contrato 002) ---
 
+export type UserStatus = 'active' | 'inactive';
+
+export interface CreateUserRequest {
+  name: string;
+  email: string;
+  role: Role;
+  temporaryPassword: string;
+}
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  status: UserStatus;
+  mustChangePassword: boolean;
+  temporaryPasswordExpiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  updatedByName: string;
+}
+
+export interface UserAuditEntry {
+  id: string;
+  action: 'user.role_changed' | 'user.deactivated' | 'user.reactivated' | 'user.password_reset';
+  actorName: string;
+  actorRole: Role;
+  occurredAt: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  ip: string | null;
+  channel: string;
+}
+
+export interface ResetPasswordRequest {
+  temporaryPassword: string;
+}
+
+export interface ChangeRoleRequest {
+  role: Role;
+}
+
+export interface UserListResponse {
+  items: UserAccount[];
+}
+
+export interface UserHistoryResponse {
+  items: UserAuditEntry[];
+}
+
 export interface RegisterRequest {
   workshopName: string;
   ruc: string;

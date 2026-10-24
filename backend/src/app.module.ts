@@ -11,6 +11,7 @@ import { ClientsModule } from './clients/clients.module.js';
 import { requireEnv } from './config/env.js';
 import { appDataSourceOptions } from './database/data-source.js';
 import { TenantTransactionInterceptor } from './database/tenant-transaction.interceptor.js';
+import { UsersModule } from './users/users.module.js';
 import { VehiclesModule } from './vehicles/vehicles.module.js';
 
 @Module({
@@ -28,6 +29,7 @@ import { VehiclesModule } from './vehicles/vehicles.module.js';
     AuthModule,
     ClientsModule,
     VehiclesModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [

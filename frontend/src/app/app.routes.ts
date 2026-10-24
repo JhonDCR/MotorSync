@@ -1,6 +1,6 @@
 import { isDevMode } from '@angular/core';
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard } from './core/auth/auth.guards';
+import { adminGuard, authGuard, guestGuard } from './core/auth/auth.guards';
 
 /**
  * Route table. `devMode` decides whether /dev-token exists (research R2 and R13: never outside development).
@@ -92,6 +92,28 @@ export function buildRoutes(devMode: boolean): Routes {
       title: 'Ficha del vehículo',
       canMatch: [authGuard],
       loadComponent: () => import('./features/vehicles/vehicle-detail.page').then((m) => m.VehicleDetailPage),
+    },
+    // users/new va antes de users/:id para que "new" no se lea como un id.
+    {
+      path: 'users',
+      title: 'Usuarios',
+      canMatch: [authGuard, adminGuard],
+      canActivate: [authGuard, adminGuard],
+      loadComponent: () => import('./features/users/users-list.page').then((m) => m.UsersListPage),
+    },
+    {
+      path: 'users/new',
+      title: 'Nuevo usuario',
+      canMatch: [authGuard, adminGuard],
+      canActivate: [authGuard, adminGuard],
+      loadComponent: () => import('./features/users/user-form.page').then((m) => m.UserFormPage),
+    },
+    {
+      path: 'users/:id',
+      title: 'Ficha de usuario',
+      canMatch: [authGuard, adminGuard],
+      canActivate: [authGuard, adminGuard],
+      loadComponent: () => import('./features/users/user-detail.page').then((m) => m.UserDetailPage),
     },
     ...devRoutes,
   ];

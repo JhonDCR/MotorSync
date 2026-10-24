@@ -1,0 +1,252 @@
+<div class="detail-container">
+  <div class="breadcrumb">
+    <a routerLink="/users" class="back-link">&larr; Volver a usuarios</a>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-state" role="status" data-testid="loading-indicator">
+      <p>Cargando información del usuario...</p>
+    </div>
+  } @else if (loadError()) {
+    <div class="alert-error" role="alert" data-testid="load-error">
+      {{ loadError() }}
+    </div>
+  } @else if (user(); as u) {
+    <div class="detail-header">
+      <div class="title-area">
+        <h1 data-testid="user-name">{{ u.name }}</h1>
+        <div class="badges">
+          <span
+            class="badge badge-role"
+            [class.badge-admin]="u.role === 'admin'"
+            [class.badge-asesor]="u.role === 'asesor'"
+            data-testid="user-role-badge"
+          >
+            {{ u.role === 'admin' ? 'Administrador' : 'Asesor' }}
+          </span>
+          <span
+            class="badge badge-status"
+            [class.badge-active]="u.status === 'active'"
+            [class.badge-inactive]="u.status === 'inactive'"
+            data-testid="user-status-badge"
+          >
+            {{ u.status === 'active' ? 'Activo' : 'Inactivo' }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    @if (actionSuccess()) {
+      <div class="alert-success" role="alert" data-testid="action-success">
+        {{ actionSuccess() }}
+      </div>
+    }
+
+    @if (actionError()) {
+      <div class="alert-error" role="alert" data-testid="action-error">
+        {{ actionError() }}
+      </div>
+    }
+
+    <!-- Confirmation box for actions -->
+    @if (confirmAction() === 'role') {
+      <div class="confirm-box" role="alertdialog" data-testid="confirm-role-box">
+        <p>
+          ¿Desea cambiar el rol de <strong>{{ u.name }}</strong> a <strong>{{ targetRoleLabel() }}</strong>?
+        </p>
+        <div class="confirm-actions">
+          <button
+            type="button"
+            class="btn-confirm-secondary"
+            data-testid="cancel-action-button"
+            [disabled]="processing()"
+            (click)="cancelConfirm()"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn-confirm-primary"
+            data-testid="confirm-change-role-button"
+            [disabled]="processing()"
+            (click)="confirmChangeRole()"
+          >
+            {{ processing() ? 'Cambiando...' : 'Confirmar cambio' }}
+          </button>
+        </div>
+      </div>
+    } @else if (confirmAction() === 'deactivate') {
+      <div class="confirm-box confirm-box-danger" role="alertdialog" data-testid="confirm-deactivate-box">
+        <p>
+          ¿Desea desactivar la cuenta de <strong>{{ u.name }}</strong>? Todas sus sesiones activas serán cerradas.
+        </p>
+        <div class="confirm-actions">
+          <button
+            type="button"
+            class="btn-confirm-secondary"
+            data-testid="cancel-action-button"
+            [disabled]="processing()"
+            (click)="cancelConfirm()"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn-danger"
+            data-testid="confirm-deactivate-button"
+            [disabled]="processing()"
+            (click)="confirmDeactivate()"
+          >
+            {{ processing() ? 'Desactivando...' : 'Desactivar cuenta' }}
+          </button>
+        </div>
+      </div>
+    } @else if (confirmAction() === 'reactivate') {
+      <div class="confirm-box" role="alertdialog" data-testid="confirm-reactivate-box">
+        <p>
+          ¿Desea reactivar la cuenta de <strong>{{ u.name }}</strong>?
+        </p>
+        <div class="confirm-actions">
+          <button
+            type="button"
+            class="btn-confirm-secondary"
+            data-testid="cancel-action-button"
+            [disabled]="processing()"
+            (click)="cancelConfirm()"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn-confirm-primary"
+            data-testid="confirm-reactivate-button"
+            [disabled]="processing()"
+            (click)="confirmReactivate()"
+          >
+            {{ processing() ? 'Reactivando...' : 'Reactivar cuenta' }}
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- Actions bar -->
+    <div class="actions-bar" data-testid="user-actions-bar">
+      <!-- Change role button -->
+      <button
+        type="button"
+        class="btn-action"
+        data-testid="change-role-button"
+        [disabled]="processing() || confirmAction() !== null"
+        (click)="promptChangeRole()"
+      >
+        Cambiar a {{ targetRoleLabel() }}
+      </button>
+
+      <!-- Deactivate / reactivate button -->
+      @if (u.status === 'active') {
+        <button
+          type="button"
+          class="btn-action btn-action-danger"
+          data-testid="deactivate-button"
+          [disabled]="processing() || confirmAction() !== null"
+          (click)="promptDeactivate()"
+        >
+          Desactivar cuenta
+        </button>
+      } @else {
+        <button
+          type="button"
+          class="btn-action btn-action-success"
+          data-testid="reactivate-button"
+          [disabled]="processing() || confirmAction() !== null"
+          (click)="promptReactivate()"
+        >
+          Reactivar cuenta
+        </button>
+      }
+
+      <!-- Reset password button / own account notice -->
+      @if (isOwnAccount()) {
+        <div class="own-account-notice" data-testid="own-account-notice">
+          Para su propia cuenta use <strong>Cambiar mi contraseña</strong>
+        </div>
+      } @else {
+        <button
+          type="button"
+          class="btn-action"
+          data-testid="reset-password-button"
+          [disabled]="processing() || confirmAction() !== null"
+          (click)="openResetPasswordDialog()"
+        >
+          Restablecer contraseña
+        </button>
+      }
+    </div>
+
+    <!-- User Information Card -->
+    <div class="info-card" data-testid="user-info-card">
+      <h2>Datos de la cuenta</h2>
+      <dl class="info-grid">
+        <dt>Correo electrónico</dt>
+        <dd data-testid="info-email">{{ u.email }}</dd>
+
+        <dt>Rol actual</dt>
+        <dd data-testid="info-role">{{ u.role === 'admin' ? 'Administrador' : 'Asesor' }}</dd>
+
+        <dt>Estado de la cuenta</dt>
+        <dd data-testid="info-status">{{ u.status === 'active' ? 'Activo' : 'Inactivo' }}</dd>
+
+        <dt>Fecha de registro</dt>
+        <dd data-testid="info-created-at">{{ u.createdAt }}</dd>
+
+        <dt>Última actualización</dt>
+        <dd data-testid="info-updated-at">{{ u.updatedAt }}</dd>
+
+        <dt>Actualizado por</dt>
+        <dd data-testid="info-updated-by">{{ u.updatedByName }}</dd>
+      </dl>
+    </div>
+
+    <!-- Audit History Section -->
+    <div class="history-section" data-testid="history-section">
+      <h2>Historial de cambios</h2>
+
+      @if (history().length === 0) {
+        <p class="empty-history" data-testid="empty-history">No hay registros de auditoría para esta cuenta.</p>
+      } @else {
+        <div class="table-wrapper">
+          <table class="history-table" role="table" aria-label="Historial de auditoría" data-testid="history-table">
+            <thead>
+              <tr>
+                <th scope="col">Fecha y hora</th>
+                <th scope="col">Acción</th>
+                <th scope="col">Realizado por</th>
+                <th scope="col">Canal</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (entry of history(); track entry.id) {
+                <tr data-testid="history-entry">
+                  <td class="time-cell" data-testid="entry-date">{{ entry.occurredAt }}</td>
+                  <td class="action-cell" data-testid="entry-action">{{ actionLabel(entry.action) }}</td>
+                  <td data-testid="entry-actor">{{ entry.actorName }} ({{ entry.actorRole === 'admin' ? 'Administrador' : 'Asesor' }})</td>
+                  <td data-testid="entry-channel">{{ entry.channel }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+
+    <!-- Reset password dialog component -->
+    @if (showResetDialog()) {
+      <app-reset-password-dialog
+        [userId]="u.id"
+        [userName]="u.name"
+        (closed)="onResetDialogClosed()"
+        (success)="onResetDialogSuccess($event)"
+      />
+    }
+  }
+</div>

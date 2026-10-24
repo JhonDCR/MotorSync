@@ -9,6 +9,9 @@ import type {
   Role,
   SessionResponse,
   SessionUser,
+  UserAccount,
+  UserAuditEntry,
+  UserStatus,
   Workshop,
 } from './api.models';
 import { mockProblem, newId, type MockResult } from './mock-api.store';
@@ -22,6 +25,9 @@ import { mockProblem, newId, type MockResult } from './mock-api.store';
 const REGISTER_FIELDS = ['workshopName', 'ruc', 'name', 'email', 'password'] as const;
 const LOGIN_FIELDS = ['email', 'password'] as const;
 const CHANGE_PASSWORD_FIELDS = ['currentPassword', 'newPassword'] as const;
+const CREATE_USER_FIELDS = ['name', 'email', 'role', 'temporaryPassword'] as const;
+const CHANGE_ROLE_FIELDS = ['role'] as const;
+const RESET_PASSWORD_FIELDS = ['temporaryPassword'] as const;
 const NAME_MIN_LENGTH = 2;
 const NAME_MAX_LENGTH = 120;
 const EMAIL_MAX_LENGTH = 254;
@@ -43,9 +49,27 @@ interface MockAccount {
   email: string;
   role: Role;
   password: string;
+  status: UserStatus;
   mustChangePassword: boolean;
   /** ISO 8601; set only while a temporary password is pending (like the CHECK of research R7). */
   temporaryPasswordExpiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  updatedByName: string;
+}
+
+interface MockAuditEntry {
+  id: string;
+  userId: string;
+  workshopId: string;
+  action: 'user.role_changed' | 'user.deactivated' | 'user.reactivated' | 'user.password_reset';
+  actorName: string;
+  actorRole: Role;
+  occurredAt: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  ip: string | null;
+  channel: string;
 }
 
 /** Server-side session (research R5). The "cookie" ms_refresh of the mock points to one of these by id. */
@@ -56,13 +80,42 @@ interface MockSession {
 
 /** Input of MockAuthStore.addAccount: direct creation of an account (tests; PR3 reuses it for POST /users). */
 export interface MockAccountInput {
+  id?: string;
   workshopId: string;
   name: string;
   email: string;
   role: Role;
   password: string;
+  status?: UserStatus;
   mustChangePassword?: boolean;
   temporaryPasswordExpiresAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  updatedByName?: string;
+}
+
+interface CallerInfo {
+  id: string;
+  workshopId: string;
+  name: string;
+  role: Role;
+}
+
+type CallerCheck = { ok: true; caller: CallerInfo } | { ok: false; problem: Problem };
+
+function toUserAccount(account: MockAccount): UserAccount {
+  return {
+    id: account.id,
+    name: account.name,
+    email: account.email,
+    role: account.role,
+    status: account.status,
+    mustChangePassword: account.mustChangePassword,
+    temporaryPasswordExpiresAt: account.temporaryPasswordExpiresAt,
+    createdAt: account.createdAt,
+    updatedAt: account.updatedAt,
+    updatedByName: account.updatedByName,
+  };
 }
 
 /** Account and session of a request token, or the Problem that rejects it. */
@@ -269,6 +322,19 @@ function readPassword(
   return value;
 }
 
+function readRole(body: Record<string, unknown>, errors: FieldErrors): Role | null {
+  const value = body['role'];
+  if (value === undefined || value === null) {
+    errors.add('role', 'REQUIRED', 'Campo obligatorio');
+    return null;
+  }
+  if (value !== 'asesor' && value !== 'admin') {
+    errors.add('role', 'VALIDATION_ERROR', 'Rol inválido');
+    return null;
+  }
+  return value;
+}
+
 /** Undefined values are dropped by JSON serialization: they count as absent. */
 function definedEntries(raw: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(Object.entries(raw).filter(([, value]) => value !== undefined));
@@ -293,19 +359,26 @@ export class MockAuthStore {
   private readonly throttles = new Map<string, LoginThrottle>();
   /** Sessions by id (the `sid` of the access tokens). */
   private readonly sessions = new Map<string, MockSession>();
+  /** Audit history entries for users. */
+  private readonly auditEntries: MockAuditEntry[] = [];
   /** The HttpOnly cookie ms_refresh of this "browser", simulated in memory: id of its session. Never in a body. */
   private refreshCookie: string | null = null;
 
   constructor() {
     const workshop: MockWorkshop = { id: newId(), ...SEED_WORKSHOP };
     this.workshops.set(workshop.id, workshop);
+    const nowIso = new Date().toISOString();
     for (const account of SEED_ACCOUNTS) {
       this.accounts.set(account.email, {
         id: newId(),
         workshopId: workshop.id,
         password: SEED_PASSWORD,
+        status: 'active',
         mustChangePassword: false,
         temporaryPasswordExpiresAt: null,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        updatedByName: 'Administrador Demo',
         ...account,
       });
     }
@@ -343,6 +416,7 @@ export class MockAuthStore {
     }
 
     const workshop: MockWorkshop = { id: newId(), name: workshopName, ruc };
+    const nowIso = new Date().toISOString();
     const account: MockAccount = {
       id: newId(),
       workshopId: workshop.id,
@@ -350,8 +424,12 @@ export class MockAuthStore {
       email,
       role: 'admin',
       password,
+      status: 'active',
       mustChangePassword: false,
       temporaryPasswordExpiresAt: null,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      updatedByName: name,
     };
     this.workshops.set(workshop.id, workshop);
     this.accounts.set(email, account);
@@ -380,7 +458,7 @@ export class MockAuthStore {
     if (account !== undefined && account.password === password && temporaryPasswordExpired(account, now)) {
       return fail(401, 'TEMPORARY_PASSWORD_EXPIRED');
     }
-    if (account === undefined || account.password !== password) {
+    if (account === undefined || account.password !== password || account.status === 'inactive') {
       this.countFailure(email, throttle, now);
       // Same body whether the email exists or not (US2-AC3, FR-008).
       return fail(401, 'INVALID_CREDENTIALS');
@@ -398,15 +476,20 @@ export class MockAuthStore {
       throw new Error('MockAuthStore.addAccount: a temporary password needs temporaryPasswordExpiresAt');
     }
     const email = normalizeEmail(input.email);
+    const nowIso = new Date().toISOString();
     this.accounts.set(email, {
-      id: newId(),
+      id: input.id ?? newId(),
       workshopId: input.workshopId,
       name: input.name,
       email,
       role: input.role,
       password: input.password,
+      status: input.status ?? 'active',
       mustChangePassword,
       temporaryPasswordExpiresAt,
+      createdAt: input.createdAt ?? nowIso,
+      updatedAt: input.updatedAt ?? nowIso,
+      updatedByName: input.updatedByName ?? 'Admin Principal',
     });
   }
 
@@ -544,7 +627,7 @@ export class MockAuthStore {
   private checkSession(sessionId: string): MockSessionCheck {
     const session = this.sessions.get(sessionId);
     const account = session === undefined ? undefined : this.accountById(session.accountId);
-    if (session === undefined || session.revoked || account === undefined) {
+    if (session === undefined || session.revoked || account === undefined || account.status === 'inactive') {
       return { ok: false, problem: mockProblem(401, 'SESSION_REVOKED') };
     }
     if (temporaryPasswordExpired(account, Date.now())) {
@@ -552,6 +635,338 @@ export class MockAuthStore {
       return { ok: false, problem: mockProblem(401, 'TEMPORARY_PASSWORD_EXPIRED') };
     }
     return { ok: true, account, sessionId };
+  }
+
+  // --- Users management (PR3 / specs/002-autenticacion/contracts/openapi.yaml) ---
+
+  listUsers(token: string | null): MockResult<{ items: UserAccount[] }> {
+    const callerCheck = this.callerOf(token);
+    if (!callerCheck.ok) return callerCheck;
+    const { caller } = callerCheck;
+    const items = [...this.accounts.values()]
+      .filter((account) => account.workshopId === caller.workshopId)
+      .map(toUserAccount);
+    return { ok: true, status: 200, body: { items } };
+  }
+
+  createUser(token: string | null, raw: unknown): MockResult<UserAccount> {
+    const callerCheck = this.callerOf(token);
+    if (!callerCheck.ok) return callerCheck;
+    const { caller } = callerCheck;
+
+    if (!isRecord(raw)) return notAnObject();
+    const body = definedEntries(raw);
+    const errors = new FieldErrors();
+    checkUnknownFields(body, CREATE_USER_FIELDS, errors);
+
+    const name = readName(body, 'name', errors);
+    const email = readEmail(body, errors);
+    const role = readRole(body, errors);
+    const temporaryPassword = readPassword(body, errors, PASSWORD_MIN_LENGTH, 'temporaryPassword');
+
+    if (errors.list.length > 0 || name === null || email === null || role === null || temporaryPassword === null) {
+      return validationFailed(errors);
+    }
+
+    if (this.accounts.has(email)) {
+      return fail(409, 'EMAIL_UNAVAILABLE');
+    }
+
+    const nowIso = new Date().toISOString();
+    const expiresIso = new Date(Date.now() + 72 * 3600 * 1000).toISOString();
+    const account: MockAccount = {
+      id: newId(),
+      workshopId: caller.workshopId,
+      name,
+      email,
+      role,
+      password: temporaryPassword,
+      status: 'active',
+      mustChangePassword: true,
+      temporaryPasswordExpiresAt: expiresIso,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      updatedByName: caller.name,
+    };
+    this.accounts.set(email, account);
+    return { ok: true, status: 201, body: toUserAccount(account) };
+  }
+
+  getUser(token: string | null, userId: string): MockResult<UserAccount> {
+    const callerCheck = this.callerOf(token);
+    if (!callerCheck.ok) return callerCheck;
+    const { caller } = callerCheck;
+
+    const account = this.accountById(userId);
+    if (account === undefined || account.workshopId !== caller.workshopId) {
+      return fail(404, 'NOT_FOUND');
+    }
+    return { ok: true, status: 200, body: toUserAccount(account) };
+  }
+
+  changeUserRole(token: string | null, userId: string, raw: unknown): MockResult<UserAccount> {
+    const callerCheck = this.callerOf(token);
+    if (!callerCheck.ok) return callerCheck;
+    const { caller } = callerCheck;
+
+    const account = this.accountById(userId);
+    if (account === undefined || account.workshopId !== caller.workshopId) {
+      return fail(404, 'NOT_FOUND');
+    }
+
+    if (!isRecord(raw)) return notAnObject();
+    const body = definedEntries(raw);
+    const errors = new FieldErrors();
+    checkUnknownFields(body, CHANGE_ROLE_FIELDS, errors);
+    const role = readRole(body, errors);
+    if (errors.list.length > 0 || role === null) {
+      return validationFailed(errors);
+    }
+
+    if (account.role === role) {
+      return { ok: true, status: 200, body: toUserAccount(account) };
+    }
+
+    if (account.role === 'admin' && role === 'asesor') {
+      const activeAdmins = this.getActiveAdmins(caller.workshopId);
+      if (activeAdmins.length <= 1 && activeAdmins.some((a) => a.id === account.id)) {
+        return fail(409, 'LAST_ADMIN');
+      }
+    }
+
+    const oldRole = account.role;
+    const nowIso = new Date().toISOString();
+    account.role = role;
+    account.updatedAt = nowIso;
+    account.updatedByName = caller.name;
+
+    this.auditEntries.unshift({
+      id: newId(),
+      userId: account.id,
+      workshopId: account.workshopId,
+      action: 'user.role_changed',
+      actorName: caller.name,
+      actorRole: caller.role,
+      occurredAt: nowIso,
+      before: { role: oldRole },
+      after: { role: account.role },
+      ip: '127.0.0.1',
+      channel: 'web',
+    });
+
+    return { ok: true, status: 200, body: toUserAccount(account) };
+  }
+
+  deactivateUser(token: string | null, userId: string): MockResult<UserAccount> {
+    const callerCheck = this.callerOf(token);
+    if (!callerCheck.ok) return callerCheck;
+    const { caller } = callerCheck;
+
+    const account = this.accountById(userId);
+    if (account === undefined || account.workshopId !== caller.workshopId) {
+      return fail(404, 'NOT_FOUND');
+    }
+
+    if (account.status === 'inactive') {
+      return { ok: true, status: 200, body: toUserAccount(account) };
+    }
+
+    if (account.role === 'admin') {
+      const activeAdmins = this.getActiveAdmins(caller.workshopId);
+      if (activeAdmins.length <= 1 && activeAdmins.some((a) => a.id === account.id)) {
+        return fail(409, 'LAST_ADMIN');
+      }
+    }
+
+    const nowIso = new Date().toISOString();
+    account.status = 'inactive';
+    account.updatedAt = nowIso;
+    account.updatedByName = caller.name;
+
+    for (const session of this.sessions.values()) {
+      if (session.accountId === account.id) {
+        session.revoked = true;
+      }
+    }
+
+    this.auditEntries.unshift({
+      id: newId(),
+      userId: account.id,
+      workshopId: account.workshopId,
+      action: 'user.deactivated',
+      actorName: caller.name,
+      actorRole: caller.role,
+      occurredAt: nowIso,
+      before: { status: 'active' },
+      after: { status: 'inactive' },
+      ip: '127.0.0.1',
+      channel: 'web',
+    });
+
+    return { ok: true, status: 200, body: toUserAccount(account) };
+  }
+
+  reactivateUser(token: string | null, userId: string): MockResult<UserAccount> {
+    const callerCheck = this.callerOf(token);
+    if (!callerCheck.ok) return callerCheck;
+    const { caller } = callerCheck;
+
+    const account = this.accountById(userId);
+    if (account === undefined || account.workshopId !== caller.workshopId) {
+      return fail(404, 'NOT_FOUND');
+    }
+
+    if (account.status === 'active') {
+      return { ok: true, status: 200, body: toUserAccount(account) };
+    }
+
+    const nowIso = new Date().toISOString();
+    account.status = 'active';
+    account.updatedAt = nowIso;
+    account.updatedByName = caller.name;
+
+    this.auditEntries.unshift({
+      id: newId(),
+      userId: account.id,
+      workshopId: account.workshopId,
+      action: 'user.reactivated',
+      actorName: caller.name,
+      actorRole: caller.role,
+      occurredAt: nowIso,
+      before: { status: 'inactive' },
+      after: { status: 'active' },
+      ip: '127.0.0.1',
+      channel: 'web',
+    });
+
+    return { ok: true, status: 200, body: toUserAccount(account) };
+  }
+
+  resetUserPassword(token: string | null, userId: string, raw: unknown): MockResult<UserAccount> {
+    const callerCheck = this.callerOf(token);
+    if (!callerCheck.ok) return callerCheck;
+    const { caller } = callerCheck;
+
+    if (caller.id === userId) {
+      return fail(409, 'SELF_RESET_NOT_ALLOWED');
+    }
+
+    const account = this.accountById(userId);
+    if (account === undefined || account.workshopId !== caller.workshopId) {
+      return fail(404, 'NOT_FOUND');
+    }
+
+    if (!isRecord(raw)) return notAnObject();
+    const body = definedEntries(raw);
+    const errors = new FieldErrors();
+    checkUnknownFields(body, RESET_PASSWORD_FIELDS, errors);
+    const temporaryPassword = readPassword(body, errors, PASSWORD_MIN_LENGTH, 'temporaryPassword');
+    if (errors.list.length > 0 || temporaryPassword === null) {
+      return validationFailed(errors);
+    }
+
+    const nowIso = new Date().toISOString();
+    const expiresIso = new Date(Date.now() + 72 * 3600 * 1000).toISOString();
+    account.password = temporaryPassword;
+    account.mustChangePassword = true;
+    account.temporaryPasswordExpiresAt = expiresIso;
+    account.updatedAt = nowIso;
+    account.updatedByName = caller.name;
+
+    for (const session of this.sessions.values()) {
+      if (session.accountId === account.id) {
+        session.revoked = true;
+      }
+    }
+    this.throttles.delete(account.email);
+
+    this.auditEntries.unshift({
+      id: newId(),
+      userId: account.id,
+      workshopId: account.workshopId,
+      action: 'user.password_reset',
+      actorName: caller.name,
+      actorRole: caller.role,
+      occurredAt: nowIso,
+      before: null,
+      after: null,
+      ip: '127.0.0.1',
+      channel: 'web',
+    });
+
+    return { ok: true, status: 200, body: toUserAccount(account) };
+  }
+
+  getUserHistory(token: string | null, userId: string): MockResult<{ items: UserAuditEntry[] }> {
+    const callerCheck = this.callerOf(token);
+    if (!callerCheck.ok) return callerCheck;
+    const { caller } = callerCheck;
+
+    const account = this.accountById(userId);
+    if (account === undefined || account.workshopId !== caller.workshopId) {
+      return fail(404, 'NOT_FOUND');
+    }
+
+    const items: UserAuditEntry[] = this.auditEntries
+      .filter((entry) => entry.userId === userId && entry.workshopId === caller.workshopId)
+      .map((entry) => ({
+        id: entry.id,
+        action: entry.action,
+        actorName: entry.actorName,
+        actorRole: entry.actorRole,
+        occurredAt: entry.occurredAt,
+        before: entry.before,
+        after: entry.after,
+        ip: entry.ip,
+        channel: entry.channel,
+      }));
+
+    return { ok: true, status: 200, body: { items } };
+  }
+
+  private callerOf(token: string | null): CallerCheck {
+    const claims = readClaims(token);
+    if (claims === null || claims.role === null) {
+      return { ok: false, problem: mockProblem(401, 'UNAUTHORIZED') };
+    }
+    if (claims.sid !== null) {
+      const check = this.checkSession(claims.sid);
+      if (!check.ok) return { ok: false, problem: check.problem };
+      if (check.account.mustChangePassword) {
+        return { ok: false, problem: mockProblem(403, 'PASSWORD_CHANGE_REQUIRED') };
+      }
+      if (check.account.role !== 'admin') {
+        return { ok: false, problem: mockProblem(403, 'FORBIDDEN') };
+      }
+      return {
+        ok: true,
+        caller: {
+          id: check.account.id,
+          workshopId: check.account.workshopId,
+          name: check.account.name,
+          role: check.account.role,
+        },
+      };
+    }
+    if (claims.role !== 'admin') {
+      return { ok: false, problem: mockProblem(403, 'FORBIDDEN') };
+    }
+    const workshopId = claims.tenantId ?? [...this.workshops.keys()][0] ?? '';
+    return {
+      ok: true,
+      caller: {
+        id: claims.sub ?? newId(),
+        workshopId,
+        name: claims.name || 'Admin Principal',
+        role: claims.role,
+      },
+    };
+  }
+
+  private getActiveAdmins(workshopId: string): MockAccount[] {
+    return [...this.accounts.values()].filter(
+      (a) => a.workshopId === workshopId && a.role === 'admin' && a.status === 'active',
+    );
   }
 
   /** Throttle of an email; 'locked' while the lock lasts. An expired lock starts over. */

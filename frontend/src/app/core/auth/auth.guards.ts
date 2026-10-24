@@ -1,5 +1,12 @@
 import { inject } from '@angular/core';
-import { type CanMatchFn, Router, type UrlSegment, type UrlTree } from '@angular/router';
+import {
+  type CanActivateFn,
+  type CanMatchFn,
+  Router,
+  type RouterStateSnapshot,
+  type UrlSegment,
+  type UrlTree,
+} from '@angular/router';
 import { map, type Observable } from 'rxjs';
 import { SessionStore } from './session.store';
 
@@ -10,12 +17,18 @@ export const CHANGE_PASSWORD_PATH = '/change-password';
  * Full URL being navigated to, with its query. canMatch only receives the segments of the route, so the target
  * comes from the current navigation; the segments are the fallback.
  */
-function requestedUrl(router: Router, segments: UrlSegment[]): string {
+function requestedUrl(router: Router, segmentsOrState?: UrlSegment[] | RouterStateSnapshot): string {
+  if (segmentsOrState && 'url' in segmentsOrState && typeof segmentsOrState.url === 'string') {
+    return segmentsOrState.url;
+  }
   const target = router.currentNavigation()?.extractedUrl;
   if (target !== undefined) {
     return router.serializeUrl(target);
   }
-  return `/${segments.map((segment) => segment.path).join('/')}`;
+  if (Array.isArray(segmentsOrState)) {
+    return `/${segmentsOrState.map((segment) => segment.path).join('/')}`;
+  }
+  return router.url;
 }
 
 /**
@@ -23,10 +36,13 @@ function requestedUrl(router: Router, segments: UrlSegment[]): string {
  * password still to change, only /change-password opens; any other protected route leads there (US5-AC1, FR-026).
  * The state comes from SessionStore (server responses), never from the JWT.
  */
-export const authGuard: CanMatchFn = (_route, segments): Observable<boolean | UrlTree> => {
+export const authGuard: CanMatchFn & CanActivateFn = (
+  _route,
+  segmentsOrState?: UrlSegment[] | RouterStateSnapshot,
+): Observable<boolean | UrlTree> => {
   const store = inject(SessionStore);
   const router = inject(Router);
-  const url = requestedUrl(router, segments);
+  const url = requestedUrl(router, segmentsOrState);
   return store.restore().pipe(
     map((signedIn) => {
       if (!signedIn) {
@@ -41,13 +57,13 @@ export const authGuard: CanMatchFn = (_route, segments): Observable<boolean | Ur
 };
 
 /** Admin-only routes; goes after authGuard. Any other role returns to the start screen (US4-AC16). */
-export const adminGuard: CanMatchFn = (): boolean | UrlTree => {
+export const adminGuard: CanMatchFn & CanActivateFn = (): boolean | UrlTree => {
   const store = inject(SessionStore);
   return store.user()?.role === 'admin' ? true : inject(Router).createUrlTree(['/']);
 };
 
 /** /login and /register: with a session there is nothing to do there, so they lead to the start screen. */
-export const guestGuard: CanMatchFn = (): Observable<boolean | UrlTree> => {
+export const guestGuard: CanMatchFn & CanActivateFn = (): Observable<boolean | UrlTree> => {
   const router = inject(Router);
   return inject(SessionStore)
     .restore()

@@ -7,10 +7,14 @@ export const AUDIT_ACTIONS = [
   'vehicle.plate_changed',
   'vehicle.vin_changed',
   'client.document_changed',
+  'user.role_changed',
+  'user.deactivated',
+  'user.reactivated',
+  'user.password_reset',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
-export type AuditEntityType = 'client' | 'vehicle';
+export type AuditEntityType = 'client' | 'vehicle' | 'user';
 
 /** JSON object stored in before and after (camelCase keys, data-model.md). */
 export type AuditSnapshot = Readonly<Record<string, string | number | boolean | null>>;

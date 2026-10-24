@@ -10,5 +10,6 @@ import { SessionsService } from './sessions.service.js';
 @Module({
   controllers: [AuthController],
   providers: [AuthService, AccessTokenService, LoginThrottleService, PasswordHasher, SessionsService],
+  exports: [PasswordHasher, SessionsService],
 })
 export class AuthModule {}

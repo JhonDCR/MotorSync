@@ -1,0 +1,96 @@
+<div class="form-container">
+  <div class="breadcrumb">
+    <a routerLink="/users" class="back-link">&larr; Volver a usuarios</a>
+  </div>
+
+  <h1>Crear nueva cuenta</h1>
+  <p class="subtitle">Complete los datos de la persona para crear su cuenta con contraseña temporal.</p>
+
+  <div class="alert-notice" role="alert" data-testid="temp-password-notice">
+    <strong>Aviso importante:</strong> La contraseña asignada es temporal, tiene una vigencia de 72 horas y debe ser entregada a la persona para su primer inicio de sesión.
+  </div>
+
+  @if (formError()) {
+    <div class="alert-error" role="alert" data-testid="form-error">
+      {{ formError() }}
+    </div>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="field">
+      <label for="name">Nombre completo</label>
+      <input
+        id="name"
+        type="text"
+        formControlName="name"
+        data-testid="name-input"
+        placeholder="Ej. Ana Pérez"
+        [attr.aria-invalid]="form.controls.name.invalid && form.controls.name.touched ? 'true' : null"
+      />
+      @if (form.controls.name.touched && form.controls.name.hasError('required')) {
+        <p class="field-error" data-testid="name-required-error">El nombre es obligatorio</p>
+      } @else if (form.controls.name.touched && (form.controls.name.hasError('minlength') || form.controls.name.hasError('maxlength'))) {
+        <p class="field-error" data-testid="name-length-error">Debe tener entre 2 y 120 caracteres</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="email">Correo electrónico</label>
+      <input
+        id="email"
+        type="email"
+        formControlName="email"
+        data-testid="email-input"
+        placeholder="ejemplo@taller.ec"
+        [attr.aria-invalid]="form.controls.email.invalid && form.controls.email.touched ? 'true' : null"
+      />
+      @if (form.controls.email.touched && form.controls.email.hasError('required')) {
+        <p class="field-error" data-testid="email-required-error">El correo es obligatorio</p>
+      } @else if (form.controls.email.touched && form.controls.email.hasError('email')) {
+        <p class="field-error" data-testid="email-format-error">El formato de correo no es válido</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="role">Rol</label>
+      <select id="role" formControlName="role" data-testid="role-select">
+        <option value="asesor">Asesor</option>
+        <option value="admin">Administrador</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="temporaryPassword">Contraseña temporal inicial</label>
+      <input
+        id="temporaryPassword"
+        type="password"
+        formControlName="temporaryPassword"
+        data-testid="temporary-password-input"
+        autocomplete="new-password"
+        placeholder="Mínimo 8 caracteres"
+        [attr.aria-invalid]="form.controls.temporaryPassword.invalid && form.controls.temporaryPassword.touched ? 'true' : null"
+        [attr.aria-describedby]="passwordDescribedBy()"
+      />
+      @if (form.controls.temporaryPassword.touched && form.controls.temporaryPassword.hasError('required')) {
+        <p class="field-error" [id]="passwordErrorIds.required" data-testid="password-required-error">La contraseña temporal es obligatoria</p>
+      } @else if (form.controls.temporaryPassword.touched && form.controls.temporaryPassword.hasError('minlength')) {
+        <p class="field-error" [id]="passwordErrorIds.minLength" data-testid="password-length-error">Debe tener al menos {{ passwordMinLength }} caracteres</p>
+      } @else if (form.controls.temporaryPassword.touched && form.controls.temporaryPassword.hasError('maxlength')) {
+        <p class="field-error" [id]="passwordErrorIds.maxLength" data-testid="password-max-length-error">Admite como máximo {{ passwordMaxLength }} caracteres</p>
+      }
+    </div>
+
+    <div class="actions">
+      <a routerLink="/users" class="btn-cancel" data-testid="cancel-button">Cancelar</a>
+      <button
+        type="submit"
+        class="btn-submit"
+        data-testid="submit-button"
+        [disabled]="submitting()"
+        [attr.aria-busy]="submitting() ? 'true' : null"
+      >
+        {{ submitting() ? 'Creando cuenta...' : 'Crear cuenta' }}
+      </button>
+    </div>
+  </form>
+</div>

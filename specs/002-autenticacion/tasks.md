@@ -440,13 +440,13 @@ Al terminar, el administrador gestiona las cuentas de su taller con auditoría, 
 
 ## Phase 9: Base del PR3
 
-- [ ] T051 [P] E2e de BD en `backend/test/db/users-last-admin.e2e-spec.ts` (como `motorsync_app` con el tenant fijado):
+- [x] T051 [P] E2e de BD en `backend/test/db/users-last-admin.e2e-spec.ts` (como `motorsync_app` con el tenant fijado):
   - pasar a `asesor` o a `inactive` al único admin activo y hacer `COMMIT` → error `23514` con `constraint = 'users_last_admin'`, y la fila no cambia;
   - con dos admins, cambiar uno → OK;
   - cambiar a un asesor o a un admin inactivo no dispara la comprobación.
 
   Respaldo en la base de FR-018 y US4-AC9 — tester
-- [ ] T052 Crear `backend/src/database/migrations/1761000000900-AddLastAdminTrigger.ts` con la función `users_require_active_admin()` y el `CONSTRAINT TRIGGER users_keep_active_admin … DEFERRABLE INITIALLY DEFERRED … WHEN (OLD.role = 'admin' AND OLD.status = 'active')` de data-model.md **literal**, y registrarla en `data-source.ts`. Ampliar `AUDIT_ACTIONS` con `user.role_changed`, `user.deactivated`, `user.reactivated` y `user.password_reset`, y `AuditEntityType` con `'user'`, en `backend/src/audit/audit-log.entity.ts` — implementer-backend
+- [x] T052 Crear `backend/src/database/migrations/1761000000900-AddLastAdminTrigger.ts` con la función `users_require_active_admin()` y el `CONSTRAINT TRIGGER users_keep_active_admin … DEFERRABLE INITIALLY DEFERRED … WHEN (OLD.role = 'admin' AND OLD.status = 'active')` de data-model.md **literal**, y registrarla en `data-source.ts`. Ampliar `AUDIT_ACTIONS` con `user.role_changed`, `user.deactivated`, `user.reactivated` y `user.password_reset`, y `AuditEntityType` con `'user'`, en `backend/src/audit/audit-log.entity.ts` — implementer-backend
 
 ## Phase 10: User Story 4, gestionar las cuentas del equipo (P2) (PR3)
 
@@ -454,7 +454,7 @@ Al terminar, el administrador gestiona las cuentas de su taller con auditoría, 
 
 **Independent Test**: quickstart §2, filas "Equipo" a "Aislamiento"; e2e `backend/test/users.e2e-spec.ts` y `backend/test/users-audit.e2e-spec.ts`.
 
-- [ ] T053 [US4] E2e de gestión en `backend/test/users.e2e-spec.ts` (sesiones reales con `loginAs`):
+- [x] T053 [US4] E2e de gestión en `backend/test/users.e2e-spec.ts` (sesiones reales con `loginAs`):
   - **US4-AC1**: `GET /users` lista las cuentas activas e inactivas del taller, sin `password` ni `passwordHash` en ningún campo.
   - **US4-AC2**: `POST /users` da 201 con `mustChangePassword: true` y `temporaryPasswordExpiresAt` ≈ ahora + 72 h; la persona inicia sesión con la temporal.
   - **US4-AC3**: un correo existente en A o en B, con espacios o mayúsculas, da el mismo 409 `EMAIL_UNAVAILABLE` sin datos de la cuenta.
@@ -480,7 +480,7 @@ Al terminar, el administrador gestiona las cuentas de su taller con auditoría, 
   - Incluye el caso movido desde T037: con contraseña temporal, GET /users → 403 PASSWORD_CHANGE_REQUIRED (US5-AC1).
 
   — tester
-- [ ] T054 [P] [US4] E2e de auditoría y aislamiento en `backend/test/users-audit.e2e-spec.ts`:
+- [x] T054 [P] [US4] E2e de auditoría y aislamiento en `backend/test/users-audit.e2e-spec.ts`:
   - **US4-AC12**: exactamente un registro `user.role_changed` con `tenant_id`, actor, `actor_role = admin`, `entity_type = user`, `before.role`, `after.role`, `occurred_at` UTC, `ip` y `channel`.
   - **US4-AC13**: `user.deactivated` (con `after.sessionsClosed`) y `user.reactivated`, uno de cada uno.
   - **US4-AC14**: un `LAST_ADMIN`, y un fallo forzado en el `UPDATE`, no dejan ni cambio, ni sesiones revocadas, ni registro.
@@ -491,7 +491,7 @@ Al terminar, el administrador gestiona las cuentas de su taller con auditoría, 
   - **US4-AC24**: el registro `user.password_reset` tiene `before.mustChangePassword`, `after.mustChangePassword = true`, `after.temporaryPasswordExpiresAt` y `after.sessionsClosed`; ni el JSON del registro ni ninguna respuesta contienen la contraseña temporal ni la anterior (búsqueda de la cadena).
 
   — tester
-- [ ] T055 [US4] Implementar el módulo de usuarios:
+- [x] T055 [US4] Implementar el módulo de usuarios:
   - `backend/src/users/user.entity.ts`, con `password_hash` excluido de las lecturas (`select: false`).
   - `backend/src/users/dto/create-user.dto.ts` (`name` de 2 a 120, `email` normalizado, `role` en `asesor` o `admin`, `temporaryPassword` con `IsPassword`), `change-role.dto.ts` y `reset-password.dto.ts`.
   - `backend/src/users/users.service.ts`:
@@ -505,9 +505,9 @@ Al terminar, el administrador gestiona las cuentas de su taller con auditoría, 
   - `backend/src/users/users.module.ts`, registrado en `app.module.ts`.
 
   Deja T053 y T054 en verde — implementer-backend
-- [ ] T056 [P] [US4] Pruebas en `frontend/src/app/core/api/users-api.service.spec.ts` (rutas y verbos del contrato) y en `frontend/src/app/core/api/mock-api.interceptor.users.spec.ts` (nuevo): `LAST_ADMIN`, `EMAIL_UNAVAILABLE`, `SELF_RESET_NOT_ALLOWED`, `FORBIDDEN` para asesor y `NOT_FOUND` — tester
-- [ ] T057 [US4] Implementar `frontend/src/app/core/api/users-api.service.ts` y las rutas `/users` del mock en `mock-api.interceptor.ts` y `mock-api.store.ts` — implementer-frontend
-- [ ] T058 [US4] Pruebas en `frontend/src/app/features/users/users-list.page.spec.ts` y `user-form.page.spec.ts`:
+- [x] T056 [P] [US4] Pruebas en `frontend/src/app/core/api/users-api.service.spec.ts` (rutas y verbos del contrato) y en `frontend/src/app/core/api/mock-api.interceptor.users.spec.ts` (nuevo): `LAST_ADMIN`, `EMAIL_UNAVAILABLE`, `SELF_RESET_NOT_ALLOWED`, `FORBIDDEN` para asesor y `NOT_FOUND` — tester
+- [x] T057 [US4] Implementar `frontend/src/app/core/api/users-api.service.ts` y las rutas `/users` del mock en `mock-api.interceptor.ts` y `mock-api.store.ts` — implementer-frontend
+- [x] T058 [US4] Pruebas en `frontend/src/app/features/users/users-list.page.spec.ts` y `user-form.page.spec.ts`:
   - **US4-AC1**: lista con nombre, correo, rol y estado.
   - **US4-AC2**: al crear, aviso de que la contraseña es temporal, vence en 72 h y hay que entregarla a la persona.
   - **US4-AC3**: "No se pudo crear la cuenta con este correo. Si la persona ya tiene una cuenta en su taller, búsquela en la lista; si no, use otro correo".
@@ -515,8 +515,8 @@ Al terminar, el administrador gestiona las cuentas de su taller con auditoría, 
   - **US4-AC16**: la opción "Usuarios" no aparece para el asesor.
 
   — tester
-- [ ] T059 [US4] Implementar `frontend/src/app/features/users/users-list.page.ts` y `user-form.page.ts` (+ plantillas y estilos) y las rutas `users` y `users/new` con `adminGuard` — implementer-frontend
-- [ ] T060 [US4] Pruebas en `frontend/src/app/features/users/user-detail.page.spec.ts` y `reset-password.dialog.spec.ts`:
+- [x] T059 [US4] Implementar `frontend/src/app/features/users/users-list.page.ts` y `user-form.page.ts` (+ plantillas y estilos) y las rutas `users` y `users/new` con `adminGuard` — implementer-frontend
+- [x] T060 [US4] Pruebas en `frontend/src/app/features/users/user-detail.page.spec.ts` y `reset-password.dialog.spec.ts`:
   - **US4-AC5**: cambiar el rol con confirmación.
   - **US4-AC6** y **US4-AC7**: desactivar y reactivar con confirmación.
   - **US4-AC9**: "El taller debe tener al menos un administrador activo".
@@ -525,11 +525,11 @@ Al terminar, el administrador gestiona las cuentas de su taller con auditoría, 
   - **US4-AC23**: en la propia cuenta, "Restablecer" no aparece y se ofrece "Para su propia cuenta use Cambiar mi contraseña".
 
   — tester
-- [ ] T061 [US4] Implementar `frontend/src/app/features/users/user-detail.page.ts` y `reset-password.dialog.ts` (+ plantillas y estilos) y la ruta `users/:id` con `adminGuard` — implementer-frontend
+- [x] T061 [US4] Implementar `frontend/src/app/features/users/user-detail.page.ts` y `reset-password.dialog.ts` (+ plantillas y estilos) y la ruta `users/:id` con `adminGuard` — implementer-frontend
 
 ## Cierre PR3
 
-- [ ] T062 Revisar el diff del PR3 contra la spec y la **constitución 1.2.0** (principio IV con desactivación, reactivación y restablecimiento). Foco:
+- [x] T062 Revisar el diff del PR3 contra la spec y la **constitución 1.2.0** (principio IV con desactivación, reactivación y restablecimiento). Foco:
   - auditoría en la misma transacción que el cambio y la revocación;
   - append-only;
   - nunca contraseñas ni hashes en `audit_log`;

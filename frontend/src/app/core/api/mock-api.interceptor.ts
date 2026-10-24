@@ -33,6 +33,13 @@ const AUTH_REFRESH_PATH = '/api/v1/auth/refresh';
 const AUTH_LOGOUT_PATH = '/api/v1/auth/logout';
 const AUTH_ME_PATH = '/api/v1/auth/me';
 const AUTH_PASSWORD_PATH = '/api/v1/auth/password';
+const USERS_PATH = '/api/v1/users';
+const USER_BY_ID = /^\/api\/v1\/users\/([^/]+)$/;
+const USER_ROLE = /^\/api\/v1\/users\/([^/]+)\/role$/;
+const USER_DEACTIVATE = /^\/api\/v1\/users\/([^/]+)\/deactivate$/;
+const USER_REACTIVATE = /^\/api\/v1\/users\/([^/]+)\/reactivate$/;
+const USER_PASSWORD_RESET = /^\/api\/v1\/users\/([^/]+)\/password-reset$/;
+const USER_HISTORY = /^\/api\/v1\/users\/([^/]+)\/history$/;
 const BEARER = /^Bearer\s+(\S+)$/i;
 
 function bearerToken(req: HttpRequest<unknown>): string | null {
@@ -102,6 +109,39 @@ function route(req: HttpRequest<unknown>, store: MockApiStore, auth: MockAuthSto
   }
   if (path === AUTH_PASSWORD_PATH && req.method === 'POST') {
     return respond(req, auth.changePassword(bearerToken(req), req.body));
+  }
+
+  // Users routes of contract 002 (US4 - solo administrador)
+  if (path === USERS_PATH && req.method === 'GET') {
+    return respond(req, auth.listUsers(bearerToken(req)));
+  }
+  if (path === USERS_PATH && req.method === 'POST') {
+    const result = auth.createUser(bearerToken(req), req.body);
+    return respond(req, result, result.ok ? `${USERS_PATH}/${result.body.id}` : undefined);
+  }
+  const userRole = USER_ROLE.exec(path);
+  if (userRole !== null && req.method === 'PUT') {
+    return respond(req, auth.changeUserRole(bearerToken(req), decodeURIComponent(userRole[1]), req.body));
+  }
+  const userDeactivate = USER_DEACTIVATE.exec(path);
+  if (userDeactivate !== null && req.method === 'POST') {
+    return respond(req, auth.deactivateUser(bearerToken(req), decodeURIComponent(userDeactivate[1])));
+  }
+  const userReactivate = USER_REACTIVATE.exec(path);
+  if (userReactivate !== null && req.method === 'POST') {
+    return respond(req, auth.reactivateUser(bearerToken(req), decodeURIComponent(userReactivate[1])));
+  }
+  const userPasswordReset = USER_PASSWORD_RESET.exec(path);
+  if (userPasswordReset !== null && req.method === 'POST') {
+    return respond(req, auth.resetUserPassword(bearerToken(req), decodeURIComponent(userPasswordReset[1]), req.body));
+  }
+  const userHistory = USER_HISTORY.exec(path);
+  if (userHistory !== null && req.method === 'GET') {
+    return respond(req, auth.getUserHistory(bearerToken(req), decodeURIComponent(userHistory[1])));
+  }
+  const userById = USER_BY_ID.exec(path);
+  if (userById !== null && req.method === 'GET') {
+    return respond(req, auth.getUser(bearerToken(req), decodeURIComponent(userById[1])));
   }
 
   // Workshop routes (001): a token with a session must be live and without a pending temporary password.

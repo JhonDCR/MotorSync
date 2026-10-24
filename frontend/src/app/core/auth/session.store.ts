@@ -39,6 +39,19 @@ export class SessionStore {
     this.currentWorkshop.set(current.workshop);
   }
 
+  /**
+   * Applies to the signed-in user the data of a server response about that same account (for example the
+   * UserAccount returned by PUT /users/{own id}/role), so the role shown and checked updates without a reload.
+   * Does nothing without a session or when the account is another one.
+   */
+  updateUser(account: Pick<SessionUser, 'id' | 'name' | 'email' | 'role'>): void {
+    const current = this.currentUser();
+    if (current === null || current.id !== account.id) {
+      return;
+    }
+    this.currentUser.set({ ...current, name: account.name, email: account.email, role: account.role });
+  }
+
   clear(): void {
     localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
     this.currentUser.set(null);

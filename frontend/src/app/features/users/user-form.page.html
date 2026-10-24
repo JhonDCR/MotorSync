@@ -69,11 +69,14 @@
         autocomplete="new-password"
         placeholder="Mínimo 8 caracteres"
         [attr.aria-invalid]="form.controls.temporaryPassword.invalid && form.controls.temporaryPassword.touched ? 'true' : null"
+        [attr.aria-describedby]="passwordDescribedBy()"
       />
       @if (form.controls.temporaryPassword.touched && form.controls.temporaryPassword.hasError('required')) {
-        <p class="field-error" data-testid="password-required-error">La contraseña temporal es obligatoria</p>
+        <p class="field-error" [id]="passwordErrorIds.required" data-testid="password-required-error">La contraseña temporal es obligatoria</p>
       } @else if (form.controls.temporaryPassword.touched && form.controls.temporaryPassword.hasError('minlength')) {
-        <p class="field-error" data-testid="password-length-error">Debe tener al menos 8 caracteres</p>
+        <p class="field-error" [id]="passwordErrorIds.minLength" data-testid="password-length-error">Debe tener al menos {{ passwordMinLength }} caracteres</p>
+      } @else if (form.controls.temporaryPassword.touched && form.controls.temporaryPassword.hasError('maxlength')) {
+        <p class="field-error" [id]="passwordErrorIds.maxLength" data-testid="password-max-length-error">Admite como máximo {{ passwordMaxLength }} caracteres</p>
       }
     </div>
 

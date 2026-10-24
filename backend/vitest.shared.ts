@@ -36,7 +36,6 @@ export function databaseSuiteConfig(options: DatabaseSuiteOptions): ViteUserConf
       globalSetup: ['./test/setup/global-setup.ts'],
       // The suites share one database: run the files one at a time.
       fileParallelism: false,
-      pool: 'threads',
       ...options,
     },
   };

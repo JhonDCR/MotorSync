@@ -19,7 +19,7 @@ const MOCK_USER: UserAccount = {
   updatedByName: 'Admin Principal',
 };
 
-describe('ResetPasswordDialog (T061)', () => {
+describe('ResetPasswordDialog (T060)', () => {
   let fixture: ComponentFixture<ResetPasswordDialog>;
   let component: ResetPasswordDialog;
   let usersApiMock: { resetPassword: ReturnType<typeof vi.fn> };
@@ -45,13 +45,13 @@ describe('ResetPasswordDialog (T061)', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('muestra la advertencia de que todas las sesiones se cerrarán', () => {
+  it('[US4-AC21] muestra la advertencia de que todas las sesiones se cerrarán', () => {
     const warning = root().querySelector('[data-testid="reset-warning"]');
     expect(warning?.textContent).toContain('se cerrarán todas las sesiones abiertas');
     expect(warning?.textContent).toContain('72 horas');
   });
 
-  it('valida que la contraseña temporal es obligatoria y tenga al menos 8 caracteres', () => {
+  it('[US4-AC21][FR-005] valida que la contraseña temporal es obligatoria y tenga al menos 8 caracteres', () => {
     const submitBtn = root().querySelector('[data-testid="confirm-reset-button"]') as HTMLButtonElement;
 
     // Submit empty
@@ -74,7 +74,47 @@ describe('ResetPasswordDialog (T061)', () => {
     expect(root().querySelector('[data-testid="password-length-error"]')).not.toBeNull();
   });
 
-  it('envía contraseña válida y emite success', () => {
+  function submitPassword(value: string): void {
+    const input = root().querySelector('[data-testid="temporary-password-input"]') as HTMLInputElement;
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    (root().querySelector('[data-testid="confirm-reset-button"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+  }
+
+  it('[US4-AC21][FR-005] 4 emojis (4 caracteres Unicode) → error de mínimo y no envía', () => {
+    submitPassword('😀'.repeat(4));
+
+    expect(root().querySelector('[data-testid="password-length-error"]')).not.toBeNull();
+    expect(usersApiMock.resetPassword).not.toHaveBeenCalled();
+  });
+
+  it('[US4-AC21][FR-005] 8 emojis (8 caracteres Unicode) → válido y se envía', () => {
+    const password = '😀'.repeat(8);
+    submitPassword(password);
+
+    expect(root().querySelector('[data-testid="password-length-error"]')).toBeNull();
+    expect(root().querySelector('[data-testid="password-max-length-error"]')).toBeNull();
+    expect(usersApiMock.resetPassword).toHaveBeenCalledWith(USER_ID, password);
+  });
+
+  it('[US4-AC21][FR-005] 128 emojis (128 caracteres Unicode, 256 unidades UTF-16) → válido y se envía', () => {
+    const password = '😀'.repeat(128);
+    submitPassword(password);
+
+    expect(root().querySelector('[data-testid="password-max-length-error"]')).toBeNull();
+    expect(usersApiMock.resetPassword).toHaveBeenCalledWith(USER_ID, password);
+  });
+
+  it('[US4-AC21][FR-005] 129 emojis (129 caracteres Unicode) → error de máximo y no envía', () => {
+    submitPassword('😀'.repeat(129));
+
+    expect(root().querySelector('[data-testid="password-max-length-error"]')).not.toBeNull();
+    expect(usersApiMock.resetPassword).not.toHaveBeenCalled();
+  });
+
+  it('[US4-AC21] envía contraseña válida y emite success', () => {
     let successUser: UserAccount | undefined;
     component.success.subscribe((u) => (successUser = u));
 
@@ -91,7 +131,7 @@ describe('ResetPasswordDialog (T061)', () => {
     expect(successUser).toEqual(MOCK_USER);
   });
 
-  it('muestra mensaje de error si falla la llamada', () => {
+  it('[US4-AC23] muestra mensaje de error si falla la llamada', () => {
     const prob: Problem = {
       type: 'about:blank',
       title: 'Error',
@@ -114,7 +154,7 @@ describe('ResetPasswordDialog (T061)', () => {
     expect(errorBox?.textContent).toContain('Para su propia cuenta use Cambiar mi contraseña');
   });
 
-  it('emite closed al pulsar Cancelar', () => {
+  it('[FR-028] emite closed al pulsar Cancelar', () => {
     let closed = false;
     component.closed.subscribe(() => (closed = true));
 
@@ -124,7 +164,7 @@ describe('ResetPasswordDialog (T061)', () => {
     expect(closed).toBe(true);
   });
 
-  it('emite closed al presionar la tecla Escape', () => {
+  it('[FR-028] emite closed al presionar la tecla Escape', () => {
     let closed = false;
     component.closed.subscribe(() => (closed = true));
 

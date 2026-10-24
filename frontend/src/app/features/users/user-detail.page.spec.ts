@@ -106,13 +106,14 @@ describe('UserDetailPage (T060)', () => {
       await createComponent();
     });
 
-    it('muestra los datos completos de la cuenta', () => {
+    it('[US4-AC1][FR-020] muestra los datos completos de la cuenta', () => {
       expect(root().querySelector('[data-testid="user-name"]')?.textContent?.trim()).toBe('Asesor Demo');
       expect(root().querySelector('[data-testid="info-email"]')?.textContent?.trim()).toBe('asesor@taller.ec');
       expect(root().querySelector('[data-testid="info-role"]')?.textContent?.trim()).toBe('Asesor');
       expect(root().querySelector('[data-testid="info-status"]')?.textContent?.trim()).toBe('Activo');
-      expect(root().querySelector('[data-testid="info-created-at"]')?.textContent?.trim()).toBe('2026-10-24T10:00:00.000Z');
-      expect(root().querySelector('[data-testid="info-updated-at"]')?.textContent?.trim()).toBe('2026-10-24T11:00:00.000Z');
+      // El formato legible (no ISO crudo) se comprueba en user-detail.page.a11y.spec.ts.
+      expect(root().querySelector('[data-testid="info-created-at"]')?.textContent).toContain('2026');
+      expect(root().querySelector('[data-testid="info-updated-at"]')?.textContent).toContain('2026');
       expect(root().querySelector('[data-testid="info-updated-by"]')?.textContent?.trim()).toBe('Admin Principal');
     });
   });
@@ -122,7 +123,7 @@ describe('UserDetailPage (T060)', () => {
       await createComponent();
     });
 
-    it('permite cambiar rol con confirmación', () => {
+    it('[US4-AC5] permite cambiar rol con confirmación', () => {
       const changeRoleBtn = root().querySelector('[data-testid="change-role-button"]') as HTMLButtonElement;
       expect(changeRoleBtn.textContent).toContain('Cambiar a administrador');
 
@@ -140,7 +141,7 @@ describe('UserDetailPage (T060)', () => {
       expect(root().querySelector('[data-testid="action-success"]')?.textContent).toContain('Rol actualizado');
     });
 
-    it('permite desactivar cuenta activa con confirmación', () => {
+    it('[US4-AC6] permite desactivar cuenta activa con confirmación', () => {
       const deactivateBtn = root().querySelector('[data-testid="deactivate-button"]') as HTMLButtonElement;
       deactivateBtn.click();
       fixture.detectChanges();
@@ -156,7 +157,7 @@ describe('UserDetailPage (T060)', () => {
       expect(root().querySelector('[data-testid="action-success"]')?.textContent).toContain('Cuenta desactivada');
     });
 
-    it('muestra el error especificado cuando la API devuelve LAST_ADMIN', () => {
+    it('[US4-AC9] muestra el error especificado cuando la API devuelve LAST_ADMIN', () => {
       const lastAdminProb: Problem = {
         type: 'about:blank',
         title: 'Error',
@@ -179,7 +180,7 @@ describe('UserDetailPage (T060)', () => {
   });
 
   describe('Reactivar cuenta inactiva', () => {
-    it('permite reactivar si el estado es inactive', async () => {
+    it('[US4-AC7] permite reactivar si el estado es inactive', async () => {
       await createComponent({ ...MOCK_TARGET_USER, status: 'inactive' });
 
       const reactivateBtn = root().querySelector('[data-testid="reactivate-button"]') as HTMLButtonElement;
@@ -198,7 +199,7 @@ describe('UserDetailPage (T060)', () => {
   });
 
   describe('Restablecer contraseña vs propia cuenta', () => {
-    it('muestra botón "Restablecer contraseña" para cuentas de terceros', async () => {
+    it('[US4-AC21] muestra botón "Restablecer contraseña" para cuentas de terceros', async () => {
       await createComponent(MOCK_TARGET_USER, LOGGED_ADMIN_ID);
 
       const resetBtn = root().querySelector('[data-testid="reset-password-button"]');
@@ -206,7 +207,7 @@ describe('UserDetailPage (T060)', () => {
       expect(root().querySelector('[data-testid="own-account-notice"]')).toBeNull();
     });
 
-    it('oculta botón y muestra aviso para la propia cuenta del administrador logueado', async () => {
+    it('[US4-AC23] oculta botón y muestra aviso para la propia cuenta del administrador logueado', async () => {
       await createComponent(MOCK_TARGET_USER, TARGET_USER_ID);
 
       const resetBtn = root().querySelector('[data-testid="reset-password-button"]');
@@ -223,7 +224,7 @@ describe('UserDetailPage (T060)', () => {
       await createComponent();
     });
 
-    it('lista los eventos en orden con las acciones traducidas al español', () => {
+    it('[US4-AC12][US4-AC13] lista los eventos en orden con las acciones traducidas al español', () => {
       const entries = root().querySelectorAll('[data-testid="history-entry"]');
       expect(entries.length).toBe(2);
 

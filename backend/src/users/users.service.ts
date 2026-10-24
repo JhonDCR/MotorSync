@@ -3,7 +3,6 @@ import type { AuditAction } from '../audit/audit-log.entity.js';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthRole } from '../auth/auth-user.js';
 import { PasswordHasher } from '../auth/password-hasher.js';
-import { SessionsService } from '../auth/sessions.service.js';
 import { ProblemException } from '../common/problem-details.filter.js';
 import { translatePgError } from '../database/pg-errors.js';
 import { getManager, getTenantContext } from '../database/tenant-context.js';
@@ -113,12 +112,24 @@ function toUserAccount(row: UserAccountRow): UserAccount {
   };
 }
 
+/**
+ * Account management of the workshop (US4). Lock order of every mutation (research R8):
+ *   1. pg_advisory_xact_lock of the workshop: taken by TenantTransactionInterceptor before the
+ *      session check on the handlers marked with @LocksTenantAdmins() (changeRole, deactivate,
+ *      reactivate, resetPassword). These methods rely on it and do not take it again.
+ *   2. The actor's own user_sessions row (SessionValidator, in the interceptor).
+ *   3. The user_sessions rows of the target account (revocation).
+ *   4. The users row of the target account.
+ * POST /auth/password also holds the workshop lock (@LocksTenantAdmins): it locks its own session,
+ * then the users row, then the OTHER sessions of the account. Without the shared lock, a reset or
+ * deactivation of that account locks the same session rows in another order (40P01) whenever the
+ * account has more than one open session. 3 before 4 keeps the session -> account order anyway.
+ */
 @Injectable()
 export class UsersService {
   constructor(
     @Inject(PasswordHasher) private readonly hasher: PasswordHasher,
     @Inject(AuditService) private readonly audit: AuditService,
-    @Inject(SessionsService) private readonly sessions: SessionsService,
   ) {}
 
   /**
@@ -171,8 +182,8 @@ export class UsersService {
     const { manager, user } = getTenantContext();
     const passwordHash = await this.hasher.hash(dto.temporaryPassword);
 
-    const savepoint = 'user_create';
-    await manager.query(`SAVEPOINT ${savepoint}`);
+    // No SAVEPOINT: a unique violation aborts the transaction, but the 409 rolls the whole request
+    // back anyway (TenantTransactionInterceptor) and nothing else runs on it after the INSERT.
     let rows: UserAccountRow[];
     try {
       rows = await manager.query<UserAccountRow[]>(
@@ -193,9 +204,7 @@ export class UsersService {
                    updated_by_name AS "updatedByName"`,
         [dto.name, dto.email, passwordHash, dto.role, user.userId, user.name],
       );
-      await manager.query(`RELEASE SAVEPOINT ${savepoint}`);
     } catch (error: unknown) {
-      await manager.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
       const translated = translatePgError(error);
       if (translated && translated.code === 'EMAIL_UNAVAILABLE') {
         throw new ProblemException(409, 'EMAIL_UNAVAILABLE');
@@ -208,16 +217,13 @@ export class UsersService {
 
   /**
    * Changes the role of a user account.
-   * Protects the last active admin with advisory lock + active admin count check.
+   * Protects the last active admin: the workshop advisory lock (@LocksTenantAdmins, taken by the
+   * interceptor) + active admin count check.
    * Idempotent: returning existing user if role is unchanged (no audit).
    */
   async changeRole(targetUserId: string, dto: ChangeRoleDto): Promise<UserAccount> {
     assertValidUserId(targetUserId);
     const { manager, user } = getTenantContext();
-
-    await manager.query(
-      "SELECT pg_advisory_xact_lock(hashtextextended('users-admins:' || app_current_tenant()::text, 0))",
-    );
 
     const currentRows = await manager.query<UserAccountRow[]>(
       `SELECT id, role, status, name, email,
@@ -277,16 +283,13 @@ export class UsersService {
 
   /**
    * Deactivates a user account and revokes all active sessions.
-   * Protects the last active admin with advisory lock + active admin count check.
+   * Protects the last active admin: the workshop advisory lock (@LocksTenantAdmins, taken by the
+   * interceptor) + active admin count check.
    * Idempotent: returning existing user if already inactive (no audit).
    */
   async deactivate(targetUserId: string): Promise<UserAccount> {
     assertValidUserId(targetUserId);
     const { manager, user } = getTenantContext();
-
-    await manager.query(
-      "SELECT pg_advisory_xact_lock(hashtextextended('users-admins:' || app_current_tenant()::text, 0))",
-    );
 
     const currentRows = await manager.query<UserAccountRow[]>(
       `SELECT id, role, status, name, email,
@@ -319,6 +322,16 @@ export class UsersService {
       }
     }
 
+    // Sessions before the account: the session -> users order of POST /auth/password (R8).
+    const rawRevoked = await manager.query(
+      `UPDATE user_sessions
+          SET revoked_at = now(), revoke_reason = $2
+        WHERE user_id = $1 AND revoked_at IS NULL
+        RETURNING id`,
+      [targetUserId, 'deactivated'],
+    );
+    const sessionsClosed = extractRowCount(rawRevoked);
+
     const rawUpdated = await manager.query(
       `UPDATE users
           SET status = 'inactive', updated_at = now(), updated_by = $2, updated_by_name = $3
@@ -333,15 +346,6 @@ export class UsersService {
     );
     const updatedRows = extractRows<UserAccountRow>(rawUpdated);
 
-    const rawRevoked = await manager.query(
-      `UPDATE user_sessions
-          SET revoked_at = now(), revoke_reason = $2
-        WHERE user_id = $1 AND revoked_at IS NULL
-        RETURNING id`,
-      [targetUserId, 'deactivated'],
-    );
-    const sessionsClosed = extractRowCount(rawRevoked);
-
     await this.audit.record({
       action: 'user.deactivated',
       entityType: 'user',
@@ -354,7 +358,8 @@ export class UsersService {
   }
 
   /**
-   * Reactivates an inactive user account.
+   * Reactivates an inactive user account. Runs under the workshop advisory lock
+   * (@LocksTenantAdmins, taken by the interceptor) like every status change (R8).
    * Idempotent: returning existing user if already active (no audit).
    */
   async reactivate(targetUserId: string): Promise<UserAccount> {
@@ -407,7 +412,8 @@ export class UsersService {
   }
 
   /**
-   * Resets another user's password with a temporary password (72h expiry).
+   * Resets another user's password with a temporary password (72h expiry). Runs under the
+   * workshop advisory lock (@LocksTenantAdmins, taken by the interceptor).
    * Revokes all active sessions of the user, clears login attempt lockouts,
    * and records an audit log entry without exposing passwords.
    */
@@ -437,6 +443,16 @@ export class UsersService {
     const current = currentRows[0];
     const passwordHash = await this.hasher.hash(dto.temporaryPassword);
 
+    // Sessions before the account: the session -> users order of POST /auth/password (R8).
+    const rawRevoked = await manager.query(
+      `UPDATE user_sessions
+          SET revoked_at = now(), revoke_reason = $2
+        WHERE user_id = $1 AND revoked_at IS NULL
+        RETURNING id`,
+      [targetUserId, 'password_reset'],
+    );
+    const sessionsClosed = extractRowCount(rawRevoked);
+
     const rawUpdated = await manager.query(
       `UPDATE users
           SET password_hash = $2,
@@ -455,15 +471,6 @@ export class UsersService {
       [targetUserId, passwordHash, user.userId, user.name],
     );
     const updatedRows = extractRows<UserAccountRow>(rawUpdated);
-
-    const rawRevoked = await manager.query(
-      `UPDATE user_sessions
-          SET revoked_at = now(), revoke_reason = $2
-        WHERE user_id = $1 AND revoked_at IS NULL
-        RETURNING id`,
-      [targetUserId, 'password_reset'],
-    );
-    const sessionsClosed = extractRowCount(rawRevoked);
 
     await manager.query('SELECT auth_clear_login_failures($1)', [targetUserId]);
 

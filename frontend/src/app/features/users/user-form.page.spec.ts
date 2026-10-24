@@ -18,7 +18,7 @@ const CREATED_USER: UserAccount = {
   updatedByName: 'Admin Demo',
 };
 
-describe('UserFormPage (T059)', () => {
+describe('UserFormPage (T058)', () => {
   let fixture: ComponentFixture<UserFormPage>;
   let usersApiMock: { create: ReturnType<typeof vi.fn> };
   let router: Router;
@@ -55,13 +55,13 @@ describe('UserFormPage (T059)', () => {
     fixture.detectChanges();
   }
 
-  it('muestra el aviso de contraseña temporal con vigencia de 72 horas', () => {
+  it('[US4-AC2] muestra el aviso de contraseña temporal con vigencia de 72 horas', () => {
     const notice = root().querySelector('[data-testid="temp-password-notice"]');
     expect(notice?.textContent).toContain('contraseña asignada es temporal');
     expect(notice?.textContent).toContain('72 horas');
   });
 
-  it('valida campos obligatorios y formatos', () => {
+  it('[US4-AC4] valida campos obligatorios y formatos', () => {
     const submitBtn = root().querySelector('[data-testid="submit-button"]') as HTMLButtonElement;
     submitBtn.click();
     fixture.detectChanges();
@@ -85,7 +85,47 @@ describe('UserFormPage (T059)', () => {
     expect(root().querySelector('[data-testid="password-length-error"]')).not.toBeNull();
   });
 
-  it('crea usuario con datos válidos y navega a /users/:id', () => {
+  function submitWithPassword(temporaryPassword: string): void {
+    setInput('name-input', 'Ana Pérez');
+    setInput('email-input', 'ana.perez@taller.ec');
+    setInput('role-select', 'asesor');
+    setInput('temporary-password-input', temporaryPassword);
+    (root().querySelector('[data-testid="submit-button"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+  }
+
+  it('[US4-AC4][FR-005] 4 emojis (4 caracteres Unicode) → error de mínimo y no envía', () => {
+    submitWithPassword('😀'.repeat(4));
+
+    expect(root().querySelector('[data-testid="password-length-error"]')).not.toBeNull();
+    expect(usersApiMock.create).not.toHaveBeenCalled();
+  });
+
+  it('[US4-AC2][FR-005] 8 emojis (8 caracteres Unicode) → válido y se envía', () => {
+    const temporaryPassword = '😀'.repeat(8);
+    submitWithPassword(temporaryPassword);
+
+    expect(root().querySelector('[data-testid="password-length-error"]')).toBeNull();
+    expect(root().querySelector('[data-testid="password-max-length-error"]')).toBeNull();
+    expect(usersApiMock.create).toHaveBeenCalledWith(expect.objectContaining({ temporaryPassword }));
+  });
+
+  it('[US4-AC2][FR-005] 128 emojis (128 caracteres Unicode, 256 unidades UTF-16) → válido y se envía', () => {
+    const temporaryPassword = '😀'.repeat(128);
+    submitWithPassword(temporaryPassword);
+
+    expect(root().querySelector('[data-testid="password-max-length-error"]')).toBeNull();
+    expect(usersApiMock.create).toHaveBeenCalledWith(expect.objectContaining({ temporaryPassword }));
+  });
+
+  it('[US4-AC4][FR-005] 129 emojis (129 caracteres Unicode) → error de máximo y no envía', () => {
+    submitWithPassword('😀'.repeat(129));
+
+    expect(root().querySelector('[data-testid="password-max-length-error"]')).not.toBeNull();
+    expect(usersApiMock.create).not.toHaveBeenCalled();
+  });
+
+  it('[US4-AC2] crea usuario con datos válidos y navega a /users/:id', () => {
     setInput('name-input', 'Ana Pérez');
     setInput('email-input', 'ana.perez@taller.ec');
     setInput('role-select', 'asesor');
@@ -105,7 +145,7 @@ describe('UserFormPage (T059)', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/users', CREATED_USER.id]);
   });
 
-  it('muestra el mensaje especificado ante error 409 EMAIL_UNAVAILABLE', () => {
+  it('[US4-AC3] muestra el mensaje especificado ante error 409 EMAIL_UNAVAILABLE', () => {
     const conflictProb: Problem = {
       type: 'about:blank',
       title: 'Error',

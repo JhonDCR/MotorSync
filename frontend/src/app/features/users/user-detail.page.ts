@@ -1,11 +1,5 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  OnInit,
-  signal,
-} from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import type { Role, UserAccount, UserAuditEntry } from '../../core/api/api.models';
 import { isProblem, problemMessage } from '../../core/api/problem';
@@ -23,7 +17,7 @@ const ACTION_LABELS: Record<UserAuditEntry['action'], string> = {
 @Component({
   selector: 'app-user-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, ResetPasswordDialog],
+  imports: [RouterLink, DatePipe, ResetPasswordDialog],
   templateUrl: './user-detail.page.html',
   styleUrl: './user-detail.page.scss',
 })
@@ -44,6 +38,9 @@ export class UserDetailPage implements OnInit {
   protected readonly confirmAction = signal<'role' | 'deactivate' | 'reactivate' | null>(null);
   protected readonly processing = signal(false);
   protected readonly showResetDialog = signal(false);
+
+  /** Button that opened the reset dialog; it gets the focus back when the dialog closes (FR-028, FR-025). */
+  private resetOpener: HTMLElement | null = null;
 
   protected readonly isOwnAccount = computed(() => {
     const sessionUserId = this.sessionStore.user()?.id;
@@ -107,6 +104,7 @@ export class UserDetailPage implements OnInit {
     this.usersApi.changeRole(this.userId, this.targetRole()).subscribe({
       next: (updated) => {
         this.user.set(updated);
+        this.syncOwnSession(updated);
         this.processing.set(false);
         this.confirmAction.set(null);
         this.actionSuccess.set('Rol actualizado correctamente');
@@ -192,7 +190,8 @@ export class UserDetailPage implements OnInit {
     this.actionError.set(null);
   }
 
-  protected openResetPasswordDialog(): void {
+  protected openResetPasswordDialog(event: Event): void {
+    this.resetOpener = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
     this.actionError.set(null);
     this.actionSuccess.set(null);
     this.showResetDialog.set(true);
@@ -200,12 +199,29 @@ export class UserDetailPage implements OnInit {
 
   protected onResetDialogSuccess(updated: UserAccount): void {
     this.user.set(updated);
-    this.showResetDialog.set(false);
+    this.closeResetDialog();
     this.actionSuccess.set('Contraseña temporal restablecida correctamente');
     this.loadHistory();
   }
 
   protected onResetDialogClosed(): void {
+    this.closeResetDialog();
+  }
+
+  private closeResetDialog(): void {
     this.showResetDialog.set(false);
+    const opener = this.resetOpener;
+    this.resetOpener = null;
+    opener?.focus();
+  }
+
+  /**
+   * When the edited account is the one of the session (an admin removing their own role), the session takes the
+   * returned data, so the "Usuarios" link and adminGuard react without a reload (US4-AC5, US4-AC11).
+   */
+  private syncOwnSession(updated: UserAccount): void {
+    if (this.sessionStore.user()?.id === updated.id) {
+      this.sessionStore.updateUser(updated);
+    }
   }
 }

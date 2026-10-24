@@ -16,6 +16,7 @@ import {
 } from './cookies.js';
 import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { LocksTenantAdmins } from './locks-tenant-admins.decorator.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { Public } from './public.decorator.js';
 
@@ -92,8 +93,14 @@ export class AuthController {
     return this.auth.me();
   }
 
-  /** POST /api/v1/auth/password (US5): 200 SessionResponse with a new access token. */
+  /**
+   * POST /api/v1/auth/password (US5): 200 SessionResponse with a new access token.
+   * Holds the workshop advisory lock (research R8) like the account mutations of /users: it locks
+   * its own session, the users row and the OTHER sessions of the account, and an admin revoking
+   * those sessions (password-reset, deactivate) would otherwise lock them in another order (40P01).
+   */
   @AllowPendingPasswordChange()
+  @LocksTenantAdmins()
   @Post('password')
   @HttpCode(200)
   changePassword(@Body() dto: ChangePasswordDto): Promise<SessionResponse> {

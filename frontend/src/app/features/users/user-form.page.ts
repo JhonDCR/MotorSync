@@ -5,12 +5,18 @@ import type { Role } from '../../core/api/api.models';
 import { isProblem, problemMessage } from '../../core/api/problem';
 import { UsersApiService } from '../../core/api/users-api.service';
 import { normalizeEmail } from '../../shared/identifiers/email';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, passwordLengthValidator } from '../auth/auth-form';
 
 const NAME_MIN_LENGTH = 2;
 const NAME_MAX_LENGTH = 120;
 const EMAIL_MAX_LENGTH = 254;
-const PASSWORD_MIN_LENGTH = 8;
-const PASSWORD_MAX_LENGTH = 128;
+
+/** Ids of the temporary password errors, referenced by the aria-describedby of the input. */
+const PASSWORD_ERROR_IDS = {
+  required: 'temporary-password-required-error',
+  minLength: 'temporary-password-length-error',
+  maxLength: 'temporary-password-max-length-error',
+} as const;
 
 @Component({
   selector: 'app-user-form-page',
@@ -33,12 +39,26 @@ export class UserFormPage {
     role: ['asesor' as Role, [Validators.required]],
     temporaryPassword: [
       '',
-      [Validators.required, Validators.minLength(PASSWORD_MIN_LENGTH), Validators.maxLength(PASSWORD_MAX_LENGTH)],
+      [Validators.required, passwordLengthValidator],
     ],
   });
 
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
+
+  protected readonly passwordErrorIds = PASSWORD_ERROR_IDS;
+  protected readonly passwordMinLength = PASSWORD_MIN_LENGTH;
+  protected readonly passwordMaxLength = PASSWORD_MAX_LENGTH;
+
+  /** Id of the visible error of the temporary password, for its aria-describedby; null when there is none. */
+  protected passwordDescribedBy(): string | null {
+    const control = this.form.controls.temporaryPassword;
+    if (!control.touched) return null;
+    if (control.hasError('required')) return PASSWORD_ERROR_IDS.required;
+    if (control.hasError('minlength')) return PASSWORD_ERROR_IDS.minLength;
+    if (control.hasError('maxlength')) return PASSWORD_ERROR_IDS.maxLength;
+    return null;
+  }
 
   protected submit(): void {
     if (this.submitting()) return;

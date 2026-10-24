@@ -8,6 +8,7 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
+import { LocksTenantAdmins } from '../auth/locks-tenant-admins.decorator.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { ChangeRoleDto } from './dto/change-role.dto.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
@@ -58,6 +59,7 @@ export class UsersController {
    */
   @Put(':userId/role')
   @Roles('admin')
+  @LocksTenantAdmins()
   changeRole(
     @Param('userId') userId: string,
     @Body() dto: ChangeRoleDto,
@@ -72,6 +74,7 @@ export class UsersController {
   @Post(':userId/deactivate')
   @HttpCode(200)
   @Roles('admin')
+  @LocksTenantAdmins()
   deactivate(@Param('userId') userId: string): Promise<UserAccount> {
     assertValidUserId(userId);
     return this.usersService.deactivate(userId);
@@ -83,6 +86,7 @@ export class UsersController {
   @Post(':userId/reactivate')
   @HttpCode(200)
   @Roles('admin')
+  @LocksTenantAdmins()
   reactivate(@Param('userId') userId: string): Promise<UserAccount> {
     assertValidUserId(userId);
     return this.usersService.reactivate(userId);
@@ -94,6 +98,7 @@ export class UsersController {
   @Post(':userId/password-reset')
   @HttpCode(200)
   @Roles('admin')
+  @LocksTenantAdmins()
   resetPassword(
     @Param('userId') userId: string,
     @Body() dto: ResetPasswordDto,

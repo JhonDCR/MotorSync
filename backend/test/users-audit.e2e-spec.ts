@@ -183,13 +183,23 @@ describe('Users audit log and multi-tenant isolation (e2e, T054, US4)', () => {
   // ---------------------------------------------------------------------------------------------
   // US4-AC12: Role change produces user.role_changed audit record
   // ---------------------------------------------------------------------------------------------
-  it('US4-AC12: Role change produces exactly one user.role_changed audit log record with actorName, actorRole="admin", entityType="user", before: { role: "asesor" }, after: { role: "admin" }, occurredAt UTC, ip, channel="web"', async () => {
+  it('[US4-AC12] el cambio de rol deja exactamente un registro user.role_changed con taller, actor, actor_role admin, entity_type user, before.role, after.role, occurred_at en UTC dentro del intervalo de la petición, ip no vacía y channel web', async () => {
     const loginAdmin = await loginAs(app, adminA.email, PASSWORD);
 
+    /** Clock of PostgreSQL, which is the one that writes occurred_at. */
+    async function databaseNow(): Promise<Date> {
+      const result = await migratorPool.query<{ now: Date }>(
+        'SELECT clock_timestamp() AS now',
+      );
+      return result.rows[0].now;
+    }
+
+    const startedAt = await databaseNow();
     const res = await server()
       .put(`/api/v1/users/${asesorLuisA.id}/role`)
       .set(authHeader(loginAdmin.accessToken))
       .send({ role: 'admin' });
+    const finishedAt = await databaseNow();
     expect(res.status).toBe(200);
 
     const rows = await readAuditLog(tenantA.id, asesorLuisA.id);
@@ -206,8 +216,34 @@ describe('Users audit log and multi-tenant isolation (e2e, T054, US4)', () => {
     expect(record.entityId).toBe(asesorLuisA.id);
     expect(record.before).toEqual({ role: 'asesor' });
     expect(record.after).toEqual({ role: 'admin' });
-    expect(record.occurredAt).toBeInstanceOf(Date);
     expect(record.channel).toBe('web');
+
+    // IP of origin: a non-empty string (supertest connects from the loopback).
+    expect(typeof record.ip).toBe('string');
+    expect((record.ip ?? '').trim().length).toBeGreaterThan(0);
+
+    // occurred_at is an instant (timestamptz, stored in UTC) taken during the request.
+    const columnType = await migratorPool.query<{ dataType: string }>(
+      `SELECT data_type AS "dataType" FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'audit_log' AND column_name = 'occurred_at'`,
+    );
+    expect(columnType.rows[0]?.dataType).toBe('timestamp with time zone');
+    expect(record.occurredAt).toBeInstanceOf(Date);
+    expect(record.occurredAt.getTime()).toBeGreaterThanOrEqual(startedAt.getTime());
+    expect(record.occurredAt.getTime()).toBeLessThanOrEqual(finishedAt.getTime());
+
+    // The history exposes the same instant in UTC (ISO 8601 with Z), the same ip and channel.
+    const history = await server()
+      .get(`/api/v1/users/${asesorLuisA.id}/history`)
+      .set(authHeader(loginAdmin.accessToken));
+    expect(history.status).toBe(200);
+    const entries = (history.body as { items: UserAuditEntryResponse[] }).items;
+    expect(entries).toHaveLength(1);
+    expect(entries[0].occurredAt).toMatch(/Z$/);
+    expect(entries[0].occurredAt).toMatch(ISO_DATE_RE);
+    expect(new Date(entries[0].occurredAt).getTime()).toBe(record.occurredAt.getTime());
+    expect(entries[0].ip).toBe(record.ip);
+    expect(entries[0].channel).toBe('web');
   });
 
   // ---------------------------------------------------------------------------------------------

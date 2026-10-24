@@ -176,7 +176,7 @@
           class="btn-action"
           data-testid="reset-password-button"
           [disabled]="processing() || confirmAction() !== null"
-          (click)="openResetPasswordDialog()"
+          (click)="openResetPasswordDialog($event)"
         >
           Restablecer contraseña
         </button>
@@ -197,10 +197,10 @@
         <dd data-testid="info-status">{{ u.status === 'active' ? 'Activo' : 'Inactivo' }}</dd>
 
         <dt>Fecha de registro</dt>
-        <dd data-testid="info-created-at">{{ u.createdAt }}</dd>
+        <dd data-testid="info-created-at">{{ u.createdAt | date: 'dd/MM/yyyy HH:mm' }}</dd>
 
         <dt>Última actualización</dt>
-        <dd data-testid="info-updated-at">{{ u.updatedAt }}</dd>
+        <dd data-testid="info-updated-at">{{ u.updatedAt | date: 'dd/MM/yyyy HH:mm' }}</dd>
 
         <dt>Actualizado por</dt>
         <dd data-testid="info-updated-by">{{ u.updatedByName }}</dd>
@@ -227,7 +227,7 @@
             <tbody>
               @for (entry of history(); track entry.id) {
                 <tr data-testid="history-entry">
-                  <td class="time-cell" data-testid="entry-date">{{ entry.occurredAt }}</td>
+                  <td class="time-cell" data-testid="entry-date">{{ entry.occurredAt | date: 'dd/MM/yyyy HH:mm' }}</td>
                   <td class="action-cell" data-testid="entry-action">{{ actionLabel(entry.action) }}</td>
                   <td data-testid="entry-actor">{{ entry.actorName }} ({{ entry.actorRole === 'admin' ? 'Administrador' : 'Asesor' }})</td>
                   <td data-testid="entry-channel">{{ entry.channel }}</td>

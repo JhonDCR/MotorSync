@@ -56,10 +56,23 @@ export const authGuard: CanMatchFn & CanActivateFn = (
   );
 };
 
-/** Admin-only routes; goes after authGuard. Any other role returns to the start screen (US4-AC16). */
-export const adminGuard: CanMatchFn & CanActivateFn = (): boolean | UrlTree => {
+/**
+ * Admin-only routes; goes after authGuard. Waits for restore() like authGuard, so a page reload with only the
+ * stored token reads the role from GET /auth/me (single-flight with authGuard), never from the JWT. Without a
+ * session it lets authGuard decide (/login?returnUrl=…); any role other than admin returns to the start screen
+ * (US4-AC16).
+ */
+export const adminGuard: CanMatchFn & CanActivateFn = (): Observable<boolean | UrlTree> => {
   const store = inject(SessionStore);
-  return store.user()?.role === 'admin' ? true : inject(Router).createUrlTree(['/']);
+  const router = inject(Router);
+  return store.restore().pipe(
+    map((signedIn) => {
+      if (!signedIn) {
+        return true;
+      }
+      return store.user()?.role === 'admin' ? true : router.createUrlTree(['/']);
+    }),
+  );
 };
 
 /** /login and /register: with a session there is nothing to do there, so they lead to the start screen. */

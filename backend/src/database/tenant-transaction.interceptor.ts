@@ -13,6 +13,10 @@ import { defer, lastValueFrom, type Observable } from 'rxjs';
 import { DataSource, type EntityManager } from 'typeorm';
 import { ALLOW_PENDING_PASSWORD_CHANGE_KEY } from '../auth/allow-pending-password-change.decorator.js';
 import type { AuthRole, AuthUser, AuthenticatedRequest } from '../auth/auth-user.js';
+import {
+  LOCKS_TENANT_ADMINS_KEY,
+  TENANT_ADMINS_LOCK_SQL,
+} from '../auth/locks-tenant-admins.decorator.js';
 import { IS_PUBLIC_KEY } from '../auth/public.decorator.js';
 import { ROLES_KEY } from '../auth/roles.decorator.js';
 import { SessionValidator } from '../auth/session-validator.js';
@@ -62,6 +66,14 @@ export class TenantTransactionInterceptor implements NestInterceptor {
         await runner.connect();
         await runner.startTransaction();
         await runner.query("SELECT set_config('app.tenant_id', $1, true)", [tokenUser.tenantId]);
+        // Lock order (research R8): workshop advisory lock -> own session row (SessionValidator)
+        // -> sessions of the target account -> users row. Taking the advisory lock before the
+        // session check means a request waiting for it holds no row yet, so the holder can revoke
+        // the waiter's sessions without a deadlock (40P01); the waiter then sees its session
+        // revoked (401 SESSION_REVOKED) or its current role (403 FORBIDDEN).
+        if (this.metadata<boolean>(LOCKS_TENANT_ADMINS_KEY, context) === true) {
+          await runner.query(TENANT_ADMINS_LOCK_SQL);
+        }
         const user = await this.currentUser(runner.manager, tokenUser);
         request.user = user;
         this.authorize(context, user);

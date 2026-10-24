@@ -529,7 +529,7 @@ Al terminar, el administrador gestiona las cuentas de su taller con auditoría, 
 
 ## Cierre PR3
 
-- [ ] T062 Revisar el diff del PR3 contra la spec y la **constitución 1.2.0** (principio IV con desactivación, reactivación y restablecimiento). Foco:
+- [x] T062 Revisar el diff del PR3 contra la spec y la **constitución 1.2.0** (principio IV con desactivación, reactivación y restablecimiento). Foco:
   - auditoría en la misma transacción que el cambio y la revocación;
   - append-only;
   - nunca contraseñas ni hashes en `audit_log`;

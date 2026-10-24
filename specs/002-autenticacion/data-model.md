@@ -342,7 +342,7 @@ Va en el PR3, junto con la gestión de usuarios, para que su prueba (T051) nazca
 
 ```sql
 -- FR-018, defensa en la base (R8): al confirmar, el taller conserva al menos un admin activo.
--- La garantía ante concurrencia la da el advisory lock del servicio; esto atrapa olvidos del código.
+-- La garantía ante concurrencia la da el advisory lock del taller (R8); esto atrapa olvidos del código.
 CREATE FUNCTION users_require_active_admin() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM users
@@ -414,7 +414,7 @@ abierta (revoked_at NULL)
 - **Validación por request (R6)**: la sentencia `UPDATE user_sessions … RETURNING` de research R6, bajo RLS.
 - **Revocar sesiones de una cuenta**: `UPDATE user_sessions SET revoked_at = now(), revoke_reason = $2 WHERE user_id = $1 AND revoked_at IS NULL [AND id <> $current]`. Con `RETURNING id` se cuentan las sesiones cerradas (`sessionsClosed`).
 - **Último administrador (R8)**:
-  1. `SELECT pg_advisory_xact_lock(hashtextextended('users-admins:' || app_current_tenant()::text, 0))`;
+  1. `SELECT pg_advisory_xact_lock(hashtextextended('users-admins:' || app_current_tenant()::text, 0))`. Lo toma el interceptor antes de validar la sesión, en los handlers con `@LocksTenantAdmins()` (orden de locks en R8), no el servicio;
   2. `SELECT count(*) FROM users WHERE role = 'admin' AND status = 'active' AND id <> $target`;
   3. si es 0 y el cambio quita el rol o desactiva a `$target`, responder 409 `LAST_ADMIN`.
 - **Listado (US4-AC1)**: `SELECT id, name, email, role, status, must_change_password, temp_password_expires_at, created_at, updated_at, updated_by_name FROM users ORDER BY status, name`. Bajo RLS; nunca se selecciona `password_hash`.

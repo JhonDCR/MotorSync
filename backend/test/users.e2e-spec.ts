@@ -24,6 +24,7 @@ import {
   closeFixtures,
   createTenant,
   createUser,
+  readAuditLog,
   setLockedUntil,
   truncateBusinessTables,
   type TenantFixture,
@@ -637,6 +638,61 @@ describe('Users management (e2e, T053, US4)', () => {
     expectProblem(resNextReq, 403, 'FORBIDDEN');
   });
 
+  it('[US4-AC11][US4-AC6] con dos administradores, Ana se desactiva a sí misma -> 200; su sesión da 401 SESSION_REVOKED en la petición siguiente; se audita user.deactivated con actor y entidad Ana y sessionsClosed >= 1; Pedro sigue como administrador activo', async () => {
+    const loginAna = await loginAs(app, adminA.email, PASSWORD);
+
+    const resDeactivate = await server()
+      .post(`/api/v1/users/${adminA.id}/deactivate`)
+      .set(authHeader(loginAna.accessToken));
+    expect(
+      resDeactivate.status,
+      `Expected 200, got ${resDeactivate.status}: ${JSON.stringify(resDeactivate.body)}`,
+    ).toBe(200);
+    expect((resDeactivate.body as UserAccountResponse).status).toBe('inactive');
+
+    // US4-AC6: her sessions are closed, starting with the one she used.
+    const resNext = await server()
+      .get('/api/v1/auth/me')
+      .set(authHeader(loginAna.accessToken));
+    expectProblem(resNext, 401, 'SESSION_REVOKED');
+
+    // Audited like any other deactivation.
+    const deactivations = (await readAuditLog(tenantA.id, adminA.id)).filter(
+      (row) => row.action === 'user.deactivated',
+    );
+    expect(deactivations).toHaveLength(1);
+    expect(deactivations[0].actorUserId).toBe(adminA.id);
+    expect(deactivations[0].entityType).toBe('user');
+    expect(deactivations[0].entityId).toBe(adminA.id);
+    expect(Number(deactivations[0].after?.sessionsClosed)).toBeGreaterThanOrEqual(1);
+
+    // Pedro remains an active admin and can still manage users.
+    const loginPedro = await loginAs(app, adminPedroA.email, PASSWORD);
+    const resPedro = await server()
+      .get(`/api/v1/users/${adminPedroA.id}`)
+      .set(authHeader(loginPedro.accessToken));
+    expect(resPedro.status).toBe(200);
+    expect((resPedro.body as UserAccountResponse).role).toBe('admin');
+    expect((resPedro.body as UserAccountResponse).status).toBe('active');
+  });
+
+  it('[US4-AC11] Ana se quita a sí misma el rol de administrador -> se audita exactamente un user.role_changed con actor y entidad Ana', async () => {
+    const loginAna = await loginAs(app, adminA.email, PASSWORD);
+
+    const resDemote = await server()
+      .put(`/api/v1/users/${adminA.id}/role`)
+      .set(authHeader(loginAna.accessToken))
+      .send({ role: 'asesor' });
+    expect(resDemote.status).toBe(200);
+
+    const roleChanges = (await readAuditLog(tenantA.id, adminA.id)).filter(
+      (row) => row.action === 'user.role_changed',
+    );
+    expect(roleChanges).toHaveLength(1);
+    expect(roleChanges[0].actorUserId).toBe(adminA.id);
+    expect(roleChanges[0].entityId).toBe(adminA.id);
+  });
+
   // ---------------------------------------------------------------------------------------------
   // US4-AC15: Idempotent / no-change operations return 200 without updatedAt modification
   // ---------------------------------------------------------------------------------------------
@@ -857,49 +913,125 @@ describe('Users management (e2e, T053, US4)', () => {
   });
 
   // ---------------------------------------------------------------------------------------------
-  // FR-020: Updated audit fields (updatedAt, updatedByName)
+  // FR-020: who created the account, who modified it last and when (UTC)
   // ---------------------------------------------------------------------------------------------
-  it("FR-020: After create, role change, deactivate, updatedAt is updated and updatedByName is actor's name", async () => {
+  it("[FR-020] tras crear, cambiar el rol, desactivar, reactivar y restablecer, updatedAt es estrictamente posterior al anterior y updatedBy y updatedByName son del administrador que actuó", async () => {
     const loginAna = await loginAs(app, adminA.email, PASSWORD);
     const loginPedro = await loginAs(app, adminPedroA.email, PASSWORD);
 
-    // 1. Create user by Ana
-    const resCreate = await server()
-      .post('/api/v1/users')
-      .set(authHeader(loginAna.accessToken))
-      .send({
-        name: 'Roberto Gómez',
-        email: uniqueEmail('roberto'),
-        role: 'asesor',
-        temporaryPassword: 'TempPassword-123',
-      });
-    expect(resCreate.status).toBe(201);
-    const userCreated = resCreate.body as UserAccountResponse;
-    expect(userCreated.updatedByName).toBe(adminA.name);
-    const initialUpdatedAt = new Date(userCreated.updatedAt).getTime();
+    interface AccountMetadata {
+      createdBy: string;
+      updatedBy: string;
+      updatedByName: string;
+      updatedAt: Date;
+    }
 
-    // 2. Role change by Pedro
-    const resRole = await server()
-      .put(`/api/v1/users/${userCreated.id}/role`)
-      .set(authHeader(loginPedro.accessToken))
-      .send({ role: 'admin' });
-    expect(resRole.status).toBe(200);
-    const userRole = resRole.body as UserAccountResponse;
-    expect(userRole.updatedByName).toBe(adminPedroA.name);
-    expect(new Date(userRole.updatedAt).getTime()).toBeGreaterThanOrEqual(
-      initialUpdatedAt,
+    async function readMetadata(userId: string): Promise<AccountMetadata> {
+      const client = await migratorPool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(`SELECT set_config('app.tenant_id', $1, true)`, [
+          tenantA.id,
+        ]);
+        const result = await client.query<AccountMetadata>(
+          `SELECT created_by AS "createdBy", updated_by AS "updatedBy",
+                  updated_by_name AS "updatedByName", updated_at AS "updatedAt"
+             FROM users WHERE id = $1`,
+          [userId],
+        );
+        await client.query('COMMIT');
+        return result.rows[0];
+      } finally {
+        client.release();
+      }
+    }
+
+    /** Response and stored metadata of one operation, both pointing at `actor`. */
+    async function expectActor(
+      res: Response,
+      expectedStatus: number,
+      actor: UserFixture,
+      previousUpdatedAt: number | undefined,
+    ): Promise<UserAccountResponse> {
+      expect(
+        res.status,
+        `Expected ${expectedStatus}, got ${res.status}: ${JSON.stringify(res.body)}`,
+      ).toBe(expectedStatus);
+      const account = expectValidUserAccount(res.body);
+      expect(account.updatedByName).toBe(actor.name);
+      const updatedAt = new Date(account.updatedAt).getTime();
+      if (previousUpdatedAt !== undefined) {
+        expect(updatedAt).toBeGreaterThan(previousUpdatedAt);
+      }
+
+      const stored = await readMetadata(account.id);
+      expect(stored.updatedBy).toBe(actor.id);
+      expect(stored.updatedByName).toBe(actor.name);
+      expect(stored.updatedAt.toISOString()).toBe(account.updatedAt);
+      return account;
+    }
+
+    // 1. Ana creates the account: created_by and updated_by are Ana.
+    const created = await expectActor(
+      await server()
+        .post('/api/v1/users')
+        .set(authHeader(loginAna.accessToken))
+        .send({
+          name: 'Roberto Gómez',
+          email: uniqueEmail('roberto'),
+          role: 'asesor',
+          temporaryPassword: 'TempPassword-123',
+        }),
+      201,
+      adminA,
+      undefined,
+    );
+    expect((await readMetadata(created.id)).createdBy).toBe(adminA.id);
+
+    // 2. Pedro changes the role.
+    const afterRole = await expectActor(
+      await server()
+        .put(`/api/v1/users/${created.id}/role`)
+        .set(authHeader(loginPedro.accessToken))
+        .send({ role: 'admin' }),
+      200,
+      adminPedroA,
+      new Date(created.updatedAt).getTime(),
     );
 
-    // 3. Deactivate by Ana
-    const resDeact = await server()
-      .post(`/api/v1/users/${userCreated.id}/deactivate`)
-      .set(authHeader(loginAna.accessToken));
-    expect(resDeact.status).toBe(200);
-    const userDeact = resDeact.body as UserAccountResponse;
-    expect(userDeact.updatedByName).toBe(adminA.name);
-    expect(new Date(userDeact.updatedAt).getTime()).toBeGreaterThanOrEqual(
-      new Date(userRole.updatedAt).getTime(),
+    // 3. Ana deactivates.
+    const afterDeactivate = await expectActor(
+      await server()
+        .post(`/api/v1/users/${created.id}/deactivate`)
+        .set(authHeader(loginAna.accessToken)),
+      200,
+      adminA,
+      new Date(afterRole.updatedAt).getTime(),
     );
+
+    // 4. Pedro reactivates.
+    const afterReactivate = await expectActor(
+      await server()
+        .post(`/api/v1/users/${created.id}/reactivate`)
+        .set(authHeader(loginPedro.accessToken)),
+      200,
+      adminPedroA,
+      new Date(afterDeactivate.updatedAt).getTime(),
+    );
+
+    // 5. Ana resets the password.
+    await expectActor(
+      await server()
+        .post(`/api/v1/users/${created.id}/password-reset`)
+        .set(authHeader(loginAna.accessToken))
+        .send({ temporaryPassword: NEW_TEMP_PASSWORD }),
+      200,
+      adminA,
+      new Date(afterReactivate.updatedAt).getTime(),
+    );
+
+    // The creator never changes.
+    expect((await readMetadata(created.id)).createdBy).toBe(adminA.id);
   });
 
   // ---------------------------------------------------------------------------------------------

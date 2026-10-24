@@ -10,6 +10,7 @@ import { isAuthRole, type AuthRole, type AuthUser } from './auth-user.js';
 import type { ChangePasswordDto } from './dto/change-password.dto.js';
 import type { LoginDto } from './dto/login.dto.js';
 import type { RegisterDto } from './dto/register.dto.js';
+import { TENANT_ADMINS_SHARED_LOCK_SQL } from './locks-tenant-admins.decorator.js';
 import { LoginThrottleService } from './login-throttle.service.js';
 import { PasswordHasher } from './password-hasher.js';
 import { SessionsService, type LockedSession } from './sessions.service.js';
@@ -220,13 +221,28 @@ export class AuthService {
     }
 
     const state = toAccountState(account, dto.email);
-    return withAuthTransaction(this.dataSource, ip, async (tx) => {
-      // false: another attempt locked the email in the meantime (US2-AC9).
-      if (!(await this.throttle.recordSuccess(tx.manager, hash))) {
-        throw new ProblemException(429, 'ACCOUNT_LOCKED');
-      }
-      return tx.asTenant(state.user, async () => this.openSession(state, await workshopName()));
-    });
+    const issued = await withAuthTransaction(this.dataSource, ip, (tx) =>
+      tx.asTenant(state.user, async () => {
+        // Research R8 (US4-AC21): scrypt ran outside any transaction, so a reset, change of
+        // password or deactivation may have committed meanwhile. The shared workshop lock goes
+        // first (before login_attempts), then the account is re-checked under RLS.
+        await tx.manager.query(TENANT_ADMINS_SHARED_LOCK_SQL);
+        if (!(await accountUnchanged(tx.manager, account))) return null;
+        // false: another attempt locked the email in the meantime (US2-AC9).
+        if (!(await this.throttle.recordSuccess(tx.manager, hash))) {
+          throw new ProblemException(429, 'ACCOUNT_LOCKED');
+        }
+        return this.openSession(state, await workshopName());
+      }),
+    );
+    if (issued === null) {
+      // The verified password is no longer the current one: a failure like a wrong password.
+      await withAuthTransaction(this.dataSource, ip, (tx) =>
+        this.throttle.recordFailure(tx.manager, hash),
+      );
+      throw new ProblemException(401, 'INVALID_CREDENTIALS');
+    }
+    return issued;
   }
 
   /**
@@ -419,6 +435,18 @@ export class AuthService {
       workshop: { id: user.tenantId, name: workshop },
     };
   }
+}
+
+/** The account still has the verified hash and is active (read under RLS, research R8). */
+async function accountUnchanged(
+  manager: EntityManager,
+  account: LoginAccountRow,
+): Promise<boolean> {
+  const rows = (await manager.query(
+    "SELECT 1 FROM users WHERE id = $1 AND password_hash = $2 AND status = 'active'",
+    [account.user_id, account.password_hash],
+  )) as unknown[];
+  return rows.length === 1;
 }
 
 /** Name of the pinned workshop, read under RLS (policy tenants_self). */

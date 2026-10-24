@@ -61,7 +61,7 @@ describe('UsersApiService (T056)', () => {
   });
 
   describe('list', () => {
-    it('hace GET /api/v1/users y devuelve lista de usuarios (200)', () => {
+    it('[US4-AC1] hace GET /api/v1/users y devuelve lista de usuarios (200)', () => {
       const response: UserListResponse = { items: [MOCK_USER] };
       let result: UserListResponse | undefined;
       service.list().subscribe((res) => (result = res));
@@ -73,7 +73,7 @@ describe('UsersApiService (T056)', () => {
       expect(result).toEqual(response);
     });
 
-    it('propaga error Problem en 403 FORBIDDEN', () => {
+    it('[US4-AC16] propaga error Problem en 403 FORBIDDEN', () => {
       const prob = makeProblem(403, 'FORBIDDEN');
       let error: unknown;
       service.list().subscribe({ error: (err) => (error = err) });
@@ -84,7 +84,7 @@ describe('UsersApiService (T056)', () => {
   });
 
   describe('create', () => {
-    it('hace POST /api/v1/users con el body CreateUserRequest y devuelve UserAccount (201)', () => {
+    it('[US4-AC2] hace POST /api/v1/users con el body CreateUserRequest y devuelve UserAccount (201)', () => {
       const body: CreateUserRequest = {
         name: 'Carlos Mendoza',
         email: 'carlos@taller.ec',
@@ -102,7 +102,7 @@ describe('UsersApiService (T056)', () => {
       expect(result).toEqual(MOCK_USER);
     });
 
-    it('propaga 409 EMAIL_UNAVAILABLE como Problem tipado', () => {
+    it('[US4-AC3] propaga 409 EMAIL_UNAVAILABLE como Problem tipado', () => {
       const body: CreateUserRequest = {
         name: 'Carlos Mendoza',
         email: 'carlos@taller.ec',
@@ -119,7 +119,7 @@ describe('UsersApiService (T056)', () => {
   });
 
   describe('getById', () => {
-    it('hace GET /api/v1/users/:id con encodeURIComponent y devuelve UserAccount (200)', () => {
+    it('[US4-AC1] hace GET /api/v1/users/:id con encodeURIComponent y devuelve UserAccount (200)', () => {
       let result: UserAccount | undefined;
       service.getById(USER_ID).subscribe((res) => (result = res));
 
@@ -130,7 +130,7 @@ describe('UsersApiService (T056)', () => {
       expect(result).toEqual(MOCK_USER);
     });
 
-    it('propaga 404 NOT_FOUND como Problem', () => {
+    it('[US4-AC17] propaga 404 NOT_FOUND como Problem', () => {
       const prob = makeProblem(404, 'NOT_FOUND');
       let error: unknown;
       service.getById(USER_ID).subscribe({ error: (err) => (error = err) });
@@ -143,7 +143,7 @@ describe('UsersApiService (T056)', () => {
   });
 
   describe('changeRole', () => {
-    it('hace PUT /api/v1/users/:id/role con { role } y devuelve UserAccount actualizado (200)', () => {
+    it('[US4-AC5] hace PUT /api/v1/users/:id/role con { role } y devuelve UserAccount actualizado (200)', () => {
       const updated = { ...MOCK_USER, role: 'admin' as const };
       let result: UserAccount | undefined;
       service.changeRole(USER_ID, 'admin').subscribe((res) => (result = res));
@@ -156,7 +156,7 @@ describe('UsersApiService (T056)', () => {
       expect(result).toEqual(updated);
     });
 
-    it('propaga 409 LAST_ADMIN como Problem', () => {
+    it('[US4-AC9] propaga 409 LAST_ADMIN como Problem', () => {
       const prob = makeProblem(409, 'LAST_ADMIN');
       let error: unknown;
       service.changeRole(USER_ID, 'asesor').subscribe({ error: (err) => (error = err) });
@@ -169,7 +169,7 @@ describe('UsersApiService (T056)', () => {
   });
 
   describe('deactivate', () => {
-    it('hace POST /api/v1/users/:id/deactivate con {} y devuelve UserAccount (200)', () => {
+    it('[US4-AC6] hace POST /api/v1/users/:id/deactivate con {} y devuelve UserAccount (200)', () => {
       const updated = { ...MOCK_USER, status: 'inactive' as const };
       let result: UserAccount | undefined;
       service.deactivate(USER_ID).subscribe((res) => (result = res));
@@ -182,7 +182,7 @@ describe('UsersApiService (T056)', () => {
       expect(result).toEqual(updated);
     });
 
-    it('propaga 409 LAST_ADMIN como Problem', () => {
+    it('[US4-AC9] propaga 409 LAST_ADMIN como Problem', () => {
       const prob = makeProblem(409, 'LAST_ADMIN');
       let error: unknown;
       service.deactivate(USER_ID).subscribe({ error: (err) => (error = err) });
@@ -195,7 +195,7 @@ describe('UsersApiService (T056)', () => {
   });
 
   describe('reactivate', () => {
-    it('hace POST /api/v1/users/:id/reactivate con {} y devuelve UserAccount (200)', () => {
+    it('[US4-AC7] hace POST /api/v1/users/:id/reactivate con {} y devuelve UserAccount (200)', () => {
       let result: UserAccount | undefined;
       service.reactivate(USER_ID).subscribe((res) => (result = res));
 
@@ -209,7 +209,7 @@ describe('UsersApiService (T056)', () => {
   });
 
   describe('resetPassword', () => {
-    it('hace POST /api/v1/users/:id/password-reset con { temporaryPassword } y devuelve UserAccount (200)', () => {
+    it('[US4-AC21] hace POST /api/v1/users/:id/password-reset con { temporaryPassword } y devuelve UserAccount (200)', () => {
       let result: UserAccount | undefined;
       service.resetPassword(USER_ID, 'NewTempPass99').subscribe((res) => (result = res));
 
@@ -221,7 +221,7 @@ describe('UsersApiService (T056)', () => {
       expect(result).toEqual(MOCK_USER);
     });
 
-    it('propaga 409 SELF_RESET_NOT_ALLOWED como Problem', () => {
+    it('[US4-AC23] propaga 409 SELF_RESET_NOT_ALLOWED como Problem', () => {
       const prob = makeProblem(409, 'SELF_RESET_NOT_ALLOWED');
       let error: unknown;
       service.resetPassword(USER_ID, 'NewTempPass99').subscribe({ error: (err) => (error = err) });
@@ -234,7 +234,7 @@ describe('UsersApiService (T056)', () => {
   });
 
   describe('getHistory', () => {
-    it('hace GET /api/v1/users/:id/history y devuelve lista de auditorías (200)', () => {
+    it('[US4-AC20] hace GET /api/v1/users/:id/history y devuelve lista de auditorías (200)', () => {
       const response: UserHistoryResponse = { items: [MOCK_AUDIT_ENTRY] };
       let result: UserHistoryResponse | undefined;
       service.getHistory(USER_ID).subscribe((res) => (result = res));
@@ -248,7 +248,7 @@ describe('UsersApiService (T056)', () => {
   });
 
   describe('errores de red', () => {
-    it('falla con HttpErrorResponse si no es un Problem', () => {
+    it('[FR-015] falla con HttpErrorResponse si no es un Problem', () => {
       let error: unknown;
       service.list().subscribe({ error: (err) => (error = err) });
 

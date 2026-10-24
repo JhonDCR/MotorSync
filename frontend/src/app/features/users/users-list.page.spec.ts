@@ -75,7 +75,7 @@ describe('UsersListPage (T058)', () => {
       await createComponent('admin');
     });
 
-    it('muestra la tabla con nombre, correo, rol y estado para cada cuenta', () => {
+    it('[US4-AC1] muestra la tabla con nombre, correo, rol y estado para cada cuenta', () => {
       const rows = root().querySelectorAll('[data-testid="user-row"]');
       expect(rows.length).toBe(2);
 
@@ -92,13 +92,13 @@ describe('UsersListPage (T058)', () => {
       expect(secondRow.querySelector('[data-testid="user-status-badge"]')?.textContent?.trim()).toBe('Inactivo');
     });
 
-    it('tiene enlace para crear nuevo usuario (/users/new)', () => {
+    it('[US4-AC2] tiene enlace para crear nuevo usuario (/users/new)', () => {
       const createLink = root().querySelector('[data-testid="new-user-link"]') as HTMLAnchorElement;
       expect(createLink).not.toBeNull();
       expect(createLink.getAttribute('href')).toBe('/users/new');
     });
 
-    it('cada usuario tiene enlace a su ficha (/users/:id)', () => {
+    it('[US4-AC1] cada usuario tiene enlace a su ficha (/users/:id)', () => {
       const detailLink = root().querySelector('[data-testid="user-detail-link"]') as HTMLAnchorElement;
       expect(detailLink.getAttribute('href')).toBe('/users/11111111-1111-4111-8111-111111111111');
     });
@@ -109,7 +109,7 @@ describe('UsersListPage (T058)', () => {
       await createComponent('asesor');
     });
 
-    it('no llama a la API de usuarios ni muestra la tabla ni el botón crear', () => {
+    it('[US4-AC16] no llama a la API de usuarios ni muestra la tabla ni el botón crear', () => {
       expect(usersApiMock.list).not.toHaveBeenCalled();
       expect(root().querySelector('[data-testid="users-table"]')).toBeNull();
       expect(root().querySelector('[data-testid="new-user-link"]')).toBeNull();

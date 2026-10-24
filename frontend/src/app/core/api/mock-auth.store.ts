@@ -645,6 +645,8 @@ export class MockAuthStore {
     const { caller } = callerCheck;
     const items = [...this.accounts.values()]
       .filter((account) => account.workshopId === caller.workshopId)
+      // Same order as the backend: ORDER BY status, name (active before inactive).
+      .sort((a, b) => a.status.localeCompare(b.status) || a.name.localeCompare(b.name))
       .map(toUserAccount);
     return { ok: true, status: 200, body: { items } };
   }
@@ -709,11 +711,7 @@ export class MockAuthStore {
     if (!callerCheck.ok) return callerCheck;
     const { caller } = callerCheck;
 
-    const account = this.accountById(userId);
-    if (account === undefined || account.workshopId !== caller.workshopId) {
-      return fail(404, 'NOT_FOUND');
-    }
-
+    // The backend ValidationPipe checks the body before the controller looks the account up.
     if (!isRecord(raw)) return notAnObject();
     const body = definedEntries(raw);
     const errors = new FieldErrors();
@@ -721,6 +719,11 @@ export class MockAuthStore {
     const role = readRole(body, errors);
     if (errors.list.length > 0 || role === null) {
       return validationFailed(errors);
+    }
+
+    const account = this.accountById(userId);
+    if (account === undefined || account.workshopId !== caller.workshopId) {
+      return fail(404, 'NOT_FOUND');
     }
 
     if (account.role === role) {
@@ -783,11 +786,7 @@ export class MockAuthStore {
     account.updatedAt = nowIso;
     account.updatedByName = caller.name;
 
-    for (const session of this.sessions.values()) {
-      if (session.accountId === account.id) {
-        session.revoked = true;
-      }
-    }
+    const sessionsClosed = this.revokeLiveSessions(account.id);
 
     this.auditEntries.unshift({
       id: newId(),
@@ -798,7 +797,7 @@ export class MockAuthStore {
       actorRole: caller.role,
       occurredAt: nowIso,
       before: { status: 'active' },
-      after: { status: 'inactive' },
+      after: { status: 'inactive', sessionsClosed },
       ip: '127.0.0.1',
       channel: 'web',
     });
@@ -847,15 +846,7 @@ export class MockAuthStore {
     if (!callerCheck.ok) return callerCheck;
     const { caller } = callerCheck;
 
-    if (caller.id === userId) {
-      return fail(409, 'SELF_RESET_NOT_ALLOWED');
-    }
-
-    const account = this.accountById(userId);
-    if (account === undefined || account.workshopId !== caller.workshopId) {
-      return fail(404, 'NOT_FOUND');
-    }
-
+    // The backend ValidationPipe checks the body before SELF_RESET_NOT_ALLOWED and before the account lookup.
     if (!isRecord(raw)) return notAnObject();
     const body = definedEntries(raw);
     const errors = new FieldErrors();
@@ -865,6 +856,16 @@ export class MockAuthStore {
       return validationFailed(errors);
     }
 
+    if (caller.id === userId) {
+      return fail(409, 'SELF_RESET_NOT_ALLOWED');
+    }
+
+    const account = this.accountById(userId);
+    if (account === undefined || account.workshopId !== caller.workshopId) {
+      return fail(404, 'NOT_FOUND');
+    }
+
+    const previousMustChangePassword = account.mustChangePassword;
     const nowIso = new Date().toISOString();
     const expiresIso = new Date(Date.now() + 72 * 3600 * 1000).toISOString();
     account.password = temporaryPassword;
@@ -873,11 +874,7 @@ export class MockAuthStore {
     account.updatedAt = nowIso;
     account.updatedByName = caller.name;
 
-    for (const session of this.sessions.values()) {
-      if (session.accountId === account.id) {
-        session.revoked = true;
-      }
-    }
+    const sessionsClosed = this.revokeLiveSessions(account.id);
     this.throttles.delete(account.email);
 
     this.auditEntries.unshift({
@@ -888,8 +885,9 @@ export class MockAuthStore {
       actorName: caller.name,
       actorRole: caller.role,
       occurredAt: nowIso,
-      before: null,
-      after: null,
+      // Never the passwords: only the flag, the expiry and how many live sessions were closed.
+      before: { mustChangePassword: previousMustChangePassword },
+      after: { mustChangePassword: true, temporaryPasswordExpiresAt: expiresIso, sessionsClosed },
       ip: '127.0.0.1',
       channel: 'web',
     });
@@ -961,6 +959,18 @@ export class MockAuthStore {
         role: claims.role,
       },
     };
+  }
+
+  /** Revokes the live sessions of an account; answers how many were still alive (already revoked ones do not count). */
+  private revokeLiveSessions(accountId: string): number {
+    let closed = 0;
+    for (const session of this.sessions.values()) {
+      if (session.accountId === accountId && !session.revoked) {
+        session.revoked = true;
+        closed += 1;
+      }
+    }
+    return closed;
   }
 
   private getActiveAdmins(workshopId: string): MockAccount[] {

@@ -8,8 +8,9 @@ Reglas no negociables del proyecto. Todo `plan.md` debe pasar el "Constitution C
 
 - Toda tabla de negocio tiene una columna `tenant_id uuid NOT NULL`, indexada y con FK a `tenants`.
 - Toda tabla de negocio tiene Row-Level Security habilitada (`ENABLE` + `FORCE ROW LEVEL SECURITY`) con una política que compara `tenant_id` con `current_setting('app.tenant_id')`.
-- El backend fija el tenant por transacción (`SET LOCAL app.tenant_id`) a partir del token autenticado o, en las rutas de autenticación (inicio de sesión, renovación de sesión, registro), de la credencial verificada en el servidor. Nunca lo toma del body, de la query ni de un header enviado por el cliente.
-- Una lectura que cruce talleres solo se admite en funciones de base de datos acotadas a la autenticación: buscan por igualdad de un secreto o de un identificador único, devuelven las columnas mínimas y no usan un rol con `BYPASSRLS`. Cualquier otro acceso entre talleres requiere una enmienda.
+- El backend fija el tenant por transacción (`SET LOCAL app.tenant_id`) a partir del token autenticado o, en las rutas de autenticación (inicio de sesión, renovación de sesión, registro), de la credencial verificada en el servidor, o, en la generación de una contraseña temporal por soporte de la plataforma, del ticket abierto leído en la base de datos. Nunca lo toma del body, de la query ni de un header enviado por el cliente.
+- Una lectura que cruce talleres solo se admite en funciones de base de datos acotadas, que devuelven las columnas mínimas y no usan un rol con `BYPASSRLS`, en dos casos: (a) a la autenticación, que buscan por igualdad de un secreto o de un identificador único; (b) al panel de soporte de la plataforma, que exigen una sesión de soporte vigente, son de solo lectura, se limitan a los datos de identificación de talleres y de sus cuentas que fija la spec (nunca datos de negocio, contraseñas ni sesiones) y registran en una bitácora de solo agregar cada consulta de las cuentas de un taller. Cualquier otro acceso entre talleres requiere una enmienda.
+- Las cuentas de soporte de la plataforma no pertenecen a ningún taller. Sus sesiones y tokens no sirven en las rutas de un taller, y los de un taller no sirven en las del panel. La única escritura de soporte sobre datos de un taller es la contraseña temporal de la cuenta de un ticket abierto, en la misma transacción que su auditoría.
 - La aplicación se conecta con un rol sin `BYPASSRLS`. Las migraciones usan un rol separado.
 - Cada módulo con datos de negocio tiene al menos una prueba que demuestra que el tenant A no puede leer ni modificar datos del tenant B.
 
@@ -35,8 +36,8 @@ Reglas no negociables del proyecto. Todo `plan.md` debe pasar el "Constitution C
 
 ### IV. Auditoría inmutable
 
-- Estos eventos se registran en `audit_log`: cambio de precio en un presupuesto aprobado, salida manual de inventario, anulación de OT, cambio de estado de OT, aceptación o rechazo de presupuesto por el cliente, cambios de rol de usuarios, desactivación y reactivación de cuentas de usuario, restablecimiento de contraseñas por un administrador, transferencia de un vehículo a otro propietario, y modificación de identificadores (placa, VIN, documento del cliente).
-- Cada registro guarda `tenant_id`, actor y su rol, acción, entidad, id, valores antes y después (JSON), fecha y hora (UTC), IP o canal, y el motivo cuando la acción lo exige.
+- Estos eventos se registran en `audit_log`: cambio de precio en un presupuesto aprobado, salida manual de inventario, anulación de OT, cambio de estado de OT, aceptación o rechazo de presupuesto por el cliente, cambios de rol de usuarios, desactivación y reactivación de cuentas de usuario, restablecimiento de contraseñas por un administrador o por soporte de la plataforma, transferencia de un vehículo a otro propietario, y modificación de identificadores (placa, VIN, documento del cliente).
+- Cada registro guarda `tenant_id`, actor y su rol (un usuario del taller o un agente de soporte de la plataforma), acción, entidad, id, valores antes y después (JSON), fecha y hora (UTC), IP o canal, y el motivo cuando la acción lo exige.
 - `audit_log` es append-only: el rol de aplicación solo tiene `INSERT` y `SELECT`. No existe endpoint para editar ni borrar registros.
 - La auditoría se escribe en la misma transacción que el cambio auditado.
 
@@ -73,4 +74,4 @@ Reglas no negociables del proyecto. Todo `plan.md` debe pasar el "Constitution C
 - Una enmienda requiere un PR propio (`docs: amend constitution …`) aprobado por ambos integrantes, con la versión incrementada según SemVer: MAJOR si elimina o redefine un principio, MINOR si agrega uno o lo amplía, PATCH si solo aclara redacción.
 - Todo PR se revisa contra esta constitución. Una violación se justifica en el plan ("Complexity Tracking") o bloquea el merge.
 
-**Version**: 1.2.0 | **Ratified**: 2026-10-21 | **Last Amended**: 2026-10-23
+**Version**: 1.3.0 | **Ratified**: 2026-10-21 | **Last Amended**: 2026-10-25

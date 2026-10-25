@@ -1,6 +1,7 @@
 import { isDevMode } from '@angular/core';
 import { Routes } from '@angular/router';
 import { adminGuard, authGuard, guestGuard } from './core/auth/auth.guards';
+import { supportAuthGuard, supportGuestGuard } from './core/support/support.guards';
 
 /**
  * Route table. `devMode` decides whether /dev-token exists (research R2 and R13: never outside development).
@@ -31,6 +32,12 @@ export function buildRoutes(devMode: boolean): Routes {
       title: 'Iniciar sesión',
       canMatch: [guestGuard],
       loadComponent: () => import('./features/auth/login.page').then((m) => m.LoginPage),
+    },
+    {
+      path: 'forgot-password',
+      title: '¿Olvidaste tu contraseña?',
+      canMatch: [guestGuard],
+      loadComponent: () => import('./features/auth/forgot-password.page').then((m) => m.ForgotPasswordPage),
     },
     // US5: the only screen open while a temporary password is pending.
     {
@@ -111,6 +118,39 @@ export function buildRoutes(devMode: boolean): Routes {
       title: 'Ficha de usuario',
       canMatch: [authGuard, adminGuard],
       loadComponent: () => import('./features/users/user-detail.page').then((m) => m.UserDetailPage),
+    },
+    // Support zone (003, US2): independent authentication, layout and lazy chunks.
+    {
+      path: 'support/login',
+      title: 'Acceso de soporte',
+      canMatch: [supportGuestGuard],
+      loadComponent: () => import('./features/support/support-login.page').then((m) => m.SupportLoginPage),
+    },
+    {
+      path: 'support/change-password',
+      title: 'Cambiar contraseña de soporte',
+      canMatch: [supportAuthGuard],
+      loadComponent: () =>
+        import('./features/support/support-change-password.page').then((m) => m.SupportChangePasswordPage),
+    },
+    {
+      path: 'support',
+      title: 'Soporte MotorSync',
+      canMatch: [supportAuthGuard],
+      loadComponent: () => import('./features/support/support-shell.component').then((m) => m.SupportShellComponent),
+      children: [
+        {
+          path: '',
+          pathMatch: 'full',
+          title: 'Tickets abiertos',
+          loadComponent: () => import('./features/support/tickets-inbox.page').then((m) => m.TicketsInboxPage),
+        },
+        {
+          path: 'tickets/:id',
+          title: 'Detalle de ticket',
+          loadComponent: () => import('./features/support/ticket-detail.page').then((m) => m.TicketDetailPage),
+        },
+      ],
     },
     ...devRoutes,
   ];

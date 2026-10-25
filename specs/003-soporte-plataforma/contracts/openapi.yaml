@@ -1,0 +1,829 @@
+openapi: 3.1.0
+info:
+  title: MotorSync API - Soporte de la plataforma y recuperación de acceso
+  version: 0.3.0
+  description: |
+    Contrato de la feature 003-soporte-plataforma. Complementa a los de la 001 y la 002
+    (`specs/001-clientes-vehiculos/contracts/openapi.yaml`, `specs/002-autenticacion/contracts/openapi.yaml`),
+    que siguen vigentes salvo lo indicado en "Cambios a la 002". Frontend y backend trabajan contra este documento
+    (principio III).
+
+    Reglas transversales:
+    - **Dos zonas separadas** (FR-008, US2-AC5, US2-AC6, research R3):
+      - **Taller**: todas las rutas de la 001 y la 002, más `POST /auth/forgot-password`. Token de acceso de taller
+        (JWT firmado con `JWT_SECRET`, claims de la 002).
+      - **Panel de soporte**: todas las rutas bajo `/support`. Token de acceso de soporte (JWT HS256 de 15 minutos
+        firmado con un secreto propio, claims `sub`, `sid`, `name`, `pwd_change` y `aud: motorsync-support`; **sin**
+        `tenant_id` ni `role`). No existen tokens de soporte sin sesión.
+      - Un token de soporte en una ruta de taller, o uno de taller en una ruta del panel, recibe **403 `FORBIDDEN`**
+        sin datos ni efectos. Las credenciales de una zona no sirven para iniciar sesión en la otra (401
+        `INVALID_CREDENTIALS`).
+    - **Rutas públicas** (sin `Authorization`): `POST /auth/forgot-password`, `POST /support/auth/login`,
+      `POST /support/auth/refresh` y `POST /support/auth/logout`.
+    - **Refresh de soporte**: opaco, solo en la cookie `ms_support_refresh`
+      (`HttpOnly; Secure; SameSite=Strict; Path=/api/v1/support/auth`). Nunca se envía a rutas de taller, y `ms_refresh`
+      (Path `/api/v1/auth`) nunca llega al panel. Refresh y logout exigen `X-Requested-With: motorsync`.
+    - Respuestas de sesión de la 002 que puede recibir **cualquier** ruta protegida del panel: `401 TOKEN_EXPIRED`,
+      `401 SESSION_EXPIRED` (30 minutos sin actividad), `401 SESSION_REVOKED` (sesión cerrada o cuenta desactivada por
+      operaciones) y `403 PASSWORD_CHANGE_REQUIRED` (temporal pendiente: solo `GET /support/auth/me`,
+      `POST /support/auth/password` y `POST /support/auth/logout`).
+    - **No existe** ninguna operación para crear, editar, reactivar, desactivar ni cambiar permisos de cuentas de
+      soporte (FR-007), para editar o borrar tickets o la bitácora (FR-015, FR-018), para modificar talleres o cuentas
+      de taller salvo la temporal de US3 (US2-AC11), para listar cuentas fuera de un taller o de un ticket (US4-AC5), ni
+      para leer datos de negocio o la auditoría de un taller (US4-AC4). Cualquier método o ruta no listado bajo
+      `/support` responde 404 `NOT_FOUND` sin efectos. La bitácora es de solo lectura (`GET /support/access-log`).
+    - Campos no definidos en un body responden 400 `VALIDATION_ERROR` (`UNKNOWN_FIELD`), como en la 002, **salvo en
+      `POST /auth/forgot-password`**, que los ignora (US1-AC9).
+    - Ninguna respuesta contiene contraseñas ni hashes, salvo la temporal recién generada en
+      `POST /support/tickets/{ticketId}/temporary-password`, una sola vez (US3-AC2).
+    - Errores en `application/problem+json` (RFC 9457) con `code` estable. Fechas en ISO 8601 UTC (el frontend las
+      muestra en la hora de Ecuador).
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Desarrollo local (el frontend llega por el proxy /api de ng serve, mismo origen)
+security:
+  - supportBearer: []
+tags:
+  - name: help
+    description: Solicitud de ayuda desde el inicio de sesión de los talleres (US1)
+  - name: support-auth
+    description: Acceso al panel de soporte (US2)
+  - name: support-tickets
+    description: Bandeja y atención de tickets (US2, US3)
+  - name: support-workshops
+    description: Consulta de talleres y cuentas (US4)
+  - name: changes-002
+    description: Cambios sobre el contrato de la 002
+
+paths:
+  /auth/forgot-password:
+    post:
+      tags: [help]
+      operationId: requestPasswordHelp
+      summary: '"¿Olvidaste tu contraseña?": pedir ayuda a soporte (US1)'
+      description: |
+        Pública. Si el correo normalizado es de una cuenta de taller (activa o desactivada) sin ticket abierto, crea un
+        ticket; si ya tiene uno, solo actualiza su última solicitud y su número de solicitudes (FR-002). Un correo
+        inexistente o de una cuenta de soporte no crea nada ni se guarda (US1-AC3, US1-AC10). No cambia la contraseña,
+        las sesiones, el bloqueo ni la auditoría de la cuenta (FR-005).
+
+        **La respuesta y su tiempo son los mismos en todos los casos** (FR-003, US1-AC2, SC-003): el servidor responde
+        después de un piso fijo de tiempo, tanto con 202 como con 429. Campos distintos de `email` (por ejemplo
+        `tenantId`, `userId` o `ticketId`) se ignoran (US1-AC9). Límite: 20 solicitudes por origen por hora, sea cual
+        sea el correo (FR-004).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ForgotPasswordRequest' }
+      responses:
+        '202':
+          description: |
+            Solicitud recibida. Sin body. El frontend muestra: "Si el correo corresponde a una cuenta de MotorSync,
+            nuestro equipo de soporte se pondrá en contacto con usted para verificar su identidad y ayudarle a recuperar
+            el acceso."
+        '400':
+          description: '`VALIDATION_ERROR` con `errors[]` en `email` (`REQUIRED` o `INVALID_EMAIL`). No cuenta para el límite (US1-AC8).'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '429':
+          description: '`HELP_RATE_LIMITED`: más de 20 solicitudes desde este origen en la última hora. Mismo cuerpo y tiempo exista o no el correo (US1-AC6). El frontend muestra "Demasiadas solicitudes. Intente de nuevo más tarde".'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /support/auth/login:
+    post:
+      tags: [support-auth]
+      operationId: supportLogin
+      summary: Iniciar sesión en el panel de soporte (US2-AC3, US2-AC4)
+      description: |
+        Solo correo y contraseña (sin segundo factor ni restricción de origen, FR-010). Solo busca cuentas de soporte:
+        las credenciales de un taller dan `INVALID_CREDENTIALS` (US2-AC5). Mensaje genérico y bloqueo 5/15 como en la
+        002 (FR-009).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupportLoginRequest' }
+      responses:
+        '200':
+          description: Sesión de soporte iniciada. Si `agent.mustChangePassword` es `true`, solo sirve para cambiar la contraseña.
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/SetSupportRefreshCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportSessionResponse' }
+        '400':
+          description: '`VALIDATION_ERROR`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: |
+            - `INVALID_CREDENTIALS`: correo inexistente (o de un taller), contraseña incorrecta o cuenta desactivada;
+              misma respuesta y tiempo equivalente.
+            - `TEMPORARY_PASSWORD_EXPIRED`: temporal correcta pero vencida (más de 72 h). No cuenta como fallo.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '429':
+          description: '`ACCOUNT_LOCKED`: 5 fallos seguidos para ese correo, durante 15 minutos. Igual exista o no.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /support/auth/refresh:
+    post:
+      tags: [support-auth]
+      operationId: supportRefreshSession
+      summary: Rotar el refresh de soporte y obtener un acceso nuevo (US2-AC9)
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/SupportRefreshCookie'
+        - $ref: '#/components/parameters/RequestedWith'
+      responses:
+        '200':
+          description: Token de acceso nuevo con el estado vigente de la cuenta. La cookie se reemplaza.
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/SetSupportRefreshCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportSessionResponse' }
+        '401':
+          description: '`SESSION_EXPIRED` o `SESSION_REVOKED`, con las mismas reglas que `/auth/refresh` de la 002. Borra la cookie.'
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/ClearSupportRefreshCookie' }
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: '`REFRESH_CONFLICT`: rotado hace menos de 10 s. El cliente reintenta una vez.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /support/auth/logout:
+    post:
+      tags: [support-auth]
+      operationId: supportLogout
+      summary: Cerrar la sesión de soporte de este equipo (US2-AC9)
+      description: Idempotente. Revoca la sesión de la cookie y la borra.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/SupportRefreshCookie'
+        - $ref: '#/components/parameters/RequestedWith'
+      responses:
+        '204':
+          description: Sesión cerrada (o ya lo estaba).
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/ClearSupportRefreshCookie' }
+
+  /support/auth/me:
+    get:
+      tags: [support-auth]
+      operationId: getSupportSession
+      summary: Agente de la sesión de soporte actual
+      description: Permitida con la temporal pendiente de cambio.
+      responses:
+        '200':
+          description: Datos vigentes de la cuenta de soporte.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agent]
+                properties:
+                  agent: { $ref: '#/components/schemas/SupportAgent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /support/auth/password:
+    post:
+      tags: [support-auth]
+      operationId: changeSupportPassword
+      summary: Cambiar la propia contraseña de soporte (US2-AC1, FR-009)
+      description: Mismas reglas que `POST /auth/password` de la 002. Cierra las otras sesiones de soporte de la cuenta. Permitida con la temporal pendiente.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '200':
+          description: 'Contraseña cambiada. Token de acceso nuevo con `pwd_change: false`.'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportSessionResponse' }
+        '400':
+          description: '`CURRENT_PASSWORD_INCORRECT` (cuenta para el bloqueo) o `VALIDATION_ERROR` (`SAME_PASSWORD`, longitud).'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: Respuestas comunes de sesión, más `TEMPORARY_PASSWORD_EXPIRED` (se revoca la sesión actual).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429':
+          description: '`ACCOUNT_LOCKED`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /support/tickets:
+    get:
+      tags: [support-tickets]
+      operationId: listOpenTickets
+      summary: Bandeja de tickets abiertos, del más antiguo al más reciente (US2-AC7, FR-013)
+      description: Solo tickets en estado `open`. Ningún otro dato de la cuenta ni del taller.
+      responses:
+        '200':
+          description: Tickets abiertos de todos los talleres.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/TicketSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /support/tickets/{ticketId}:
+    parameters:
+      - $ref: '#/components/parameters/TicketId'
+    get:
+      tags: [support-tickets]
+      operationId: getTicket
+      summary: Ver un ticket (abierto o cerrado) con su cierre
+      responses:
+        '200':
+          description: El ticket. Nunca contiene la temporal generada (FR-012).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TicketDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /support/tickets/{ticketId}/discard:
+    parameters:
+      - $ref: '#/components/parameters/TicketId'
+    post:
+      tags: [support-tickets]
+      operationId: discardTicket
+      summary: Descartar un ticket abierto con un motivo (US2-AC12)
+      description: Abierto → Descartado. No cambia la cuenta ni escribe en la auditoría del taller. Serializado con la generación de la temporal (US3-AC12).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DiscardTicketRequest' }
+      responses:
+        '200':
+          description: Ticket descartado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TicketDetail' }
+        '400':
+          description: '`VALIDATION_ERROR` con `errors[]` en `reason` (`REQUIRED` si está vacío o solo con espacios).'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/TicketNotOpen' }
+
+  /support/tickets/{ticketId}/temporary-password:
+    parameters:
+      - $ref: '#/components/parameters/TicketId'
+    post:
+      tags: [support-tickets]
+      operationId: generateTemporaryPassword
+      summary: Generar la contraseña temporal de la cuenta del ticket y resolverlo (US3)
+      description: |
+        Solo sobre un ticket abierto, para la cuenta del ticket (no acepta identificadores de cuenta ni de taller,
+        US3-AC9), si la cuenta está activa (US3-AC8) y con la nota de verificación (US3-AC3). En una sola transacción
+        (US3-AC1, US3-AC7): contraseña nueva temporal de 72 h, sesiones de la cuenta cerradas, bloqueo y contador
+        reiniciados, registro `user.password_reset_by_support` en la auditoría del taller (US3-AC6), nota guardada en el
+        ticket y ticket Resuelto. Serializado con el restablecimiento del administrador del taller (US3-AC11) y con otras
+        operaciones sobre el mismo ticket (US3-AC12). El rol y el estado de la cuenta no cambian (US3-AC13).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GenerateTemporaryPasswordRequest' }
+      responses:
+        '200':
+          description: |
+            La temporal se muestra **solo en esta respuesta** (US3-AC2). `Cache-Control: no-store`. El sistema no la
+            envía por ningún canal (FR-023).
+          headers:
+            Cache-Control:
+              schema: { type: string, const: no-store }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TemporaryPasswordResponse' }
+        '400':
+          description: '`VALIDATION_ERROR` con `errors[]` en `verificationNote` (`REQUIRED`; el frontend muestra "Indique cómo verificó la identidad de la persona"), o `UNKNOWN_FIELD` si se envía `userId`, `tenantId` u otro campo. Sin efectos.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: |
+            - `TICKET_NOT_OPEN`: el ticket está Resuelto o Descartado (también si otro agente lo cerró a la vez). El
+              frontend muestra "Solo se puede generar una contraseña temporal sobre un ticket abierto" (US3-AC5, US3-AC12).
+            - `ACCOUNT_INACTIVE`: la cuenta del ticket está desactivada. El frontend muestra "La cuenta está
+              desactivada; el administrador de su taller debe reactivarla" (US3-AC8).
+            Ninguno cambia la cuenta, las sesiones, la auditoría ni el ticket.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /support/workshops:
+    get:
+      tags: [support-workshops]
+      operationId: listWorkshops
+      summary: Listar y buscar talleres (US4-AC1, US4-AC2)
+      description: Solo nombre comercial, RUC y fecha de alta, 50 por página, ordenados por nombre. Sin indicadores de negocio.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: RUC (con o sin espacios o guiones; coincide por prefijo) o parte del nombre comercial (sin distinguir mayúsculas ni tildes).
+          schema: { type: string, minLength: 1, maxLength: 120 }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+      responses:
+        '200':
+          description: Una página de talleres.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, pageSize, total]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 50
+                    items: { $ref: '#/components/schemas/WorkshopSummary' }
+                  page: { type: integer }
+                  pageSize: { type: integer, const: 50 }
+                  total: { type: integer }
+        '400':
+          description: '`VALIDATION_ERROR`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /support/workshops/{workshopId}/accounts:
+    parameters:
+      - name: workshopId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [support-workshops]
+      operationId: listWorkshopAccounts
+      summary: Cuentas de un taller (US4-AC3). Queda registrado en la bitácora de soporte (US4-AC6).
+      responses:
+        '200':
+          description: Todas las cuentas del taller con solo nombre, correo, rol, estado y si tienen ticket abierto.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workshop, items]
+                properties:
+                  workshop: { $ref: '#/components/schemas/WorkshopSummary' }
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/WorkshopAccount' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: '`NOT_FOUND`: el taller no existe (o el id no es un uuid). No crea registro en la bitácora (US4-AC7).'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /support/access-log:
+    get:
+      tags: [support-workshops]
+      operationId: listAccessLog
+      summary: Bitácora de soporte, solo lectura (US4-AC8, US4-AC9, FR-027)
+      description: |
+        Quién consultó las cuentas de qué taller y cuándo, de la más reciente a la más antigua, 50 por página.
+        Filtros opcionales y combinables por taller y por agente. **Consultar la bitácora no crea registros en ella.**
+        No existe ninguna operación para agregar, editar ni borrar registros (`POST`, `PUT`, `PATCH`, `DELETE` → 404).
+        Un filtro con un id que no existe devuelve una página vacía.
+      parameters:
+        - name: workshopId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: agentId
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+      responses:
+        '200':
+          description: Una página de la bitácora.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page, pageSize, total]
+                properties:
+                  items:
+                    type: array
+                    maxItems: 50
+                    items: { $ref: '#/components/schemas/AccessLogEntry' }
+                  page: { type: integer }
+                  pageSize: { type: integer, const: 50 }
+                  total: { type: integer }
+        '400':
+          description: '`VALIDATION_ERROR` (por ejemplo, `workshopId` que no es uuid).'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /users/{userId}/history:
+    get:
+      tags: [changes-002]
+      operationId: getUserHistory
+      summary: (002, sin cambios de ruta) El historial incluye los restablecimientos por soporte (US3-AC6)
+      description: |
+        Misma operación que en la 002. Cambia solo el esquema `UserAuditEntry` (ver `UserAuditEntry` abajo): la acción
+        `user.password_reset_by_support` y el rol de actor `platform_support`. El actor de soporte se identifica con su
+        nombre (nunca su correo); el frontend lo muestra como "<nombre> (Soporte MotorSync)".
+      security:
+        - workshopBearer: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Registros de la cuenta, del más reciente al más antiguo.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/UserAuditEntry' }
+
+components:
+  securitySchemes:
+    supportBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de acceso de soporte (secreto propio, `aud` motorsync-support).
+    workshopBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token de acceso de taller de la 002.
+    supportRefreshCookie:
+      type: apiKey
+      in: cookie
+      name: ms_support_refresh
+
+  parameters:
+    TicketId:
+      name: ticketId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    SupportRefreshCookie:
+      name: ms_support_refresh
+      in: cookie
+      required: false
+      description: Refresh opaco de soporte (base64url de 32 bytes). Lo pone y lo borra solo el servidor.
+      schema: { type: string }
+    RequestedWith:
+      name: X-Requested-With
+      in: header
+      required: true
+      description: Protección CSRF adicional a SameSite=Strict. Sin este valor, 400 `VALIDATION_ERROR`.
+      schema: { type: string, const: motorsync }
+
+  headers:
+    SetSupportRefreshCookie:
+      description: '`ms_support_refresh=<token>; Path=/api/v1/support/auth; HttpOnly; Secure; SameSite=Strict` (sin Max-Age).'
+      schema: { type: string }
+    ClearSupportRefreshCookie:
+      description: '`ms_support_refresh=; Path=/api/v1/support/auth; HttpOnly; Secure; SameSite=Strict; Max-Age=0`.'
+      schema: { type: string }
+
+  responses:
+    Unauthorized:
+      description: '`UNAUTHORIZED`, `TOKEN_EXPIRED`, `SESSION_EXPIRED` o `SESSION_REVOKED`.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: |
+        - `FORBIDDEN`: el token es de un taller (US2-AC5).
+        - `PASSWORD_CHANGE_REQUIRED`: temporal de soporte pendiente de cambio.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: '`NOT_FOUND`: el ticket no existe (o el id no es un uuid).'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    TicketNotOpen:
+      description: '`TICKET_NOT_OPEN`: el ticket ya está Resuelto o Descartado; no admite cambios (US2-AC13, US3-AC12).'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Role:
+      type: string
+      enum: [asesor, admin]
+    AuditActorRole:
+      type: string
+      enum: [asesor, admin, platform_support]
+    UserStatus:
+      type: string
+      enum: [active, inactive]
+    TicketStatus:
+      type: string
+      enum: [open, resolved, discarded]
+    Email:
+      type: string
+      maxLength: 254
+      description: El servidor recorta espacios y pasa a minúsculas antes de validar y comparar (FR-003 de la 002).
+      example: ana.perez@taller.ec
+    Password:
+      type: string
+      minLength: 8
+      maxLength: 128
+      writeOnly: true
+
+    ForgotPasswordRequest:
+      type: object
+      additionalProperties: true
+      description: Solo se usa `email`; cualquier otro campo se ignora (US1-AC9).
+      required: [email]
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+
+    SupportLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { $ref: '#/components/schemas/Email' }
+        password: { type: string, minLength: 1, maxLength: 128, writeOnly: true }
+
+    ChangePasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string, minLength: 1, maxLength: 128, writeOnly: true }
+        newPassword: { $ref: '#/components/schemas/Password' }
+
+    SupportAgent:
+      type: object
+      required: [id, name, email, mustChangePassword]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string }
+        mustChangePassword: { type: boolean }
+        temporaryPasswordExpiresAt: { type: [string, 'null'], format: date-time }
+
+    SupportSessionResponse:
+      type: object
+      required: [accessToken, expiresIn, agent]
+      properties:
+        accessToken: { type: string, description: 'JWT de soporte; el frontend lo guarda en localStorage `motorsync.support.token`.' }
+        expiresIn: { type: integer, example: 900 }
+        agent: { $ref: '#/components/schemas/SupportAgent' }
+
+    TicketAccount:
+      type: object
+      description: Solo los campos de FR-013.
+      required: [email, name, role, status]
+      properties:
+        email: { type: string }
+        name: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        status: { $ref: '#/components/schemas/UserStatus' }
+
+    TicketWorkshop:
+      type: object
+      required: [name, ruc]
+      properties:
+        name: { type: string }
+        ruc: { type: [string, 'null'], description: 'Null solo en talleres anteriores a la 002 (sin RUC).' }
+
+    TicketSummary:
+      type: object
+      required: [id, number, createdAt, lastRequestedAt, requestCount, account, workshop]
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: integer, description: 'Referencia legible del ticket (#123); es la que va a la auditoría del taller.' }
+        createdAt: { type: string, format: date-time }
+        lastRequestedAt: { type: string, format: date-time }
+        requestCount: { type: integer, minimum: 1 }
+        account: { $ref: '#/components/schemas/TicketAccount' }
+        workshop: { $ref: '#/components/schemas/TicketWorkshop' }
+
+    TicketDetail:
+      allOf:
+        - $ref: '#/components/schemas/TicketSummary'
+        - type: object
+          required: [status]
+          properties:
+            status: { $ref: '#/components/schemas/TicketStatus' }
+            resolution:
+              type: [object, 'null']
+              description: Solo si está Resuelto.
+              required: [verificationNote, resolvedByName, resolvedAt]
+              properties:
+                verificationNote: { type: string }
+                resolvedByName: { type: string }
+                resolvedAt: { type: string, format: date-time }
+            discard:
+              type: [object, 'null']
+              description: Solo si está Descartado.
+              required: [reason, discardedByName, discardedAt]
+              properties:
+                reason: { type: string }
+                discardedByName: { type: string }
+                discardedAt: { type: string, format: date-time }
+
+    DiscardTicketRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500, description: 'Se recorta; vacío o solo espacios → REQUIRED.' }
+
+    GenerateTemporaryPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [verificationNote]
+      properties:
+        verificationNote:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Cómo verificó el agente la identidad (FR-023). Se recorta; vacío o solo espacios → REQUIRED. No debe contener contraseñas.
+
+    TemporaryPasswordResponse:
+      type: object
+      required: [temporaryPassword, temporaryPasswordExpiresAt, sessionsClosed, ticket]
+      properties:
+        temporaryPassword:
+          type: string
+          minLength: 19
+          maxLength: 19
+          pattern: '^[A-HJ-NP-Z2-9]{4}(-[A-HJ-NP-Z2-9]{4}){3}$'
+          example: ABCD-EFGH-JKMN-PQRS
+          description: |
+            Generada por el servidor: 16 caracteres sin 0/O ni 1/I/L en 4 bloques separados por guiones. **Los guiones
+            forman parte de la contraseña** (19 caracteres; FR-005 de la 002 admite 8–128) y el inicio de sesión la compara
+            tal cual. Se muestra una sola vez; no se puede volver a obtener (US3-AC2).
+        temporaryPasswordExpiresAt: { type: string, format: date-time, description: 'now() + 72 h.' }
+        sessionsClosed: { type: integer, minimum: 0 }
+        ticket: { $ref: '#/components/schemas/TicketDetail' }
+
+    WorkshopSummary:
+      type: object
+      description: Solo los campos de FR-016.
+      required: [id, name, ruc, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        ruc: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+
+    WorkshopAccount:
+      type: object
+      description: Solo los campos de FR-016. Nunca contraseñas, sesiones, intentos ni metadatos.
+      required: [name, email, role, status, hasOpenTicket]
+      properties:
+        name: { type: string }
+        email: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+        status: { $ref: '#/components/schemas/UserStatus' }
+        hasOpenTicket: { type: boolean }
+
+    AccessLogEntry:
+      type: object
+      description: Registro de la bitácora (FR-018). Nunca el correo del agente ni cuentas del taller.
+      required: [id, occurredAt, agent, workshop, channel]
+      properties:
+        id: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+        agent:
+          type: object
+          required: [id, name]
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+        workshop: { $ref: '#/components/schemas/WorkshopSummaryRef' }
+        ip: { type: [string, 'null'] }
+        channel: { type: string, example: support_panel }
+
+    WorkshopSummaryRef:
+      type: object
+      required: [id, name, ruc]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        ruc: { type: [string, 'null'] }
+
+    UserAuditEntry:
+      description: (002, ampliado) Registro del historial de una cuenta.
+      type: object
+      required: [id, action, actorName, actorRole, occurredAt, before, after]
+      properties:
+        id: { type: string, format: uuid }
+        action:
+          type: string
+          enum: [user.role_changed, user.deactivated, user.reactivated, user.password_reset, user.password_reset_by_support]
+        actorName: { type: string }
+        actorRole: { $ref: '#/components/schemas/AuditActorRole' }
+        occurredAt: { type: string, format: date-time }
+        before: { type: [object, 'null'], additionalProperties: true }
+        after:
+          type: [object, 'null']
+          additionalProperties: true
+          description: 'En `user.password_reset_by_support`: `mustChangePassword`, `temporaryPasswordExpiresAt`, `sessionsClosed` y `supportTicketNumber`.'
+        ip: { type: [string, 'null'] }
+        channel: { type: string, examples: [web, support_panel] }
+
+    FieldError:
+      type: object
+      required: [field, code, message]
+      properties:
+        field: { type: string }
+        code: { type: string, examples: [REQUIRED, INVALID_EMAIL, PASSWORD_TOO_SHORT, PASSWORD_TOO_LONG, SAME_PASSWORD, CURRENT_PASSWORD_INCORRECT, UNKNOWN_FIELD] }
+        message: { type: string }
+
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri-reference, example: about:blank }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code:
+          type: string
+          description: Los de la 002 más los nuevos `HELP_RATE_LIMITED`, `TICKET_NOT_OPEN` y `ACCOUNT_INACTIVE`.
+          enum:
+            - UNAUTHORIZED
+            - TOKEN_EXPIRED
+            - SESSION_EXPIRED
+            - SESSION_REVOKED
+            - REFRESH_CONFLICT
+            - INVALID_CREDENTIALS
+            - ACCOUNT_LOCKED
+            - TEMPORARY_PASSWORD_EXPIRED
+            - PASSWORD_CHANGE_REQUIRED
+            - CURRENT_PASSWORD_INCORRECT
+            - FORBIDDEN
+            - HELP_RATE_LIMITED
+            - TICKET_NOT_OPEN
+            - ACCOUNT_INACTIVE
+            - VALIDATION_ERROR
+            - NOT_FOUND
+            - INTERNAL_ERROR
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/FieldError' }

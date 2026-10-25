@@ -21,13 +21,24 @@ export function allowSessionlessTokensInTests(): void {
   process.env.AUTH_ALLOW_SESSIONLESS_TOKENS ??= 'true';
 }
 
+/**
+ * Test-only default (research R3): the support panel signs its tokens with its own secret,
+ * different from JWT_SECRET. An exported value (or the one in .env) wins.
+ */
+export function supportJwtSecretInTests(): void {
+  process.env.SUPPORT_JWT_SECRET ??=
+    'test-only-support-secret-0123456789abcdef';
+}
+
 type DatabaseSuiteOptions = {
   include: string[];
   testTimeout?: number;
   hookTimeout?: number;
 };
 
-export function databaseSuiteConfig(options: DatabaseSuiteOptions): ViteUserConfig {
+export function databaseSuiteConfig(
+  options: DatabaseSuiteOptions,
+): ViteUserConfig {
   return {
     resolve: { tsconfigPaths: true },
     test: {

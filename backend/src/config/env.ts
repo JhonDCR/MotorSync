@@ -34,6 +34,17 @@ export function requireEnv(
   return value;
 }
 
+/**
+ * Reads SUPPORT_JWT_SECRET, trimmed, or undefined when it is missing or blank (research R3).
+ * The guard and the support token service read it per request; unlike loadEnv it never throws.
+ */
+export function readSupportJwtSecret(
+  source: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  const value = source.SUPPORT_JWT_SECRET?.trim();
+  return value ? value : undefined;
+}
+
 /** Same as requireEnv, but records a problem instead of throwing so loadEnv can report them all. */
 function readRequired(
   name: string,

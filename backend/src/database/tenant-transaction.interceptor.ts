@@ -12,7 +12,11 @@ import { Reflector } from '@nestjs/core';
 import { defer, lastValueFrom, type Observable } from 'rxjs';
 import { DataSource, type EntityManager } from 'typeorm';
 import { ALLOW_PENDING_PASSWORD_CHANGE_KEY } from '../auth/allow-pending-password-change.decorator.js';
-import type { AuthRole, AuthUser, AuthenticatedRequest } from '../auth/auth-user.js';
+import type {
+  AuthRole,
+  AuthUser,
+  AuthenticatedRequest,
+} from '../auth/auth-user.js';
 import {
   LOCKS_TENANT_ADMINS_KEY,
   TENANT_ADMINS_LOCK_SQL,
@@ -22,6 +26,7 @@ import { ROLES_KEY } from '../auth/roles.decorator.js';
 import { SessionValidator } from '../auth/session-validator.js';
 import { revokeSessionApart } from '../auth/sessions.service.js';
 import { ProblemException } from '../common/problem-details.filter.js';
+import { SUPPORT_AREA_KEY } from '../support/support-area.decorator.js';
 import { AfterReleaseError } from './after-release.js';
 import { tenantStorage } from './tenant-context.js';
 
@@ -30,8 +35,10 @@ import { tenantStorage } from './tenant-context.js';
  * set_config('app.tenant_id', ..., true) as its first statement (principle I, research R1).
  * Then, for tokens with a session (research R6, R7, R8): validates the session, replaces role,
  * name and mustChangePassword with the database values, enforces the pending password change
- * and @Roles() with the current role. @Public() routes get no transaction at all (research R2).
- * Together with tenant-context.ts, the only place that uses the DataSource directly.
+ * and @Roles() with the current role. @Public() routes get no transaction at all (research R2),
+ * and @SupportArea() routes get none either: the panel has its own interceptor and never pins a
+ * workshop (research 003 R3). Together with tenant-context.ts, the only place that uses the
+ * DataSource directly.
  *
  * Reflector and SessionValidator are optional so that `new TenantTransactionInterceptor(ds)`
  * keeps the 001 behaviour; a token with `sid` and no validator fails closed (SESSION_REVOKED).
@@ -43,7 +50,9 @@ export class TenantTransactionInterceptor implements NestInterceptor {
   constructor(
     @Inject(DataSource) private readonly dataSource: DataSource,
     @Optional() @Inject(Reflector) private readonly reflector?: Reflector,
-    @Optional() @Inject(SessionValidator) private readonly sessionValidator?: SessionValidator,
+    @Optional()
+    @Inject(SessionValidator)
+    private readonly sessionValidator?: SessionValidator,
   ) {}
 
   // Same return type as NestInterceptor.intercept, although this implementation is synchronous.
@@ -51,7 +60,12 @@ export class TenantTransactionInterceptor implements NestInterceptor {
     context: ExecutionContext,
     next: CallHandler,
   ): Observable<unknown> | Promise<Observable<unknown>> {
-    if (this.metadata<boolean>(IS_PUBLIC_KEY, context) === true) return next.handle();
+    if (this.metadata<boolean>(IS_PUBLIC_KEY, context) === true)
+      return next.handle();
+    // The support panel never pins a workshop (research 003 R3); SupportTransactionInterceptor
+    // opens its own transaction without a tenant.
+    if (this.metadata<boolean>(SUPPORT_AREA_KEY, context) === true)
+      return next.handle();
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const tokenUser = request.user;
@@ -65,7 +79,9 @@ export class TenantTransactionInterceptor implements NestInterceptor {
       try {
         await runner.connect();
         await runner.startTransaction();
-        await runner.query("SELECT set_config('app.tenant_id', $1, true)", [tokenUser.tenantId]);
+        await runner.query("SELECT set_config('app.tenant_id', $1, true)", [
+          tokenUser.tenantId,
+        ]);
         // Lock order (research R8): workshop advisory lock -> own session row (SessionValidator)
         // -> sessions of the target account -> users row. Taking the advisory lock before the
         // session check means a request waiting for it holds no row yet, so the holder can revoke
@@ -96,7 +112,8 @@ export class TenantTransactionInterceptor implements NestInterceptor {
         // for a second connection while holding the first one (with the session row locked) can
         // exhaust it and hang every request of the session (T049).
         await runner.release();
-        if (revokeExpiredTemporary) await this.revokeExpiredTemporarySession(tokenUser);
+        if (revokeExpiredTemporary)
+          await this.revokeExpiredTemporarySession(tokenUser);
         // Not caught: if it fails the client gets a 500 (e.g. a failure that could not be counted).
         if (afterRelease) await afterRelease();
       }
@@ -112,7 +129,9 @@ export class TenantTransactionInterceptor implements NestInterceptor {
       await revokeSessionApart(this.dataSource, user, 'temp_password_expired');
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Could not revoke a session with an expired temporary password: ${reason}`);
+      this.logger.error(
+        `Could not revoke a session with an expired temporary password: ${reason}`,
+      );
     }
   }
 
@@ -122,7 +141,8 @@ export class TenantTransactionInterceptor implements NestInterceptor {
     user: AuthUser,
   ): Promise<AuthUser> {
     if (user.sessionId === undefined) return user;
-    if (!this.sessionValidator) throw new ProblemException(401, 'SESSION_REVOKED');
+    if (!this.sessionValidator)
+      throw new ProblemException(401, 'SESSION_REVOKED');
     const state = await this.sessionValidator.validate(manager, user);
     return {
       ...user,
@@ -135,12 +155,14 @@ export class TenantTransactionInterceptor implements NestInterceptor {
   private authorize(context: ExecutionContext, user: AuthUser): void {
     if (
       user.mustChangePassword === true &&
-      this.metadata<boolean>(ALLOW_PENDING_PASSWORD_CHANGE_KEY, context) !== true
+      this.metadata<boolean>(ALLOW_PENDING_PASSWORD_CHANGE_KEY, context) !==
+        true
     ) {
       throw new ProblemException(403, 'PASSWORD_CHANGE_REQUIRED');
     }
     const roles = this.metadata<AuthRole[]>(ROLES_KEY, context);
-    if (roles && !roles.includes(user.role)) throw new ProblemException(403, 'FORBIDDEN');
+    if (roles && !roles.includes(user.role))
+      throw new ProblemException(403, 'FORBIDDEN');
   }
 
   private metadata<T>(key: string, context: ExecutionContext): T | undefined {
@@ -153,5 +175,8 @@ export class TenantTransactionInterceptor implements NestInterceptor {
 
 /** 401 TEMPORARY_PASSWORD_EXPIRED: from SessionValidator or from POST /auth/password (R7). */
 function isTemporaryPasswordExpired(error: unknown): boolean {
-  return error instanceof ProblemException && error.code === 'TEMPORARY_PASSWORD_EXPIRED';
+  return (
+    error instanceof ProblemException &&
+    error.code === 'TEMPORARY_PASSWORD_EXPIRED'
+  );
 }

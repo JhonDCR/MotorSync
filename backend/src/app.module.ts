@@ -11,6 +11,8 @@ import { ClientsModule } from './clients/clients.module.js';
 import { requireEnv } from './config/env.js';
 import { appDataSourceOptions } from './database/data-source.js';
 import { TenantTransactionInterceptor } from './database/tenant-transaction.interceptor.js';
+import { SupportSessionValidator } from './support/support-session-validator.js';
+import { SupportTransactionInterceptor } from './support/support-transaction.interceptor.js';
 import { UsersModule } from './users/users.module.js';
 import { VehiclesModule } from './vehicles/vehicles.module.js';
 
@@ -36,9 +38,14 @@ import { VehiclesModule } from './vehicles/vehicles.module.js';
     AppService,
     // Always available to the global interceptor: a token with sid is never accepted without it.
     SessionValidator,
+    // Same for the panel: a support token is never accepted without its session validator.
+    SupportSessionValidator,
     // Guards run before interceptors: the transaction always sees a verified user.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // Each interceptor self-excludes from the other zone (@SupportArea() vs @Public()), so the
+    // order only decides who calls next.handle() first.
     { provide: APP_INTERCEPTOR, useClass: TenantTransactionInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: SupportTransactionInterceptor },
   ],
 })
 export class AppModule {}

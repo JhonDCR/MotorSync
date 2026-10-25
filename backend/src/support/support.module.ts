@@ -5,6 +5,8 @@ import { SupportAccessTokenService } from './support-access-token.service.js';
 import { SupportAuthController } from './support-auth.controller.js';
 import { SupportAuthService } from './support-auth.service.js';
 import { SupportSessionsService } from './support-sessions.service.js';
+import { SupportTicketsController } from './support-tickets.controller.js';
+import { SupportTicketsService } from './support-tickets.service.js';
 
 /**
  * Support panel (feature 003). AuthModule provides PasswordHasher (and the same 5/15 lock
@@ -15,10 +17,11 @@ import { SupportSessionsService } from './support-sessions.service.js';
  */
 @Module({
   imports: [AuthModule],
-  controllers: [SupportAuthController],
+  controllers: [SupportAuthController, SupportTicketsController],
   providers: [
     SupportAuthService,
     SupportSessionsService,
+    SupportTicketsService,
     SupportAccessTokenService,
     LoginThrottleService,
   ],

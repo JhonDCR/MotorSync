@@ -316,12 +316,12 @@ Al terminar, el agente genera la temporal de la cuenta de un ticket abierto con 
 
   — tester
 - [x] T045 Crear `backend/src/database/migrations/1761000001300-AllowSupportAuditActor.ts` y `1761000001400-CreateSupportPasswordFunctions.ts` con el DDL de data-model.md **literal** (incluido `support_resolve_ticket … RETURNS timestamptz`), con el `GRANT CREATE` / `SET ROLE motorsync_support` / `RESET ROLE` / `REVOKE CREATE` de la lección también en `down()`, y registrarlas en `backend/src/database/data-source.ts`. Deja T044 en verde — implementer-backend
-- [ ] T046 [P] Pruebas unitarias del núcleo compartido y de la auditoría:
+- [x] T046 [P] Pruebas unitarias del núcleo compartido y de la auditoría:
   - `backend/src/users/apply-temporary-password.spec.ts` (manager falso): ejecuta, en este orden, la revocación de las sesiones del objetivo con `revoke_reason = 'password_reset'` y `RETURNING id`, el `UPDATE users` (hash, `must_change_password = true`, vencimiento a 72 h, `updated_by`, `updated_by_name`), y `auth_clear_login_failures`; devuelve `sessionsClosed`, el `mustChangePassword` anterior y el vencimiento; nunca toca `role` ni `status` (US3-AC13).
   - `backend/src/audit/audit.service.support.spec.ts` (nuevo): `recordAsSupport(manager, agent, ip, entry)` escribe con el manager recibido, `actor_user_id` = id del agente, `actor_name` = su nombre (nunca su correo), `actor_role = platform_support`, `channel = support_panel`, `reason = NULL`; `record()` de la 001 no cambia.
 
   — tester
-- [ ] T047 Implementar `backend/src/users/apply-temporary-password.ts`, usarlo en `UsersService.resetPassword` de `backend/src/users/users.service.ts` **sin cambio de comportamiento** (las e2e `users*.e2e-spec.ts` de la 002 siguen en verde sin tocarse), ampliar `AUDIT_ACTIONS` con `user.password_reset_by_support` y `AuditActorRole = AuthRole | 'platform_support'` en `backend/src/audit/audit-log.entity.ts`, y agregar `recordAsSupport` en `backend/src/audit/audit.service.ts`. Ajustar el mapper del historial de `UsersService` al `UserAuditEntry` ampliado del contrato — implementer-backend
+- [x] T047 Implementar `backend/src/users/apply-temporary-password.ts`, usarlo en `UsersService.resetPassword` de `backend/src/users/users.service.ts` **sin cambio de comportamiento** (las e2e `users*.e2e-spec.ts` de la 002 siguen en verde sin tocarse), ampliar `AUDIT_ACTIONS` con `user.password_reset_by_support` y `AuditActorRole = AuthRole | 'platform_support'` en `backend/src/audit/audit-log.entity.ts`, y agregar `recordAsSupport` en `backend/src/audit/audit.service.ts`. Ajustar el mapper del historial de `UsersService` al `UserAuditEntry` ampliado del contrato — implementer-backend
 
 ## Phase 7: User Story 3, generar una contraseña temporal sobre un ticket abierto (P1) (PR2)
 

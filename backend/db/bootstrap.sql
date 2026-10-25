@@ -51,3 +51,17 @@ GRANT USAGE ON SCHEMA public TO motorsync_auth;
 -- El migrator debe poder hacer ALTER FUNCTION ... OWNER TO motorsync_auth (PG16: SET),
 -- sin heredar sus privilegios.
 GRANT motorsync_auth TO motorsync_migrator WITH INHERIT FALSE, SET TRUE;
+
+-- Feature 003 (specs/003-soporte-plataforma/data-model.md, "Bootstrap"; research R1).
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'motorsync_support') THEN
+    CREATE ROLE motorsync_support;
+  END IF;
+  -- Dueño de las funciones SECURITY DEFINER del panel (R1). Sin login y sin BYPASSRLS.
+  ALTER ROLE motorsync_support NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOINHERIT;
+END
+$$;
+
+GRANT USAGE ON SCHEMA public TO motorsync_support;
+GRANT motorsync_support TO motorsync_migrator WITH INHERIT FALSE, SET TRUE;

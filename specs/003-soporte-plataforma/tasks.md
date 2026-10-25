@@ -120,7 +120,7 @@ Al terminar, "¿Olvidaste tu contraseña?" crea o actualiza tickets sin revelar 
 
   — tester
 - [x] T012 Extraer la lógica pura de `backend/src/auth/sessions.service.ts` a `backend/src/auth/refresh-token-policy.ts` (sin cambio de comportamiento: `auth-session.e2e-spec.ts` de la 002 sigue en verde) y parametrizar nombre y `Path` de la cookie en `backend/src/auth/cookies.ts` (research R4) — implementer-backend
-- [ ] T013 [P] Pruebas del guard por zona en `backend/src/auth/jwt-auth.guard.support.spec.ts` (nuevo; las dos specs del guard de la 001 y la 002 no se tocan) y del decorador en `backend/src/support/support-area.spec.ts`:
+- [x] T013 [P] Pruebas del guard por zona en `backend/src/auth/jwt-auth.guard.support.spec.ts` (nuevo; las dos specs del guard de la 001 y la 002 no se tocan) y del decorador en `backend/src/support/support-area.spec.ts`:
   - ruta de taller con token de taller: igual que hoy; con un token firmado con `SUPPORT_JWT_SECRET` (`aud: motorsync-support`): 403 `FORBIDDEN` y sin `request.user` (US2-AC6);
   - ruta `@SupportArea()` con token de soporte válido: `request.supportAgent = { id, sessionId, name, mustChangePassword }` y **sin** `request.user`; con token de taller: 403 `FORBIDDEN` (US2-AC5); vencido: 401 `TOKEN_EXPIRED`; sin `sid`, sin `aud` correcto o con firma de otro secreto que no es de taller: 401 `UNAUTHORIZED`;
   - un token de soporte sin `sid` se rechaza aunque `AUTH_ALLOW_SESSIONLESS_TOKENS = true` (no hay tokens de soporte sin sesión, R3);
@@ -128,20 +128,20 @@ Al terminar, "¿Olvidaste tu contraseña?" crea o actualiza tickets sin revelar 
   - `support-area.spec.ts`: `@SupportArea()` deja la metadata `supportArea` leíble con `Reflector`, y **todo controlador declarado en `SupportModule`** la tiene a nivel de clase (se recorre `Reflect.getMetadata('controllers', SupportModule)`; esta parte queda en rojo hasta T029 y se completa con cada controlador nuevo).
 
   — tester
-- [ ] T014 Implementar `backend/src/support/support-area.decorator.ts`, `backend/src/support/support-agent.ts` (tipo `SupportAgent`, distinto de `AuthUser`), `backend/src/support/support-access-token.service.ts` (HS256 de 15 minutos con `sub`, `sid`, `name`, `pwd_change` y `aud: 'motorsync-support'`, firmado con `supportJwtSecret`) y la verificación por zona en `backend/src/auth/jwt-auth.guard.ts` (research R3). **Mantener compatible** la construcción del guard que usan las specs de la 001 y la 002 — implementer-backend
-- [ ] T015 [P] Pruebas del interceptor y del validador de soporte:
+- [x] T014 Implementar `backend/src/support/support-area.decorator.ts`, `backend/src/support/support-agent.ts` (tipo `SupportAgent`, distinto de `AuthUser`), `backend/src/support/support-access-token.service.ts` (HS256 de 15 minutos con `sub`, `sid`, `name`, `pwd_change` y `aud: 'motorsync-support'`, firmado con `supportJwtSecret`) y la verificación por zona en `backend/src/auth/jwt-auth.guard.ts` (research R3). **Mantener compatible** la construcción del guard que usan las specs de la 001 y la 002 — implementer-backend
+- [x] T015 [P] Pruebas del interceptor y del validador de soporte:
   - `backend/src/support/support-session-validator.spec.ts`: ejecuta la sentencia de research R4 sobre `support_sessions`/`support_accounts`; 401 `SESSION_EXPIRED` si la inactividad supera 30 minutos y `SESSION_REVOKED` si la sesión está revocada o la cuenta inactiva (consulta de diagnóstico, como en la 002).
   - `backend/src/support/support-transaction.interceptor.spec.ts`: solo actúa en rutas `@SupportArea()` no públicas; abre la transacción y **nunca** ejecuta `set_config('app.tenant_id', …)`; llama al validador antes del handler; con `must_change_password = true` y sin `@AllowPendingPasswordChange()`: 403 `PASSWORD_CHANGE_REQUIRED`; publica `supportStorage` con `manager`, `agent` e `ip`; `ROLLBACK` si el handler o el validador fallan.
   - `backend/src/database/tenant-transaction.interceptor.support.spec.ts` (nuevo): en una ruta `@SupportArea()` el interceptor del taller no abre transacción ni ejecuta `set_config` (como con `@Public()`).
 
   — tester
-- [ ] T016 Implementar `backend/src/support/support-context.ts` (`supportStorage`, `AsyncLocalStorage`), `backend/src/support/support-session-validator.ts`, `backend/src/support/support-transaction.interceptor.ts` (global, `APP_INTERCEPTOR` en `backend/src/app.module.ts`) y la exclusión de `@SupportArea()` en `backend/src/database/tenant-transaction.interceptor.ts`. **Mantener compatible** `new TenantTransactionInterceptor(dataSource)` de la spec de la 001 — implementer-backend
-- [ ] T017 [P] Pruebas de errores en archivos **nuevos**:
+- [x] T016 Implementar `backend/src/support/support-context.ts` (`supportStorage`, `AsyncLocalStorage`), `backend/src/support/support-session-validator.ts`, `backend/src/support/support-transaction.interceptor.ts` (global, `APP_INTERCEPTOR` en `backend/src/app.module.ts`) y la exclusión de `@SupportArea()` en `backend/src/database/tenant-transaction.interceptor.ts`. **Mantener compatible** `new TenantTransactionInterceptor(dataSource)` de la spec de la 001 — implementer-backend
+- [x] T017 [P] Pruebas de errores en archivos **nuevos**:
   - `backend/src/common/problem-details.filter.support.spec.ts`: `HELP_RATE_LIMITED` (429), `TICKET_NOT_OPEN` (409) y `ACCOUNT_INACTIVE` (409) se propagan con su `code`; los códigos de la 001 y la 002 no cambian.
   - `backend/src/database/pg-errors.support.spec.ts`: `28000` lanzado por una función `support_*` → 401 `SESSION_REVOKED`; `P0002` → 404 `NOT_FOUND`; `23505` en `users_email_key` lanzado por el trigger `users_email_not_support` → la misma traducción genérica de la 002 (`EMAIL_UNAVAILABLE`), sin mencionar soporte.
 
   — tester
-- [ ] T018 Implementar los cambios en `backend/src/common/problem-details.filter.ts` y `backend/src/database/pg-errors.ts` — implementer-backend
+- [x] T018 Implementar los cambios en `backend/src/common/problem-details.filter.ts` y `backend/src/database/pg-errors.ts` — implementer-backend
 - [ ] T019 **Regresión de la 001 y la 002 con el guard y los interceptores nuevos**. Con T002 a T018 en verde:
   - `cd backend && npm run lint && npm test && npm run build && npm run db:bootstrap && npm run db:migrate && npm run test:e2e`;
   - confirmar que **todas** las suites de la 001 y la 002 pasan sin cambios (`jwt-auth.guard*.spec.ts`, `tenant-transaction.interceptor*.spec.ts`, `cookies.spec.ts`, `auth-*.e2e-spec.ts`, `users*.e2e-spec.ts`, `test/db/*.e2e-spec.ts` de la 001 y la 002…);

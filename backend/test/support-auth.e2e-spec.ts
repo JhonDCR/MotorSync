@@ -1016,7 +1016,7 @@ describe('Support auth: acceso al panel (e2e, T025, US2)', () => {
       .set(authHeader(workshop.accessToken))
       .send({ reason: 'Intento desde un taller' });
     expectProblem(discard, 403, 'FORBIDDEN');
-    expectNoData(discard, 'ticket', 'status');
+    expectNoData(discard, 'ticket');
 
     // The ms_refresh cookie is not a support cookie: the panel refresh rejects it.
     const panelRefresh = await server()

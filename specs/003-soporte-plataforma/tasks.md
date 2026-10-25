@@ -158,13 +158,13 @@ Al terminar, "¿Olvidaste tu contraseña?" crea o actualiza tickets sin revelar 
 
 **Independent Test**: quickstart §3, tabla "¿Olvidaste tu contraseña?"; e2e `backend/test/auth-forgot-password.e2e-spec.ts`.
 
-- [ ] T020 [P] [US1] Pruebas unitarias:
+- [x] T020 [P] [US1] Pruebas unitarias:
   - `backend/src/auth/forgot-password-body.pipe.spec.ts`: `{ email, tenantId, userId, ticketId }` → solo `{ email }` normalizado, sin error (US1-AC9); correo ausente → 400 `REQUIRED`; formato inválido o más de 254 caracteres → 400 `INVALID_EMAIL` (US1-AC8); body que no es objeto → 400.
   - `backend/src/auth/forgot-password.service.spec.ts` (reloj y base falsos): llama una sola vez a `support_request_help(email, origin_hash)` con `origin_hash = SHA-256 hex de req.ip`; `accepted` → 202 y `rate_limited` → 429 `HELP_RATE_LIMITED`; **la respuesta nunca sale antes de 400 ms** desde el inicio de la petición (`HELP_RESPONSE_FLOOR_MS`), tampoco con 429 ni si la función lanza (500); si la base tarda más de 400 ms, responde en cuanto termina; nunca registra el correo en el logger.
 
   — tester
-- [ ] T021 [US1] Implementar `backend/src/auth/forgot-password-body.pipe.ts` (class-validator con `whitelist: true, forbidNonWhitelisted: false`) y `backend/src/auth/forgot-password.service.ts` (`withAuthTransaction` sin taller, piso de 400 ms, research R7) — implementer-backend
-- [ ] T022 [US1] E2e en `backend/test/auth-forgot-password.e2e-spec.ts` (app con `enableTrustProxyForTests` y `X-Forwarded-For` distinto por grupo de peticiones):
+- [x] T021 [US1] Implementar `backend/src/auth/forgot-password-body.pipe.ts` (class-validator con `whitelist: true, forbidNonWhitelisted: false`) y `backend/src/auth/forgot-password.service.ts` (`withAuthTransaction` sin taller, piso de 400 ms, research R7) — implementer-backend
+- [x] T022 [US1] E2e en `backend/test/auth-forgot-password.e2e-spec.ts` (app con `enableTrustProxyForTests` y `X-Forwarded-For` distinto por grupo de peticiones):
   - **US1-AC1**: ` Ana.Perez@Taller.EC ` → 202 sin body; un ticket `open` de la cuenta de Ana y del taller A con el correo normalizado, `request_count = 1`.
   - **US1-AC2 / SC-003** (estadística, como la de la 002): 20 peticiones por caso para correo inexistente, cuenta activa, cuenta desactivada, cuenta con ticket abierto y cuenta de soporte; todas 202 con body idéntico, ninguna antes de 400 ms, y la mediana de cada caso difiere menos del 25 % de la del caso inexistente.
   - **US1-AC3**: `nadie@ejemplo.ec` → 0 tickets y ninguna fila de ninguna tabla contiene ese correo (búsqueda en `support_tickets`, `support_ticket_events`, `help_request_throttle`, `audit_log`).
@@ -178,8 +178,8 @@ Al terminar, "¿Olvidaste tu contraseña?" crea o actualiza tickets sin revelar 
   - **SC-008 / FR-004 (concurrencia)**: 10 solicitudes simultáneas con el correo de Ana sin ticket previo → exactamente un ticket `open` con `request_count = 10`; 25 simultáneas desde la misma IP → exactamente 20 aceptadas y 5 con 429 (todas contadas).
   - **FR-025**: el admin del taller A no tiene ninguna ruta para ver tickets (`GET /support/tickets` con su token → 403 `FORBIDDEN`).
 
-  — tester
-- [ ] T023 [US1] Implementar `POST /auth/forgot-password` (`@Public()`, `@Body(ForgotPasswordBodyPipe)` con el parámetro sin clase, 202 sin body) en `backend/src/auth/auth.controller.ts` y registrar el servicio en `backend/src/auth/auth.module.ts`. Deja T020 y T022 en verde — implementer-backend
+  — tester (13/14; el caso FR-025 se completa con T029)
+- [x] T023 [US1] Implementar `POST /auth/forgot-password` (`@Public()`, `@Body(ForgotPasswordBodyPipe)` con el parámetro sin clase, 202 sin body) en `backend/src/auth/auth.controller.ts` y registrar el servicio en `backend/src/auth/auth.module.ts`. Deja T020 y T022 en verde — implementer-backend
 
 ## Phase 4: User Story 2, entrar al panel de soporte y atender la bandeja (P1) (PR1)
 

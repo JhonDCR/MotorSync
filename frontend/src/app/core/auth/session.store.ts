@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { computed, inject, Injectable, Injector, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { catchError, finalize, map, type Observable, of, shareReplay } from 'rxjs';
 import type { CurrentSessionResponse, SessionResponse, SessionUser, Workshop } from '../api/api.models';
 import { AuthApiService } from '../api/auth-api.service';
@@ -31,6 +32,10 @@ export class SessionStore {
     localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, session.accessToken);
     this.currentUser.set(session.user);
     this.currentWorkshop.set(session.workshop);
+    const router = this.injector.get(Router, null);
+    if (router !== null && router.url.split(/[?#]/)[0] === '/forgot-password') {
+      router.onSameUrlNavigation = 'reload';
+    }
   }
 
   /** GET /auth/me: session data only; the stored token is left as is. */

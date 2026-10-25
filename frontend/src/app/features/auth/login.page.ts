@@ -20,7 +20,8 @@ const REASON_MESSAGES: Readonly<Record<string, string>> = {
   expired: 'Su sesión expiró por inactividad',
   revoked: 'Su sesión fue cerrada. Vuelva a iniciar sesión',
   logout: 'Cerró su sesión',
-  'temporary-expired': 'Su contraseña temporal venció. Pida al administrador de su taller que la restablezca',
+  'temporary-expired':
+    'Su contraseña temporal venció. Pida al administrador de su taller que la restablezca o use ¿Olvidaste tu contraseña?',
 };
 
 function reasonMessage(reason: string | null): string | null {
@@ -64,12 +65,17 @@ export class LoginPage {
   /** Typed values. The password is kept only here and never rendered back (FR-006). */
   private readonly values: Record<LoginField, string> = { email: '', password: '' };
 
+  protected readonly emailQuery = signal<Record<string, string> | null>(null);
   protected readonly errors = signal<Partial<Record<LoginField, string>>>({});
   protected readonly formError = signal<string | null>(null);
   protected readonly submitting = signal(false);
 
   protected update(field: LoginField, event: Event): void {
-    this.values[field] = (event.target as HTMLInputElement).value;
+    const value = (event.target as HTMLInputElement).value;
+    this.values[field] = value;
+    if (field === 'email') {
+      this.emailQuery.set(value !== '' ? { email: value } : null);
+    }
     // Editing a field clears its message; the rest stay until the next submit.
     if (this.errors()[field] !== undefined) {
       this.errors.update((current) => {

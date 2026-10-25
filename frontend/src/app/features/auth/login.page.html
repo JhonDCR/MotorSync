@@ -52,5 +52,11 @@
     </button>
   </form>
 
+  <p class="alternate">
+    <a routerLink="/forgot-password" [queryParams]="emailQuery()" data-testid="forgot-password-link">
+      ¿Olvidaste tu contraseña?
+    </a>
+  </p>
+
   <p class="alternate">¿Su taller aún no usa MotorSync? <a routerLink="/register">Registrar taller</a></p>
 </section>

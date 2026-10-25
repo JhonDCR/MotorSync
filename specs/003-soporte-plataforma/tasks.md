@@ -142,7 +142,7 @@ Al terminar, "¿Olvidaste tu contraseña?" crea o actualiza tickets sin revelar 
 
   — tester
 - [x] T018 Implementar los cambios en `backend/src/common/problem-details.filter.ts` y `backend/src/database/pg-errors.ts` — implementer-backend
-- [ ] T019 **Regresión de la 001 y la 002 con el guard y los interceptores nuevos**. Con T002 a T018 en verde:
+- [x] T019 **Regresión de la 001 y la 002 con el guard y los interceptores nuevos**. Con T002 a T018 en verde:
   - `cd backend && npm run lint && npm test && npm run build && npm run db:bootstrap && npm run db:migrate && npm run test:e2e`;
   - confirmar que **todas** las suites de la 001 y la 002 pasan sin cambios (`jwt-auth.guard*.spec.ts`, `tenant-transaction.interceptor*.spec.ts`, `cookies.spec.ts`, `auth-*.e2e-spec.ts`, `users*.e2e-spec.ts`, `test/db/*.e2e-spec.ts` de la 001 y la 002…);
   - correr dos veces seguidas `npm run test:e2e` (el truncado limpia las tablas nuevas);

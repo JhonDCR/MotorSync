@@ -39,7 +39,7 @@ description: "Tareas de 003-soporte-plataforma, agrupadas por PR y por historia,
 
 # PR0: enmienda de la constitución 1.3.0 (prerrequisito)
 
-- [ ] T001 Aplicar la enmienda MINOR 1.3.0 con el texto **literal** de research R1 ("Enmienda de la constitución necesaria") en `.specify/memory/constitution.md` (principio I: tercera y cuarta viñetas y viñeta nueva; principio IV: primera y segunda viñetas; pie `**Version**: 1.3.0 | **Ratified**: 2026-10-21 | **Last Amended**: <fecha del merge>`). PR propio `docs: amend constitution 1.3.0`, aprobado por ambos integrantes en GitHub, integrado en `main` **antes** de integrar cualquier código del PR1. Revisar que `CLAUDE.md` y `.claude/agents/reviewer.md` sigan siendo coherentes (research R1, "Procedimiento"). **En curso** — leader
+- [x] T001 Aplicar la enmienda MINOR 1.3.0 con el texto **literal** de research R1 ("Enmienda de la constitución necesaria") en `.specify/memory/constitution.md` (principio I: tercera y cuarta viñetas y viñeta nueva; principio IV: primera y segunda viñetas; pie `**Version**: 1.3.0 | **Ratified**: 2026-10-21 | **Last Amended**: <fecha del merge>`). PR propio `docs: amend constitution 1.3.0`, aprobado por ambos integrantes en GitHub, integrado en `main` **antes** de integrar cualquier código del PR1. Revisar que `CLAUDE.md` y `.claude/agents/reviewer.md` sigan siendo coherentes (research R1, "Procedimiento"). **Completada**: PR #16 mergeado en `main` el 2026-10-25 — leader
 
 ---
 

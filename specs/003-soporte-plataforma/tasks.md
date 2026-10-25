@@ -225,7 +225,7 @@ Al terminar, "¿Olvidaste tu contraseña?" crea o actualiza tickets sin revelar 
 
   — tester
 - [x] T029 [US2] Implementar `backend/src/support/support-tickets.service.ts` y `backend/src/support/support-tickets.controller.ts` (`@SupportArea()`; `GET /support/tickets`, `GET /support/tickets/:ticketId`, `POST /support/tickets/:ticketId/discard`; uuid inválido → 404; `not_found` → 404 y `not_open` → 409 `TICKET_NOT_OPEN`; mapper tipado de las filas de `support_list_open_tickets`/`support_get_ticket` al contrato) y `backend/src/support/dto/discard-ticket.dto.ts` (`reason` recortado, "obligatorio; 1–500 caracteres tras recortar", vacío o solo espacios → `REQUIRED`). Deja T028 y la parte de T013 sobre los controladores de `SupportModule` en verde — implementer-backend
-- [ ] T030 [P] [US2] Actualizar `backend/scripts/seed-dev.ts`: cuenta de soporte `soporte@motorsync.test` (no temporal en desarrollo, contraseña de desarrollo impresa en consola, idempotente; sigue abortando con `NODE_ENV=production`). Script de desarrollo sin prueba propia (`seed-dev-guard.e2e-spec.ts` de la 002 sigue en verde): se verifica en T043 con quickstart §1 — implementer-backend
+- [x] T030 [P] [US2] Actualizar `backend/scripts/seed-dev.ts`: cuenta de soporte `soporte@motorsync.test` (no temporal en desarrollo, contraseña de desarrollo impresa en consola, idempotente; sigue abortando con `NODE_ENV=production`). Script de desarrollo sin prueba propia (`seed-dev-guard.e2e-spec.ts` de la 002 sigue en verde): se verifica en T043 con quickstart §1 — implementer-backend
 
 ## Phase 5: Frontend del PR1 (US1, US2, FR-022)
 

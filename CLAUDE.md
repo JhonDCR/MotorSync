@@ -1,6 +1,6 @@
 # MotorSync: guía para agentes
 
-SaaS multi-tenant para talleres automotrices (check-in 360°, presupuestos, OT, inventario, historial por placa). Monorepo con Angular, NestJS y PostgreSQL, desarrollado con Spec-Driven Development.
+SaaS multi-tenant para talleres automotrices (check-in 360°, presupuestos, OT, inventario, historial por placa, reportes y panel del administrador). Monorepo con Angular, NestJS y PostgreSQL, desarrollado con Spec-Driven Development.
 
 **Lee primero la constitución:** [.specify/memory/constitution.md](.specify/memory/constitution.md). Si algo de este archivo la contradice, gana la constitución.
 

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { EntityManager } from 'typeorm';
 import { normalizeReason } from '../common/reason-policy.js';
 import { getTenantContext } from '../database/tenant-context.js';
 import type { AuditAction, AuditEntityType, AuditSnapshot } from './audit-log.entity.js';
@@ -50,6 +51,28 @@ export class AuditService {
       normalizeReason(entry.reason),
       ip,
       CHANNEL,
+    ]);
+    return rows[0];
+  }
+
+  async recordAsSupport(
+    manager: EntityManager,
+    agent: { id: string; name: string },
+    ip: string | null,
+    entry: AuditEntry,
+  ): Promise<AuditRecord> {
+    const rows: AuditRecord[] = await manager.query(INSERT_SQL, [
+      agent.id,
+      agent.name,
+      'platform_support',
+      entry.action,
+      entry.entityType,
+      entry.entityId,
+      entry.before === null ? null : JSON.stringify(entry.before),
+      entry.after === null ? null : JSON.stringify(entry.after),
+      null,
+      ip,
+      'support_panel',
     ]);
     return rows[0];
   }

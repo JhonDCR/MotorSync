@@ -308,14 +308,14 @@ Al terminar, el agente genera la temporal de la cuenta de un ticket abierto con 
 
 ## Phase 6: Base del PR2
 
-- [ ] T044 [P] E2e de BD en `backend/test/db/support-roles-password.e2e-spec.ts` (nuevo):
+- [x] T044 [P] E2e de BD en `backend/test/db/support-roles-password.e2e-spec.ts` (nuevo):
   - el CHECK `audit_log_actor_role_check` acepta `platform_support` y sigue rechazando otros valores;
   - `support_lock_open_ticket` y `support_resolve_ticket`: `prosecdef = true`, dueño `motorsync_support`, `search_path` fijo, sin `EXECUTE` para `PUBLIC` y con `EXECUTE` para `motorsync_app`;
   - `support_lock_open_ticket` con sesión válida y sin taller devuelve `tenant_id, user_id, number, status` (también para un ticket cerrado) y 0 filas con un id inexistente; con el taller fijado o sin sesión válida lanza `28000`;
   - `support_resolve_ticket`: con el taller del ticket fijado y nota → devuelve `resolved_at`, deja el ticket `resolved` con la nota recortada y `resolved_by` = la cuenta de la sesión, e inserta el evento `temporary_password_generated`; con nota de solo espacios lanza `22023`; **sin taller fijado o con el taller B fijado** para un ticket de A lanza `55000` sin cambios; sobre un ticket ya `resolved` lanza `55000`.
 
   — tester
-- [ ] T045 Crear `backend/src/database/migrations/1761000001300-AllowSupportAuditActor.ts` y `1761000001400-CreateSupportPasswordFunctions.ts` con el DDL de data-model.md **literal** (incluido `support_resolve_ticket … RETURNS timestamptz`), con el `GRANT CREATE` / `SET ROLE motorsync_support` / `RESET ROLE` / `REVOKE CREATE` de la lección también en `down()`, y registrarlas en `backend/src/database/data-source.ts`. Deja T044 en verde — implementer-backend
+- [x] T045 Crear `backend/src/database/migrations/1761000001300-AllowSupportAuditActor.ts` y `1761000001400-CreateSupportPasswordFunctions.ts` con el DDL de data-model.md **literal** (incluido `support_resolve_ticket … RETURNS timestamptz`), con el `GRANT CREATE` / `SET ROLE motorsync_support` / `RESET ROLE` / `REVOKE CREATE` de la lección también en `down()`, y registrarlas en `backend/src/database/data-source.ts`. Deja T044 en verde — implementer-backend
 - [ ] T046 [P] Pruebas unitarias del núcleo compartido y de la auditoría:
   - `backend/src/users/apply-temporary-password.spec.ts` (manager falso): ejecuta, en este orden, la revocación de las sesiones del objetivo con `revoke_reason = 'password_reset'` y `RETURNING id`, el `UPDATE users` (hash, `must_change_password = true`, vencimiento a 72 h, `updated_by`, `updated_by_name`), y `auth_clear_login_failures`; devuelve `sessionsClosed`, el `mustChangePassword` anterior y el vencimiento; nunca toca `role` ni `status` (US3-AC13).
   - `backend/src/audit/audit.service.support.spec.ts` (nuevo): `recordAsSupport(manager, agent, ip, entry)` escribe con el manager recibido, `actor_user_id` = id del agente, `actor_name` = su nombre (nunca su correo), `actor_role = platform_support`, `channel = support_panel`, `reason = NULL`; `record()` de la 001 no cambia.

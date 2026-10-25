@@ -24,6 +24,7 @@
     "db:bootstrap": "node dist/scripts/db-bootstrap.js",
     "db:migrate": "node dist/src/database/migrate.js",
     "db:seed:dev": "node dist/scripts/seed-dev.js",
+    "support:account": "node dist/scripts/support-account.js",
     "token:dev": "node dist/scripts/issue-dev-token.js"
   },
   "dependencies": {

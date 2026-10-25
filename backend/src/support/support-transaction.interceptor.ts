@@ -13,6 +13,7 @@ import { DataSource } from 'typeorm';
 import { ALLOW_PENDING_PASSWORD_CHANGE_KEY } from '../auth/allow-pending-password-change.decorator.js';
 import { IS_PUBLIC_KEY } from '../auth/public.decorator.js';
 import { ProblemException } from '../common/problem-details.filter.js';
+import { AfterReleaseError } from '../database/after-release.js';
 import type { SupportAgent, SupportRequest } from './support-agent.js';
 import { SUPPORT_AREA_KEY } from './support-area.decorator.js';
 import { supportStorage } from './support-context.js';
@@ -59,6 +60,7 @@ export class SupportTransactionInterceptor implements NestInterceptor {
     return defer(async () => {
       const runner = this.dataSource.createQueryRunner();
       let revokeExpiredTemporary = false;
+      let afterRelease: (() => Promise<unknown>) | undefined;
       let agent = tokenAgent;
       try {
         await runner.connect();
@@ -84,14 +86,20 @@ export class SupportTransactionInterceptor implements NestInterceptor {
       } catch (error) {
         if (runner.isTransactionActive) await runner.rollbackTransaction();
         revokeExpiredTemporary = isTemporaryPasswordExpired(error);
+        if (error instanceof AfterReleaseError) {
+          afterRelease = error.afterRelease;
+          throw error.response;
+        }
         throw error;
       } finally {
-        // The revocation runs only after the release: asking the pool for a second connection
-        // while holding the first one can exhaust it (T049 of the 002).
+        // The revocation and the work committed apart run only after the release: asking the pool
+        // for a second connection while holding the first one can exhaust it (T049 of the 002).
         await runner.release();
         if (revokeExpiredTemporary) {
           await this.revokeExpiredTemporarySession(agent);
         }
+        // Not caught: if it fails the client gets a 500 (e.g. a failure that could not be counted).
+        if (afterRelease) await afterRelease();
       }
     });
   }

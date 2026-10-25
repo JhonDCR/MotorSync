@@ -11,6 +11,7 @@ import { ClientsModule } from './clients/clients.module.js';
 import { requireEnv } from './config/env.js';
 import { appDataSourceOptions } from './database/data-source.js';
 import { TenantTransactionInterceptor } from './database/tenant-transaction.interceptor.js';
+import { SupportModule } from './support/support.module.js';
 import { SupportSessionValidator } from './support/support-session-validator.js';
 import { SupportTransactionInterceptor } from './support/support-transaction.interceptor.js';
 import { UsersModule } from './users/users.module.js';
@@ -32,6 +33,7 @@ import { VehiclesModule } from './vehicles/vehicles.module.js';
     ClientsModule,
     VehiclesModule,
     UsersModule,
+    SupportModule,
   ],
   controllers: [AppController],
   providers: [

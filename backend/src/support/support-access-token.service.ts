@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { readSupportJwtSecret } from '../config/env.js';
@@ -15,6 +16,8 @@ interface SupportTokenClaims {
   sid: string;
   name: string;
   pwd_change: boolean;
+  /** Unique per issuance, so a rotated token is never byte-identical to the previous one. */
+  jti: string;
 }
 
 /** Issues the HS256 access tokens of the support panel (SUPPORT_JWT_SECRET, 15 minutes). */
@@ -35,6 +38,7 @@ export class SupportAccessTokenService {
       sid: agent.sessionId,
       name: agent.name,
       pwd_change: agent.mustChangePassword,
+      jti: randomUUID(),
     };
     return this.jwt.sign(claims, {
       algorithm: 'HS256',

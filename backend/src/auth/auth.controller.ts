@@ -1,4 +1,14 @@
-import { Body, Controller, Get, HttpCode, Inject, Post, Req, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
+import { performance } from 'node:perf_hooks';
 import type { Request, Response } from 'express';
 import { ProblemException } from '../common/problem-details.filter.js';
 import { AllowPendingPasswordChange } from './allow-pending-password-change.decorator.js';
@@ -18,19 +28,29 @@ import { ChangePasswordDto } from './dto/change-password.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { LocksTenantAdmins } from './locks-tenant-admins.decorator.js';
 import { RegisterDto } from './dto/register.dto.js';
+import {
+  ForgotPasswordBodyPipe,
+  type ForgotPasswordBody,
+} from './forgot-password-body.pipe.js';
+import { ForgotPasswordService } from './forgot-password.service.js';
 import { Public } from './public.decorator.js';
 
 /**
- * Auth routes. register, login, refresh and logout are @Public() (research R2): no Authorization
- * and no request transaction; the services open their own with withAuthTransaction. refresh and
- * logout identify the session ONLY by the ms_refresh cookie (an Authorization header is ignored)
- * and require `X-Requested-With: motorsync` (research R11). The cookie is set only after the
- * service succeeded, so an error response never carries a new ms_refresh. me and password run in
- * the request transaction and are allowed with a pending temporary password (research R7).
+ * Auth routes. register, login, refresh, logout and forgot-password are @Public() (research R2,
+ * R7): no Authorization and no request transaction; the services open their own with
+ * withAuthTransaction. refresh and logout identify the session ONLY by the ms_refresh cookie (an
+ * Authorization header is ignored) and require `X-Requested-With: motorsync` (research R11). The
+ * cookie is set only after the service succeeded, so an error response never carries a new
+ * ms_refresh. me and password run in the request transaction and are allowed with a pending
+ * temporary password (research R7).
  */
 @Controller('auth')
 export class AuthController {
-  constructor(@Inject(AuthService) private readonly auth: AuthService) {}
+  constructor(
+    @Inject(AuthService) private readonly auth: AuthService,
+    @Inject(ForgotPasswordService)
+    private readonly forgot: ForgotPasswordService,
+  ) {}
 
   /** POST /api/v1/auth/register (US1): 201 SessionResponse + ms_refresh. */
   @Public()
@@ -69,9 +89,13 @@ export class AuthController {
   ): Promise<SessionResponse> {
     assertRequestedWith(req.headers);
     try {
-      return withCookie(res, await this.auth.refresh(refreshTokenOf(req), req.ip ?? null));
+      return withCookie(
+        res,
+        await this.auth.refresh(refreshTokenOf(req), req.ip ?? null),
+      );
     } catch (error) {
-      if (error instanceof ProblemException && error.getStatus() === 401) clearRefreshCookie(res);
+      if (error instanceof ProblemException && error.getStatus() === 401)
+        clearRefreshCookie(res);
       throw error;
     }
   }
@@ -80,10 +104,25 @@ export class AuthController {
   @Public()
   @Post('logout')
   @HttpCode(204)
-  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
     assertRequestedWith(req.headers);
     await this.auth.logout(refreshTokenOf(req), req.ip ?? null);
     clearRefreshCookie(res);
+  }
+
+  /** POST /api/v1/auth/forgot-password (US1): 202 without body, after the fixed floor. */
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(202)
+  async forgotPassword(
+    @Body(ForgotPasswordBodyPipe) body: ForgotPasswordBody,
+    @Req() req: Request,
+  ): Promise<void> {
+    const startedAt = performance.now();
+    await this.forgot.request(body.email, req.ip ?? null, startedAt);
   }
 
   /** GET /api/v1/auth/me: current user and workshop. */

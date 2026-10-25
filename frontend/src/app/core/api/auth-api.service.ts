@@ -4,6 +4,7 @@ import { map, type Observable } from 'rxjs';
 import type {
   ChangePasswordRequest,
   CurrentSessionResponse,
+  ForgotPasswordRequest,
   LoginRequest,
   RegisterRequest,
   SessionResponse,
@@ -21,7 +22,7 @@ function cookieRequestOptions(): { withCredentials: true; headers: HttpHeaders }
 }
 
 /**
- * Auth endpoints of specs/002-autenticacion/contracts/openapi.yaml.
+ * Auth endpoints of specs/002-autenticacion/contracts/openapi.yaml and 003-soporte-plataforma/contracts/openapi.yaml.
  * withCredentials lets the browser keep and send the HttpOnly refresh cookie; the frontend never reads it and no
  * body carries a refresh token. Passwords are sent as typed: never trimmed or transformed (FR-005).
  * Storing the access token is up to the caller (SessionStore).
@@ -36,6 +37,15 @@ export class AuthApiService {
 
   login(body: LoginRequest): Observable<SessionResponse> {
     return this.http.post<SessionResponse>(`${AUTH_URL}/login`, body, { withCredentials: true }).pipe(toProblem);
+  }
+
+  forgotPassword(emailOrRequest: string | ForgotPasswordRequest): Observable<void> {
+    const email = typeof emailOrRequest === 'string' ? emailOrRequest : emailOrRequest.email;
+    const request: ForgotPasswordRequest = { email };
+    return this.http.post(`${AUTH_URL}/forgot-password`, request).pipe(
+      map(() => undefined),
+      toProblem,
+    );
   }
 
   refresh(): Observable<SessionResponse> {

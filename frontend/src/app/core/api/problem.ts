@@ -51,7 +51,8 @@ const PROBLEM_MESSAGES: Record<ProblemCode, string> = {
   REFRESH_CONFLICT: 'La sesión se estaba renovando en otra pestaña. Vuelva a intentarlo',
   INVALID_CREDENTIALS: 'Correo o contraseña incorrectos',
   ACCOUNT_LOCKED: 'Demasiados intentos fallidos. Intente de nuevo en unos minutos',
-  TEMPORARY_PASSWORD_EXPIRED: 'Su contraseña temporal venció. Pida al administrador de su taller que la restablezca',
+  TEMPORARY_PASSWORD_EXPIRED:
+    'Su contraseña temporal venció. Pida al administrador de su taller que la restablezca o use ¿Olvidaste tu contraseña?',
   PASSWORD_CHANGE_REQUIRED: 'Debe cambiar su contraseña antes de continuar',
   CURRENT_PASSWORD_INCORRECT: 'La contraseña actual no es correcta',
   RUC_ALREADY_REGISTERED: 'Este RUC ya tiene un taller registrado en MotorSync',
@@ -61,6 +62,10 @@ const PROBLEM_MESSAGES: Record<ProblemCode, string> = {
   LAST_ADMIN: 'El taller debe tener al menos un administrador activo',
   SELF_RESET_NOT_ALLOWED: 'Para su propia cuenta use Cambiar mi contraseña',
   FORBIDDEN: 'No tiene permisos para gestionar usuarios',
+  // Contrato 003
+  HELP_RATE_LIMITED: 'Demasiadas solicitudes. Intente de nuevo más tarde',
+  TICKET_NOT_OPEN: 'Solo se puede generar una contraseña temporal sobre un ticket abierto',
+  ACCOUNT_INACTIVE: 'La cuenta está desactivada; el administrador de su taller debe reactivarla',
 };
 
 const NOT_FOUND_BY_RESOURCE: Record<NonNullable<ProblemContext['resource']>, string> = {

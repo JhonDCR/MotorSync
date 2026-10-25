@@ -98,28 +98,28 @@ Al terminar, "¿Olvidaste tu contraseña?" crea o actualiza tickets sin revelar 
 
 **Purpose**: configuración, generador de temporales, política de refresh compartida, separación de zonas en el guard, interceptor de soporte y errores. Bloquea US1 y US2.
 
-- [ ] T007 [P] Pruebas de configuración en `backend/src/config/env.support.spec.ts` (archivo nuevo; `env.spec.ts` de la 002 no se toca):
+- [x] T007 [P] Pruebas de configuración en `backend/src/config/env.support.spec.ts` (archivo nuevo; `env.spec.ts` de la 002 no se toca):
   - `loadEnv` falla, nombrando `SUPPORT_JWT_SECRET`, si falta, si tiene menos de 32 caracteres o si es igual a `JWT_SECRET`, en cualquier `NODE_ENV`;
   - con `NODE_ENV=production`, falla si vale lo mismo que el ejemplo de `.env.example`;
   - con un valor válido, `AppEnv.supportJwtSecret` lo expone;
   - las validaciones de la 002 (FR-T01, `AUTH_COOKIE_SECURE`) no cambian.
 
   — tester
-- [ ] T008 Implementar `supportJwtSecret` en `backend/src/config/env.ts` (`AppEnv` y `loadEnv`), sin valor por defecto — implementer-backend
-- [ ] T009 [P] Pruebas del generador en `backend/src/support/temporary-password-generator.spec.ts` (FR-019, decisión 7 del humano):
+- [x] T008 Implementar `supportJwtSecret` en `backend/src/config/env.ts` (`AppEnv` y `loadEnv`), sin valor por defecto — implementer-backend
+- [x] T009 [P] Pruebas del generador en `backend/src/support/temporary-password-generator.spec.ts` (FR-019, decisión 7 del humano):
   - 1000 temporales cumplen `^[A-HJ-NP-Z2-9]{4}(-[A-HJ-NP-Z2-9]{4}){3}$`, tienen 19 caracteres y nunca contienen `0`, `O`, `1`, `I`, `L` ni minúsculas;
   - todas son distintas;
   - pasan la política `IsPassword` de la 002 (8 a 128 caracteres);
   - con un `randomInt` inyectado, cada símbolo se elige con `randomInt(0, 31)` sobre el alfabeto `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (sin sesgo de módulo), y con 31 000 muestras cada símbolo aparece entre 700 y 1300 veces.
 
   — tester
-- [ ] T010 Implementar `backend/src/support/temporary-password-generator.ts` con `node:crypto.randomInt` (research R9). Lo usarán el script de operaciones (T026) y la temporal por soporte (T053) — implementer-backend
-- [ ] T011 [P] Pruebas de la política de refresh y de las cookies:
+- [x] T010 Implementar `backend/src/support/temporary-password-generator.ts` con `node:crypto.randomInt` (research R9). Lo usarán el script de operaciones (T026) y la temporal por soporte (T053) — implementer-backend
+- [x] T011 [P] Pruebas de la política de refresh y de las cookies:
   - `backend/src/auth/refresh-token-policy.spec.ts` (nuevo): el refresh es base64url de 32 bytes; su hash es SHA-256 hex; la clasificación devuelve `fresh` (sin `rotated_at`), `recently_rotated` (rotado hace menos de 10 s) o `reused` (10 s o más), con el reloj inyectado.
   - `backend/src/auth/cookies.support.spec.ts` (nuevo): la cookie `ms_support_refresh` sale con `HttpOnly`, `Secure` según `AUTH_COOKIE_SECURE`, `SameSite=Strict`, `Path=/api/v1/support/auth` y sin `Max-Age`; su borrado con `Max-Age=0` y el mismo `Path`; `ms_refresh` sigue con `Path=/api/v1/auth` (la `cookies.spec.ts` de la 002 no se toca y debe seguir pasando).
 
   — tester
-- [ ] T012 Extraer la lógica pura de `backend/src/auth/sessions.service.ts` a `backend/src/auth/refresh-token-policy.ts` (sin cambio de comportamiento: `auth-session.e2e-spec.ts` de la 002 sigue en verde) y parametrizar nombre y `Path` de la cookie en `backend/src/auth/cookies.ts` (research R4) — implementer-backend
+- [x] T012 Extraer la lógica pura de `backend/src/auth/sessions.service.ts` a `backend/src/auth/refresh-token-policy.ts` (sin cambio de comportamiento: `auth-session.e2e-spec.ts` de la 002 sigue en verde) y parametrizar nombre y `Path` de la cookie en `backend/src/auth/cookies.ts` (research R4) — implementer-backend
 - [ ] T013 [P] Pruebas del guard por zona en `backend/src/auth/jwt-auth.guard.support.spec.ts` (nuevo; las dos specs del guard de la 001 y la 002 no se tocan) y del decorador en `backend/src/support/support-area.spec.ts`:
   - ruta de taller con token de taller: igual que hoy; con un token firmado con `SUPPORT_JWT_SECRET` (`aud: motorsync-support`): 403 `FORBIDDEN` y sin `request.user` (US2-AC6);
   - ruta `@SupportArea()` con token de soporte válido: `request.supportAgent = { id, sessionId, name, mustChangePassword }` y **sin** `request.user`; con token de taller: 403 `FORBIDDEN` (US2-AC5); vencido: 401 `TOKEN_EXPIRED`; sin `sid`, sin `aud` correcto o con firma de otro secreto que no es de taller: 401 `UNAUTHORIZED`;

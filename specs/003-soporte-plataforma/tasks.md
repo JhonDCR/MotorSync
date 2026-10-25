@@ -229,16 +229,16 @@ Al terminar, "¿Olvidaste tu contraseña?" crea o actualiza tickets sin revelar 
 
 ## Phase 5: Frontend del PR1 (US1, US2, FR-022)
 
-- [ ] T031 [P] [US1] [US2] Pruebas de API y mock:
+- [x] T031 [P] [US1] [US2] Pruebas de API y mock:
   - `frontend/src/app/core/api/auth-api.service.forgot.spec.ts` (nuevo): `forgotPassword(email)` → `POST /api/v1/auth/forgot-password` con body `{ email }` y nada más.
   - `frontend/src/app/core/api/support-api.service.spec.ts`: `login`, `refresh`, `logout`, `me`, `changePassword`, `listOpenTickets`, `getTicket` y `discardTicket` con las rutas y verbos del contrato, `withCredentials` y `X-Requested-With: motorsync` en refresh y logout.
   - `frontend/src/app/core/api/mock-support.store.spec.ts` y `frontend/src/app/core/api/mock-api.interceptor.support.spec.ts` (nuevos), con las reglas del contrato: `forgot-password` siempre 202 (también con correo inexistente o de soporte), 429 `HELP_RATE_LIMITED` a la 21.ª del mismo origen simulado, un único ticket abierto por cuenta de `mock-auth.store.ts` con `requestCount` creciente; login de soporte (`INVALID_CREDENTIALS`, `ACCOUNT_LOCKED` tras 5 fallos, temporal inicial con `PASSWORD_CHANGE_REQUIRED`), refresh, logout idempotente, me y password; bandeja ordenada, detalle, descarte (`REQUIRED`, `TICKET_NOT_OPEN`); separación: token de taller en `/support/**` → 403 `FORBIDDEN` y token de soporte en rutas del taller → 403 `FORBIDDEN`.
 
   — tester
-- [ ] T032 [US1] **FR-022 sobre la 002** (research R12; principio II): cambiar a "Su contraseña temporal venció. Pida al administrador de su taller que la restablezca o use ¿Olvidaste tu contraseña?" los valores `AUTH_MESSAGES.TEMPORARY_PASSWORD_EXPIRED` y `LOGIN_REASON_MESSAGES['temporary-expired']` de `frontend/src/testing/auth-fixtures.ts`, y los comentarios de cabecera que citan el texto en `frontend/src/app/core/api/problem.auth.spec.ts` (línea 12), `frontend/src/app/features/auth/login.page.spec.ts` (línea 23), `frontend/src/app/features/auth/login.page.session.spec.ts` (línea 9) y `frontend/src/app/features/auth/change-password.page.spec.ts` (línea 31, solo comentario). Quedan en rojo **3 pruebas** de la 002: `[US5-AC9] TEMPORARY_PASSWORD_EXPIRED → mensaje de temporal vencida` (problem.auth), `[US5-AC9] 401 TEMPORARY_PASSWORD_EXPIRED → …` (login.page) y el caso `['temporary-expired', '[US5-AC9]']` (login.page.session). Ningún `it()`, aserción ni lógica de esas pruebas cambia. Crear además `frontend/src/testing/support-fixtures.ts` con los textos literales de la spec 003 (FR-003, US1-AC6, US3-AC3, US3-AC5, US3-AC8, FR-022, avisos del panel). **Redactar la nota de justificación para el PR**: "cambio de requisito FR-022 de la spec 003 sobre US5-AC9 de la 002; solo cambia el valor esperado del fixture". El merge exige **aprobación humana explícita** de este cambio — tester
-- [ ] T033 [US1] Implementar el texto de FR-022 en `frontend/src/app/core/api/problem.ts` (`TEMPORARY_PASSWORD_EXPIRED`) y en `frontend/src/app/features/auth/login.page.ts` (`'temporary-expired'`), con el enlace "¿Olvidaste tu contraseña?" junto al mensaje. Deja en verde las 3 pruebas de T032 — implementer-frontend
-- [ ] T034 [US1] [US2] Implementar los tipos del contrato 003 en `frontend/src/app/core/api/api.models.ts`, `forgotPassword()` en `frontend/src/app/core/api/auth-api.service.ts`, `frontend/src/app/core/api/support-api.service.ts` (parte del PR1), `frontend/src/app/core/api/mock-support.store.ts` y las rutas `/auth/forgot-password` y `/support/**` del PR1 en `frontend/src/app/core/api/mock-api.interceptor.ts`. Deja T031 en verde — implementer-frontend
-- [ ] T035 [US1] Pruebas en `frontend/src/app/features/auth/forgot-password.page.spec.ts` y `frontend/src/app/features/auth/login.page.forgot.spec.ts` (nuevos):
+- [x] T032 [US1] **FR-022 sobre la 002** (research R12; principio II): cambiar a "Su contraseña temporal venció. Pida al administrador de su taller que la restablezca o use ¿Olvidaste tu contraseña?" los valores `AUTH_MESSAGES.TEMPORARY_PASSWORD_EXPIRED` y `LOGIN_REASON_MESSAGES['temporary-expired']` de `frontend/src/testing/auth-fixtures.ts`, y los comentarios de cabecera que citan el texto en `frontend/src/app/core/api/problem.auth.spec.ts` (línea 12), `frontend/src/app/features/auth/login.page.spec.ts` (línea 23), `frontend/src/app/features/auth/login.page.session.spec.ts` (línea 9) y `frontend/src/app/features/auth/change-password.page.spec.ts` (línea 31, solo comentario). Quedan en rojo **3 pruebas** de la 002: `[US5-AC9] TEMPORARY_PASSWORD_EXPIRED → mensaje de temporal vencida` (problem.auth), `[US5-AC9] 401 TEMPORARY_PASSWORD_EXPIRED → …` (login.page) y el caso `['temporary-expired', '[US5-AC9]']` (login.page.session). Ningún `it()`, aserción ni lógica de esas pruebas cambia. Crear además `frontend/src/testing/support-fixtures.ts` con los textos literales de la spec 003 (FR-003, US1-AC6, US3-AC3, US3-AC5, US3-AC8, FR-022, avisos del panel). **Redactar la nota de justificación para el PR**: "cambio de requisito FR-022 de la spec 003 sobre US5-AC9 de la 002; solo cambia el valor esperado del fixture". El merge exige **aprobación humana explícita** de este cambio — tester
+- [x] T033 [US1] Implementar el texto de FR-022 en `frontend/src/app/core/api/problem.ts` (`TEMPORARY_PASSWORD_EXPIRED`) y en `frontend/src/app/features/auth/login.page.ts` (`'temporary-expired'`), con el enlace "¿Olvidaste tu contraseña?" junto al mensaje. Deja en verde las 3 pruebas de T032 — implementer-frontend
+- [x] T034 [US1] [US2] Implementar los tipos del contrato 003 en `frontend/src/app/core/api/api.models.ts`, `forgotPassword()` en `frontend/src/app/core/api/auth-api.service.ts`, `frontend/src/app/core/api/support-api.service.ts` (parte del PR1), `frontend/src/app/core/api/mock-support.store.ts` y las rutas `/auth/forgot-password` y `/support/**` del PR1 en `frontend/src/app/core/api/mock-api.interceptor.ts`. Deja T031 en verde — implementer-frontend
+- [x] T035 [US1] Pruebas en `frontend/src/app/features/auth/forgot-password.page.spec.ts` y `frontend/src/app/features/auth/login.page.forgot.spec.ts` (nuevos):
   - **US1-AC11 / FR-001**: `/login` muestra el enlace "¿Olvidaste tu contraseña?" debajo del botón de entrar, sin sesión, con objetivo táctil de al menos 44 px; un toque navega a `/forgot-password` y precarga el correo ya escrito.
   - **US1-AC8**: correo vacío o inválido → error en el campo y ninguna petición.
   - **US1-AC1 / FR-003**: tras 202, en lugar del formulario aparece el texto literal de FR-003 (sin prometer canal ni correo).
@@ -247,8 +247,8 @@ Al terminar, "¿Olvidaste tu contraseña?" crea o actualiza tickets sin revelar 
   - **FR-026**: la página usa el layout mobile-first desde 360 px y sus controles miden al menos 44 px; enlace de vuelta a `/login`; `/forgot-password` lleva `guestGuard`.
 
   — tester
-- [ ] T036 [US1] Implementar `frontend/src/app/features/auth/forgot-password.page.ts` (+ `.html` y `.scss`, mobile-first), la ruta `forgot-password` con `guestGuard` en `frontend/src/app/app.routes.ts` y el enlace en `frontend/src/app/features/auth/login.page.html` — implementer-frontend
-- [ ] T037 [P] [US2] Pruebas de sesión del panel:
+- [x] T036 [US1] Implementar `frontend/src/app/features/auth/forgot-password.page.ts` (+ `.html` y `.scss`, mobile-first), la ruta `forgot-password` con `guestGuard` en `frontend/src/app/app.routes.ts` y el enlace en `frontend/src/app/features/auth/login.page.html` — implementer-frontend
+- [x] T037 [P] [US2] Pruebas de sesión del panel:
   - `frontend/src/app/core/support/support-session.store.spec.ts`: se llena desde `SupportSessionResponse` y desde `/support/auth/me`; guarda el token en `localStorage` `motorsync.support.token` (nunca en `motorsync.token`); `clear()` solo borra el suyo.
   - `frontend/src/app/core/support/support.guards.spec.ts`: `supportAuthGuard` sin sesión de soporte → `/support/login` (aunque haya sesión de taller, US2-AC5 en la interfaz); con `mustChangePassword` solo deja pasar `/support/change-password`; `supportGuestGuard` con sesión → `/support`.
   - `frontend/src/app/core/auth/auth-token.interceptor.support.spec.ts` (nuevo): a `/api/v1/support/**` le pone el token de soporte y al resto el del taller; nunca los dos.
@@ -256,8 +256,8 @@ Al terminar, "¿Olvidaste tu contraseña?" crea o actualiza tickets sin revelar 
   - `frontend/src/app/core/auth/auth-refresh.interceptor.support.spec.ts` (nuevo): el interceptor del taller ignora las URLs `/api/v1/support/**`.
 
   — tester
-- [ ] T038 [US2] Implementar `frontend/src/app/core/support/support-session.store.ts`, `support.guards.ts` y `support-refresh.interceptor.ts`, ajustar `frontend/src/app/core/auth/auth-token.interceptor.ts` y `auth-refresh.interceptor.ts`, y registrar el interceptor nuevo en `frontend/src/app/app.config.ts` (después de `authTokenInterceptor` y antes de `mockApiInterceptor`) — implementer-frontend
-- [ ] T039 [US2] Pruebas de pantallas del panel (PR1):
+- [x] T038 [US2] Implementar `frontend/src/app/core/support/support-session.store.ts`, `support.guards.ts` y `support-refresh.interceptor.ts`, ajustar `frontend/src/app/core/auth/auth-token.interceptor.ts` y `auth-refresh.interceptor.ts`, y registrar el interceptor nuevo en `frontend/src/app/app.config.ts` (después de `authTokenInterceptor` y antes de `mockApiInterceptor`) — implementer-frontend
+- [x] T039 [US2] Pruebas de pantallas del panel (PR1):
   - `frontend/src/app/features/support/support-login.page.spec.ts`: **US2-AC3** "Correo o contraseña incorrectos" para `INVALID_CREDENTIALS` y el mensaje de bloqueo de la 002 para `ACCOUNT_LOCKED`; con `mustChangePassword` navega a `/support/change-password`; **US2-AC4** solo campos de correo y contraseña.
   - `frontend/src/app/features/support/support-change-password.page.spec.ts`: reglas de la 002 (actual incorrecta, menos de 8, igual a la actual, confirmación) y vuelta a la bandeja.
   - `frontend/src/app/features/support/support-shell.component.spec.ts`: cabecera "Soporte MotorSync" con el nombre del agente y "Cerrar sesión"; **US2-AC9** al pulsarlo llama a `POST /support/auth/logout`, limpia la sesión de soporte y navega a `/support/login`.
@@ -266,18 +266,18 @@ Al terminar, "¿Olvidaste tu contraseña?" crea o actualiza tickets sin revelar 
   - `frontend/src/app/app.support.spec.ts` (nuevo): en `/support/**` no se muestra la cabecera del taller; con sesión de taller, `/support` redirige a `/support/login`; con sesión de soporte, `/` redirige a `/login` (US2-AC5, US2-AC6 en la interfaz); las rutas del panel se cargan de forma diferida; **FR-026** objetivos táctiles de 44 px.
 
   — tester
-- [ ] T040 [US2] Implementar `frontend/src/app/features/support/support-shell.component.*`, `support-login.page.*`, `support-change-password.page.*`, `tickets-inbox.page.*` y `ticket-detail.page.*` (ver y descartar), las rutas hijas diferidas de `/support` en `frontend/src/app/app.routes.ts` y la ocultación de la cabecera del taller en `frontend/src/app/app.ts` / `app.html` — implementer-frontend
+- [x] T040 [US2] Implementar `frontend/src/app/features/support/support-shell.component.*`, `support-login.page.*`, `support-change-password.page.*`, `tickets-inbox.page.*` y `ticket-detail.page.*` (ver y descartar), las rutas hijas diferidas de `/support` en `frontend/src/app/app.routes.ts` y la ocultación de la cabecera del taller en `frontend/src/app/app.ts` / `app.html` — implementer-frontend
 
 ## Cierre PR1
 
-- [ ] T041 Actualizar `CLAUDE.md`:
+- [x] T041 Actualizar `CLAUDE.md`:
   - comandos: `npm run support:account -- create|deactivate|reactivate|reset-password|list` (y `access-log`, que llega en el PR3), con `--confirm` y la temporal impresa una sola vez;
   - arranque: volver a correr `npm run db:bootstrap` al actualizar desde una versión anterior a la 003 (rol `motorsync_support`); `SUPPORT_JWT_SECRET` obligatoria en `.env` (copiar de `.env.example`, al menos 32 caracteres y distinta de `JWT_SECRET`; la API no arranca sin ella);
   - el seed crea `soporte@motorsync.test`; el panel en `/support/login`; `token:dev` no emite tokens de soporte;
   - "Lecciones": ampliar la de `SET ROLE` a las funciones `support_*` y a los triggers de FR-024 (dueño `motorsync_support`, data-model 003, "Mantenimiento").
 
   — leader
-- [ ] T042 Revisar el diff del PR1 contra spec.md, plan.md (Constitution Check) y la **constitución 1.3.0**. Foco:
+- [x] T042 Revisar el diff del PR1 contra spec.md, plan.md (Constitution Check) y la **constitución 1.3.0**. Foco:
   - principio I (1.3.0): las funciones del panel son `SECURITY DEFINER` de `motorsync_support`, con `search_path` fijo, compuerta de sesión y de contexto, columnas mínimas y sin `BYPASSRLS`; el panel nunca fija taller; `forgot-password` no toma nada del cliente;
   - separación de zonas en ambos sentidos (secreto propio, `aud`, `@SupportArea()` en todo controlador de `src/support/`, interceptor global, cookies con `Path` distinto);
   - la app no puede crear, renombrar, reactivar ni desactivar cuentas de soporte (privilegios);
@@ -288,7 +288,7 @@ Al terminar, "¿Olvidaste tu contraseña?" crea o actualiza tickets sin revelar 
   - pruebas con ID para US1-AC1 a AC11, US2-AC1 a AC13, FR-022, FR-024 (ambos sentidos) y SC-008.
 
   — reviewer
-- [ ] T043 Verificar el PR1:
+- [x] T043 Verificar el PR1:
   - `cd backend && npm run lint && npm test && npm run build && npm run db:bootstrap && npm run db:migrate && npm run test:e2e` (las e2e estadísticas de tiempo de T022 y T025 en CI; en Windows pueden dar falsos positivos, plan riesgo 4);
   - `npm run test:perf` en local una vez (las consultas de la 001 no cambian; CI lo corre igual);
   - `cd frontend && npm run lint && npm test -- --watch=false && npm run build`;

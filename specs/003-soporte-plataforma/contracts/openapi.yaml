@@ -477,7 +477,7 @@ paths:
       description: |
         Misma operación que en la 002. Cambia solo el esquema `UserAuditEntry` (ver `UserAuditEntry` abajo): la acción
         `user.password_reset_by_support` y el rol de actor `platform_support`. El actor de soporte se identifica con su
-        nombre (nunca su correo); el frontend lo muestra como "<nombre> (Soporte MotorSync)".
+        nombre (nunca su correo); el frontend lo muestra como "Soporte MotorSync (<nombre>)".
       security:
         - workshopBearer: []
       parameters:

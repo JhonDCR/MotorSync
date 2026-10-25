@@ -130,6 +130,6 @@ Recorrido:
 1. En un teléfono de 360 px: `/login` → "¿Olvidaste tu contraseña?" (un toque, 44 px) → correo → mensaje de FR-003 (US1-AC11, FR-026).
 2. En una computadora o tablet: `/support/login` → cambio de la temporal → bandeja → abrir el ticket → nota → "Generar contraseña temporal" → diálogo con la temporal y "Copiar" → la bandeja ya no lo muestra.
 3. Con la temporal, `/login` del taller → `/change-password`.
-4. Como admin del taller: `/users/{id}` → el historial muestra "<nombre> (Soporte MotorSync)" y "Restablecimiento de contraseña por soporte (ticket #N)".
+4. Como admin del taller: `/users/{id}` → el historial muestra "Soporte MotorSync (<nombre>)" y "Restablecimiento de contraseña por soporte (ticket #N)".
 5. Con sesión de taller abierta, ir a `/support` → redirige a `/support/login`; con sesión de soporte, ir a `/` → redirige a `/login`.
 6. `/support/workshops` → buscar → abrir un taller → cuentas → "Ver bitácora de este taller" → `/support/access-log` filtrado; tocar un agente para filtrar también por él y quitar los filtros.

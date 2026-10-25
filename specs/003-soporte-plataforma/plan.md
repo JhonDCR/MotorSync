@@ -39,6 +39,7 @@ Enfoque técnico:
 - E2e contra PostgreSQL real, con el tiempo manipulado por el migrator (`last_activity_at`, `window_started_at`, `temp_password_expires_at`).
 - Prueba de roles y RLS a nivel de base (`db/support-roles.e2e-spec.ts`).
 - Pruebas estadísticas de tiempo como la de la 002.
+- Orígenes distintos en las e2e de "¿Olvidaste tu contraseña?" (US1-AC6, US1-AC7 y las de tiempo): la app de prueba activa `trust proxy` (`'loopback'`) solo dentro de la suite y cada petición manda su `X-Forwarded-For`. La API de producción no cambia (riesgo 3).
 - Frontend: Vitest + jsdom.
 
 **Target Platform**: API en Linux (contenedor). "¿Olvidaste tu contraseña?" en teléfonos desde 360 px y tablets; panel en computadoras y tablets (FR-026).
@@ -80,7 +81,7 @@ Evaluado antes de la fase 0 y **reevaluado después del diseño** (data-model, c
 | Regla (1.2.0) | Cómo se cumple | Estado |
 |---|---|---|
 | `tenant_id uuid NOT NULL`, indexado y con FK a `tenants` en toda tabla de negocio | No hay tablas de negocio de taller nuevas. `support_tickets` y `support_access_log` tienen `tenant_id NOT NULL REFERENCES tenants(id)` e índice; `support_tickets` usa además la FK compuesta `(tenant_id, user_id) → users (tenant_id, id)`. `support_accounts`, `support_sessions`, `support_refresh_tokens`, `support_ticket_events` y `help_request_throttle` son de plataforma, sin taller (Complexity Tracking). | Cumple (con excepciones justificadas) |
-| RLS `ENABLE` + `FORCE` con política sobre `app.tenant_id` | Las tablas de taller (`users`, `user_sessions`, `audit_log`…) conservan su RLS `FORCE`; solo ganan políticas `FOR SELECT TO motorsync_support` en `users` y `tenants`, que solo alcanzan al código de las funciones (R1). Las tablas de soporte tienen RLS `ENABLE` sin `FORCE` (precedente: `tenants`) con políticas `app_current_tenant() IS NULL` para la app o solo `TO motorsync_support` (R2, R6). | Cumple (excepción "sin `FORCE`" justificada) |
+| RLS `ENABLE` + `FORCE` con política sobre `app.tenant_id` | Las tablas de taller (`users`, `user_sessions`, `audit_log`…) conservan su RLS `FORCE`; solo ganan políticas `FOR SELECT TO motorsync_support` en `users` y `tenants`, que solo alcanzan al código de las funciones (R1). Las tablas de soporte tienen RLS `ENABLE` sin `FORCE` (precedente: `tenants`) con políticas `app_current_tenant() IS NULL` para la app o solo `TO motorsync_support` (R2, R6). `help_request_throttle` es técnica y global, sin RLS y sin ningún privilegio para la app, como `login_attempts` de la 002 (R8). | Cumple (excepción "sin `FORCE`" justificada) |
 | El tenant se fija por transacción a partir del token o, en las rutas de autenticación, de la credencial verificada; nunca del cliente | `POST /auth/forgot-password`: no fija taller (la función resuelve todo, R7). Panel: nunca fija taller, salvo en la generación de la temporal, donde el tenant sale de la fila del ticket que devuelve `support_lock_open_ticket`, nunca del body (R9). Los DTOs rechazan `tenantId` y `userId` (US3-AC9); `forgot-password` los ignora (US1-AC9). | **Requiere enmienda 1.3.0** (I-a): "del ticket abierto leído en la base" no es token ni credencial |
 | Lecturas entre talleres solo en funciones acotadas a la autenticación (igualdad de secreto o identificador, columnas mínimas, sin `BYPASSRLS`); cualquier otro acceso requiere enmienda | `support_request_help` es de autenticación (recuperación) y busca por igualdad del correo: cabe en la 1.2.0. Las funciones del panel (`support_list_open_tickets`, `support_get_ticket`, `support_list_workshops`, `support_list_workshop_accounts`, `support_list_access_log`) **no** son de autenticación, y `support_list_workshops` busca por parte del nombre. Están acotadas (sesión de soporte viva como capacidad, sin taller fijado, columnas de FR-013 y FR-016, privilegios por columna, bitácora) y no usan `BYPASSRLS`. | **Requiere enmienda 1.3.0** (I-a) |
 | Rol de app sin `BYPASSRLS`; migraciones con rol separado | `motorsync_app` y `motorsync_migrator` sin cambios de atributos. `motorsync_support` es `NOLOGIN`, `NOBYPASSRLS` y `NOINHERIT`; la app no es miembro: solo tiene `EXECUTE` sobre las funciones públicas del panel. | Cumple |
@@ -139,8 +140,8 @@ Evaluado antes de la fase 0 y **reevaluado después del diseño** (data-model, c
 ### Flujo y arnés
 
 Ciclo spec → clarify → **plan (aquí)** → tasks → issues. Este plan solo escribe en `specs/`. Quedan como tareas para los roles correspondientes:
-- leader: enmienda 1.3.0, `.env.example`, `ci.yml` (si hace falta exportar `SUPPORT_JWT_SECRET`) y la línea de `motorsync_support` en "Lecciones" de `CLAUDE.md`;
-- implementers: `db/bootstrap.sql`, `vitest.config*.ts`;
+- leader: enmienda 1.3.0, `.env.example`, `backend/vitest.config.ts` y `backend/vitest.shared.ts` (valor de prueba de `SUPPORT_JWT_SECRET` para unitarias, e2e y perf), `ci.yml` (si hace falta exportar `SUPPORT_JWT_SECRET`) y la línea de `motorsync_support` en "Lecciones" de `CLAUDE.md`;
+- implementers: `db/bootstrap.sql`;
 - tester: `test/setup/db-fixtures.ts` y `frontend/src/testing/auth-fixtures.ts`.
 
 ## Project Structure
@@ -218,7 +219,9 @@ backend/
 └── test/
     ├── setup/db-fixtures.ts                               # M (tester, PR1): BUSINESS_TABLES + createSupportAccount(), createTicket()
     ├── setup/support.ts                                   # N (tester, PR1): loginAsSupport(), cookies de soporte
-    ├── db/support-roles.e2e-spec.ts                       # N (PR1, ampliada en PR2 y PR3): roles, RLS, columnas, compuertas
+    ├── db/support-roles.e2e-spec.ts                       # N (PR1): roles, RLS, columnas, compuertas
+    ├── db/support-roles-password.e2e-spec.ts              # N (PR2): CHECK de actor_role y funciones de la temporal
+    ├── db/support-roles-access-log.e2e-spec.ts            # N (PR3): bitácora append-only y sus funciones
     ├── auth-forgot-password.e2e-spec.ts                   # N (PR1): US1 (incluye tiempos y concurrencia)
     ├── support-auth.e2e-spec.ts                           # N (PR1): US2-AC1 a AC6, AC9, AC10
     ├── support-tickets.e2e-spec.ts                        # N (PR1): US2-AC7, AC8, AC11 a AC13
@@ -262,7 +265,7 @@ frontend/src/
     └── features/users/user-detail.page.*                  # M (PR2): actor "Soporte MotorSync" y acción nueva
 ```
 
-Además (leader): `.env.example` (`SUPPORT_JWT_SECRET`), `backend/vitest.config.ts` y `vitest.config.e2e.ts` (un `SUPPORT_JWT_SECRET` de prueba, distinto de `JWT_SECRET`), y `.github/workflows/ci.yml` solo si el job de e2e no toma la variable de la configuración de Vitest.
+Además (leader): `.env.example` (`SUPPORT_JWT_SECRET`), `backend/vitest.config.ts` (`test.env`) y `backend/vitest.shared.ts` (`??=`, que usan `vitest.config.e2e.ts` y `vitest.config.perf.ts`) con un `SUPPORT_JWT_SECRET` de prueba distinto de `JWT_SECRET` (en CI, `JWT_SECRET` es aleatorio), y `.github/workflows/ci.yml` solo si el job de e2e no toma la variable de la configuración de Vitest.
 
 **Structure Decision**: monorepo web existente. Un módulo de backend nuevo, `support`, más cambios acotados en `auth` (guard por zona, "¿Olvidaste tu contraseña?", política de refresh extraída), `users` (núcleo de la temporal extraído) y `audit` (`recordAsSupport`). En el frontend, `features/support` y `core/support`, con rutas diferidas bajo `/support`.
 

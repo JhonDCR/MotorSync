@@ -473,8 +473,9 @@ END $$;
 
 -- US3 (R9), paso 8: cierra el ticket como Resuelto con la nota. Exige el taller del ticket fijado
 -- (lo fijó el paso 3) y el ticket todavía abierto (la fila ya está bloqueada por el paso 1).
+-- Devuelve resolved_at para armar la respuesta sin volver a leer el ticket con el taller fijado.
 CREATE FUNCTION support_resolve_ticket(p_session_id uuid, p_ticket_id uuid, p_note text, p_ip text)
-  RETURNS void
+  RETURNS timestamptz
   LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE
   v_agent uuid;
@@ -493,6 +494,7 @@ BEGIN
   END IF;
   INSERT INTO public.support_ticket_events (ticket_id, support_account_id, action, from_status, to_status, ip)
        VALUES (p_ticket_id, v_agent, 'temporary_password_generated', 'open', 'resolved', p_ip);
+  RETURN now();
 END $$;
 -- Dueño, REVOKE FROM PUBLIC y GRANT EXECUTE TO motorsync_app como en 1761000001200.
 ```
@@ -543,9 +545,13 @@ END $$;
 -- La API escapa % y _ de p_name_query antes de llamarla (con ESCAPE '\' implícito de LIKE).
 
 -- US4-AC3, US4-AC6, US4-AC7: cuentas de un taller + registro en la bitácora, en una sola llamada.
--- Taller inexistente: P0002 (404) y sin registro.
+-- Taller inexistente: P0002 (404) y sin registro. Cada fila repite los datos de FR-016 del taller
+-- (nombre, RUC y fecha de alta) para el campo `workshop` de la respuesta. Un taller sin cuentas (por
+-- ejemplo, uno anterior a la 002) devuelve una sola fila con las columnas de la cuenta en NULL, que la
+-- API descarta de `items` (LEFT JOIN): nunca 0 filas para un taller existente.
 CREATE FUNCTION support_list_workshop_accounts(p_session_id uuid, p_tenant_id uuid, p_ip text)
-  RETURNS TABLE (user_id uuid, name text, email text, role text, status text, has_open_ticket boolean)
+  RETURNS TABLE (user_id uuid, name text, email text, role text, status text, has_open_ticket boolean,
+                 workshop_name text, workshop_ruc text, workshop_created_at timestamptz)
   LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE v_agent uuid;
 BEGIN
@@ -558,9 +564,13 @@ BEGIN
        VALUES (v_agent, p_tenant_id, 'workshop.accounts_viewed', p_ip);
   RETURN QUERY
     SELECT u.id, u.name, u.email, u.role, u.status,
-           EXISTS (SELECT 1 FROM public.support_tickets k WHERE k.user_id = u.id AND k.status = 'open')
-      FROM public.users u
-     WHERE u.tenant_id = p_tenant_id
+           CASE WHEN u.id IS NULL THEN NULL
+                ELSE EXISTS (SELECT 1 FROM public.support_tickets k WHERE k.user_id = u.id AND k.status = 'open')
+           END,
+           t.name, t.ruc, t.created_at
+      FROM public.tenants t
+      LEFT JOIN public.users u ON u.tenant_id = t.id
+     WHERE t.id = p_tenant_id
      ORDER BY u.status, u.name, u.id;
 END $$;
 
@@ -598,7 +608,7 @@ Solo el CHECK de `actor_role` (migración 1300). Se amplían `AUDIT_ACTIONS` (`u
 
 | Acción | `before` | `after` |
 |---|---|---|
-| `user.password_reset_by_support` | `{ "mustChangePassword": false }` | `{ "mustChangePassword": true, "temporaryPasswordExpiresAt": "…Z", "sessionsClosed": 2, "supportTicketNumber": 123 }` |
+| `user.password_reset_by_support` | `{ "mustChangePassword": <valor vigente antes del cambio> }` | `{ "mustChangePassword": true, "temporaryPasswordExpiresAt": "…Z", "sessionsClosed": 2, "supportTicketNumber": 123 }` |
 
 Nunca se incluyen la temporal, el hash ni la nota de verificación (FR-020, US3-AC6).
 

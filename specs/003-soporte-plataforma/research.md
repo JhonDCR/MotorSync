@@ -22,7 +22,7 @@ El panel necesita leer, sin taller fijado, datos de identificación de **todos**
   - `support_request_help(email, origin_hash)`: la única pública (US1, R7).
   - `support_list_open_tickets(session)`, `support_get_ticket(session, ticket)`, `support_discard_ticket(session, ticket, reason, ip)` (US2).
   - `support_lock_open_ticket(session, ticket)`, `support_resolve_ticket(session, ticket, note, ip)` (US3, R9).
-  - `support_list_workshops(session, query, limit, offset)`, `support_list_workshop_accounts(session, tenant, ip)` (US4; la segunda escribe la bitácora, R10) y `support_list_access_log(session, tenant, agent, limit, offset)` (US4-AC8, lectura de la bitácora, R10).
+  - `support_list_workshops(session, name_query, ruc_prefix, limit, offset)`, `support_list_workshop_accounts(session, tenant, ip)` (US4; la segunda escribe la bitácora, R10) y `support_list_access_log(session, tenant, agent, limit, offset)` (US4-AC8, lectura de la bitácora, R10).
   - `support_workshop_email_exists(email)`: solo para el procedimiento de operaciones (`EXECUTE` para `motorsync_migrator`, no para la app; R5).
 
 **Razón**:
@@ -240,13 +240,14 @@ Controles:
 | 0b | Generar la temporal y su hash scrypt **antes** de tomar ningún otro lock (unos 100 ms; si el ticket resulta no estar abierto, se descarta) | — |
 | 1 | `SELECT * FROM support_lock_open_ticket($sid, $ticket)` | fila del ticket (`FOR UPDATE`) |
 | 2 | Si no existe: 404 `NOT_FOUND`. Si no está `open`: 409 `TICKET_NOT_OPEN` (US3-AC5, US2-AC13, US3-AC12) | — |
+| 2b | `support_get_ticket($sid, $ticket)` **todavía sin taller fijado** (exige contexto de plataforma): datos de la cuenta y del taller para el `ticket` de la respuesta | (fila del ticket, ya tomada) |
 | 3 | `set_config('app.tenant_id', <tenant_id devuelto por el paso 1>, true)` | — |
 | 4 | `TENANT_ADMINS_LOCK_SQL` (el advisory lock del taller de R8 de la 002) | advisory lock del taller |
 | 5 | `SELECT status … FROM users WHERE id = <user_id del paso 1>` bajo RLS. Si está `inactive`: 409 `ACCOUNT_INACTIVE` (US3-AC8), con el estado **vigente** (después del lock) | — |
-| 6 | `applyTemporaryPassword`: revoca sesiones (`revoke_reason = 'password_reset'`) → `UPDATE users` (`updated_by` = id del agente, `updated_by_name` = "<nombre> (Soporte MotorSync)") → `auth_clear_login_failures` | sesiones del objetivo → fila de `users` |
+| 6 | `applyTemporaryPassword`: revoca sesiones (`revoke_reason = 'password_reset'`) → `UPDATE users` (`updated_by` = id del agente, `updated_by_name` = "Soporte MotorSync (<nombre>)", spec Assumptions) → `auth_clear_login_failures` | sesiones del objetivo → fila de `users` |
 | 7 | `AuditService.recordAsSupport(...)` en `audit_log` del taller fijado (R11) | — |
-| 8 | `support_resolve_ticket($sid, $ticket, $note, $ip)`: exige que el ticket siga `open` y que su `tenant_id` sea `app_current_tenant()`; guarda la nota, `resolved_by`, `resolved_at`, pasa a `resolved` e inserta el evento | (fila del ticket, ya tomada) |
-| 9 | Commit. Responde 200 con la temporal | libera todo |
+| 8 | `support_resolve_ticket($sid, $ticket, $note, $ip)`: exige que el ticket siga `open` y que su `tenant_id` sea `app_current_tenant()`; guarda la nota, `resolved_by`, `resolved_at`, pasa a `resolved`, inserta el evento y devuelve `resolved_at` | (fila del ticket, ya tomada) |
+| 9 | Commit. Responde 200 con la temporal y el `ticket` armado con el paso 2b más `status = resolved`, la nota recortada, el nombre del agente y `resolved_at` del paso 8 | libera todo |
 
 - **Orden de locks** (extensión de R8 de la 002): **sesión de soporte propia → ticket → advisory lock del taller → sesiones del objetivo → fila de `users`**. Ningún camino de un taller toma un ticket ni una sesión de soporte, y ningún camino de soporte toma un ticket después del advisory lock, así que no hay ciclos:
   - frente al restablecimiento del administrador (US3-AC11): ambos toman el advisory lock del mismo taller antes de las sesiones y de `users`; se aplican uno tras otro, cada uno con su auditoría (dos registros), y la cuenta queda con la temporal del último, sin sesiones;
@@ -298,13 +299,13 @@ Columnas actuales de `audit_log` (001): `tenant_id`, `actor_user_id uuid NOT NUL
 | `actor_role` | `platform_support` |
 | `action` | `user.password_reset_by_support` |
 | `entity_type`, `entity_id` | `user`, id de la cuenta afectada |
-| `before` | `{ "mustChangePassword": false }` |
+| `before` | `{ "mustChangePassword": <valor vigente antes del cambio> }` (normalmente `false`; `true` si la cuenta ya tenía una temporal) |
 | `after` | `{ "mustChangePassword": true, "temporaryPasswordExpiresAt": "…Z", "sessionsClosed": 2, "supportTicketNumber": 123 }` |
 | `reason` | `NULL` (la nota de verificación queda solo en el ticket, FR-023) |
 | `ip`, `channel` | IP del agente, `support_panel` |
 
 - `AuditService` gana `recordAsSupport(manager, agent, ip, entry)`: recibe el manager explícito (no hay `tenantStorage` en el panel, R9) y fija actor, rol y canal. `record()` de la 001 y la 002 no cambia.
-- El administrador del taller lo ve en `GET /users/{id}/history` (002) sin cambios de consulta. Cambios de contrato sobre la 002 (en [contracts/openapi.yaml](./contracts/openapi.yaml), sección "Cambios a la 002"): `UserAuditEntry.action` suma `user.password_reset_by_support` y `actorRole` suma `platform_support`. El frontend muestra "<nombre> (Soporte MotorSync)" y la acción "Restablecimiento de contraseña por soporte (ticket #123)".
+- El administrador del taller lo ve en `GET /users/{id}/history` (002) sin cambios de consulta. Cambios de contrato sobre la 002 (en [contracts/openapi.yaml](./contracts/openapi.yaml), sección "Cambios a la 002"): `UserAuditEntry.action` suma `user.password_reset_by_support` y `actorRole` suma `platform_support`. El frontend muestra "Soporte MotorSync (<nombre>)" (spec, Assumptions: "Soporte MotorSync" seguido del nombre del agente) y la acción "Restablecimiento de contraseña por soporte (ticket #123)".
 - Una prueba recorre el JSON del registro y de todas las respuestas buscando la temporal generada y la nota de verificación (US3-AC6, SC-007).
 
 **Alternativas**: columnas nuevas `actor_kind` / `support_ticket_id` en `audit_log` (más DDL en una tabla de la 001 para lo que cabe en `actor_role` y `after`); `reason` con la referencia del ticket (el CHECK exige 10–500 y `reason` significa "motivo"); registrar con `actor_role = 'admin'` (falsea al actor).
@@ -343,7 +344,7 @@ Ninguna prueba del backend cambia (`auth-login.e2e-spec.ts` y `auth-password.e2e
   - `support-refresh.interceptor.ts` (N): el mismo comportamiento que `auth-refresh.interceptor` (single-flight, `REFRESH_CONFLICT`, redirecciones) contra `/support/auth/refresh`, solo para URLs del panel; el de taller ignora las URLs del panel.
   - Bandeja: tabla con los campos de US2-AC7, del más antiguo al más reciente, fechas en hora de Ecuador (`America/Guayaquil`). Detalle del ticket: campo de nota con la advertencia "No escriba contraseñas en la nota", botón "Generar contraseña temporal" (deshabilitado sin nota) y diálogo que muestra la temporal una vez con "Copiar" y el aviso de que no se volverá a mostrar; "Descartar" con motivo obligatorio.
   - Pensado para computadoras y tablets (FR-026); objetivos táctiles de 44 px igualmente.
-- **Auditoría del taller** (002, M): `user-detail.page` muestra el actor `platform_support` como "(Soporte MotorSync)" y la acción nueva con su número de ticket.
+- **Auditoría del taller** (002, M): `user-detail.page` muestra el actor `platform_support` como "Soporte MotorSync (<nombre>)" y la acción nueva con su número de ticket.
 - **Mock** (`ng serve --configuration mock`): `core/api/mock-support.store.ts` (N) con cuentas de soporte, sesiones, tickets, talleres y bitácora, y las rutas `/auth/forgot-password` y `/support/**` en `mock-api.interceptor.ts` con las mismas reglas del contrato (límite por origen simulado, un ticket abierto por cuenta, una temporal por ticket, separación de tokens). `forgot-password` consulta las cuentas de `mock-auth.store.ts` y la temporal de soporte las actualiza, para recorrer el flujo entero sin backend.
 
 **Alternativas**: una segunda aplicación Angular para el panel (dos builds y dos despliegues para pocas pantallas; YAGNI); mostrar el panel dentro de la cabecera del taller (mezcla las dos identidades en la misma barra).

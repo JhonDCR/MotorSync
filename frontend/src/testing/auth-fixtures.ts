@@ -120,7 +120,8 @@ export const AUTH_MESSAGES = {
   REGISTRATION_FAILED: 'No se pudo completar el registro con estos datos; si ya tiene una cuenta, inicie sesión',
   INVALID_CREDENTIALS: 'Correo o contraseña incorrectos',
   ACCOUNT_LOCKED: 'Demasiados intentos fallidos. Intente de nuevo en unos minutos',
-  TEMPORARY_PASSWORD_EXPIRED: 'Su contraseña temporal venció. Pida al administrador de su taller que la restablezca',
+  TEMPORARY_PASSWORD_EXPIRED:
+    'Su contraseña temporal venció. Pida al administrador de su taller que la restablezca o use ¿Olvidaste tu contraseña?',
 } as const;
 
 /** min-height (o height) calculado en px; acepta rem/em a 16 px. NaN si no hay valor. */
@@ -222,7 +223,8 @@ export const LOGIN_REASON_MESSAGES = {
   expired: 'Su sesión expiró por inactividad',
   revoked: 'Su sesión fue cerrada. Vuelva a iniciar sesión',
   logout: 'Cerró su sesión',
-  'temporary-expired': 'Su contraseña temporal venció. Pida al administrador de su taller que la restablezca',
+  'temporary-expired':
+    'Su contraseña temporal venció. Pida al administrador de su taller que la restablezca o use ¿Olvidaste tu contraseña?',
 } as const;
 
 export type LoginReason = keyof typeof LOGIN_REASON_MESSAGES;

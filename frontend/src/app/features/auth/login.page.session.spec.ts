@@ -6,8 +6,9 @@
 //         expired            "Su sesión expiró por inactividad"                       (US3-AC2, literal de spec.md)
 //         revoked            "Su sesión fue cerrada. Vuelva a iniciar sesión"          (US3-AC4)
 //         logout             "Cerró su sesión"                                         (US3-AC3)
-//         temporary-expired  "Su contraseña temporal venció. Pida al administrador de su taller que la restablezca"
-//                                                                                     (US5-AC9)
+//         temporary-expired  "Su contraseña temporal venció. Pida al administrador de su taller que la restablezca o use
+//                             ¿Olvidaste tu contraseña?"
+//                                                                                     (US5-AC9; FR-022 de la 003)
 //       Sin `reason` o con un valor desconocido no se muestra nada (el texto del query nunca se pinta tal cual).
 //   - Al entrar (200): SessionStore.setSession(respuesta) (session.store.ts), que guarda el token y llena el store.
 //   - Destino tras entrar: `/change-password` si user.mustChangePassword; si no, `returnUrl` del query cuando es una

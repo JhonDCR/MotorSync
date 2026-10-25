@@ -588,8 +588,9 @@ async function supportAccountForClosing(agentId?: string): Promise<string> {
 
   const passwordHash = await hashPassword(FIXTURE_AGENT_PASSWORD);
   const inserted = await migratorPool().query<{ id: string }>(
-    `INSERT INTO support_accounts (name, email, password_hash)
-          VALUES ($1, $2, $3)
+    `INSERT INTO support_accounts (name, email, password_hash, must_change_password,
+                                   temp_password_expires_at)
+          VALUES ($1, $2, $3, false, NULL)
      ON CONFLICT (email) DO NOTHING
        RETURNING id`,
     ['Soporte Fixture', FIXTURE_AGENT_EMAIL, passwordHash],

@@ -18,6 +18,8 @@ import { AddLastAdminTrigger1761000000900 } from './migrations/1761000000900-Add
 import { CreateSupportAccounts1761000001000 } from './migrations/1761000001000-CreateSupportAccounts.js';
 import { CreateSupportTickets1761000001100 } from './migrations/1761000001100-CreateSupportTickets.js';
 import { CreateSupportFunctions1761000001200 } from './migrations/1761000001200-CreateSupportFunctions.js';
+import { AllowSupportAuditActor1761000001300 } from './migrations/1761000001300-AllowSupportAuditActor.js';
+import { CreateSupportPasswordFunctions1761000001400 } from './migrations/1761000001400-CreateSupportPasswordFunctions.js';
 
 // Registered by class reference, never by glob: TypeORM's path loading does not work in ESM.
 export const ENTITIES: (new () => object)[] = [Client, Vehicle, AuditLog, User];
@@ -36,6 +38,8 @@ export const MIGRATIONS: (new () => object)[] = [
   CreateSupportAccounts1761000001000,
   CreateSupportTickets1761000001100,
   CreateSupportFunctions1761000001200,
+  AllowSupportAuditActor1761000001300,
+  CreateSupportPasswordFunctions1761000001400,
 ];
 
 /**

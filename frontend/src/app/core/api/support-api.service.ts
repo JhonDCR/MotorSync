@@ -1,7 +1,8 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { map, type Observable } from 'rxjs';
 import type {
+  AccessLogResponse,
   ChangePasswordRequest,
   CurrentSupportSessionResponse,
   DiscardTicketRequest,
@@ -11,6 +12,8 @@ import type {
   TemporaryPasswordResponse,
   TicketDetail,
   TicketListResponse,
+  WorkshopAccountsResponse,
+  WorkshopListResponse,
 } from './api.models';
 import { REQUESTED_WITH_HEADER, REQUESTED_WITH_VALUE } from './auth-api.service';
 import { toProblem } from './problem-operator';
@@ -18,6 +21,14 @@ import { toProblem } from './problem-operator';
 const SUPPORT_URL = '/api/v1/support';
 const SUPPORT_AUTH_URL = `${SUPPORT_URL}/auth`;
 const SUPPORT_TICKETS_URL = `${SUPPORT_URL}/tickets`;
+const SUPPORT_WORKSHOPS_URL = `${SUPPORT_URL}/workshops`;
+const SUPPORT_ACCESS_LOG_URL = `${SUPPORT_URL}/access-log`;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Contract `page`: a 1-based integer. Anything else is not sent (the query has no empty params). */
+function isValidPage(page: number | undefined): page is number {
+  return page !== undefined && Number.isInteger(page) && page >= 1;
+}
 
 function cookieRequestOptions(): { withCredentials: true; headers: HttpHeaders } {
   return { withCredentials: true, headers: new HttpHeaders({ [REQUESTED_WITH_HEADER]: REQUESTED_WITH_VALUE }) };
@@ -94,5 +105,35 @@ export class SupportApiService {
         request,
       )
       .pipe(toProblem);
+  }
+
+  /** GET /support/workshops (US4-AC1, US4-AC2): `q` and `page` are only sent when they come. */
+  listWorkshops(q?: string, page?: number): Observable<WorkshopListResponse> {
+    let params = new HttpParams();
+    if (q !== undefined && q !== '') params = params.set('q', q);
+    if (isValidPage(page)) params = params.set('page', String(page));
+    return this.http.get<WorkshopListResponse>(SUPPORT_WORKSHOPS_URL, { params }).pipe(toProblem);
+  }
+
+  /** GET /support/workshops/{workshopId}/accounts (US4-AC3): the id is URL-encoded. */
+  listWorkshopAccounts(workshopId: string): Observable<WorkshopAccountsResponse> {
+    return this.http
+      .get<WorkshopAccountsResponse>(`${SUPPORT_WORKSHOPS_URL}/${encodeURIComponent(workshopId)}/accounts`)
+      .pipe(toProblem);
+  }
+
+  /** GET /support/access-log (US4-AC8): only the filters that come are sent. */
+  listAccessLog(
+    filters?: { workshopId?: string; agentId?: string; page?: number },
+  ): Observable<AccessLogResponse> {
+    let params = new HttpParams();
+    if (filters?.workshopId !== undefined && UUID_PATTERN.test(filters.workshopId)) {
+      params = params.set('workshopId', filters.workshopId);
+    }
+    if (filters?.agentId !== undefined && UUID_PATTERN.test(filters.agentId)) {
+      params = params.set('agentId', filters.agentId);
+    }
+    if (isValidPage(filters?.page)) params = params.set('page', String(filters.page));
+    return this.http.get<AccessLogResponse>(SUPPORT_ACCESS_LOG_URL, { params }).pipe(toProblem);
   }
 }

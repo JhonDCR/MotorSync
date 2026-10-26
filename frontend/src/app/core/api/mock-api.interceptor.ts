@@ -45,6 +45,9 @@ const SUPPORT_TICKETS_PATH = '/api/v1/support/tickets';
 const SUPPORT_TICKET_BY_ID = /^\/api\/v1\/support\/tickets\/([^/]+)$/;
 const SUPPORT_TICKET_DISCARD = /^\/api\/v1\/support\/tickets\/([^/]+)\/discard$/;
 const SUPPORT_TICKET_TEMP_PASSWORD = /^\/api\/v1\/support\/tickets\/([^/]+)\/temporary-password$/;
+const SUPPORT_WORKSHOPS_PATH = '/api/v1/support/workshops';
+const SUPPORT_WORKSHOP_ACCOUNTS = /^\/api\/v1\/support\/workshops\/([^/]+)\/accounts$/;
+const SUPPORT_ACCESS_LOG_PATH = '/api/v1/support/access-log';
 const USERS_PATH = '/api/v1/users';
 const USER_BY_ID = /^\/api\/v1\/users\/([^/]+)$/;
 const USER_ROLE = /^\/api\/v1\/users\/([^/]+)\/role$/;
@@ -168,6 +171,33 @@ function route(
   const supportTicketById = SUPPORT_TICKET_BY_ID.exec(path);
   if (supportTicketById !== null && req.method === 'GET') {
     return respond(req, support.getTicket(bearerToken(req), decodeURIComponent(supportTicketById[1])));
+  }
+  // Support workshops and access log of contract 003 (PR3): read-only, 50 per page.
+  if (path === SUPPORT_WORKSHOPS_PATH && req.method === 'GET') {
+    return respond(
+      req,
+      support.listWorkshops(bearerToken(req), {
+        q: queryParam(req, 'q'),
+        page: queryParam(req, 'page'),
+      }),
+    );
+  }
+  const supportWorkshopAccounts = SUPPORT_WORKSHOP_ACCOUNTS.exec(path);
+  if (supportWorkshopAccounts !== null && req.method === 'GET') {
+    return respond(
+      req,
+      support.listWorkshopAccounts(bearerToken(req), decodeURIComponent(supportWorkshopAccounts[1])),
+    );
+  }
+  if (path === SUPPORT_ACCESS_LOG_PATH && req.method === 'GET') {
+    return respond(
+      req,
+      support.listAccessLog(bearerToken(req), {
+        workshopId: queryParam(req, 'workshopId'),
+        agentId: queryParam(req, 'agentId'),
+        page: queryParam(req, 'page'),
+      }),
+    );
   }
   if (path === SUPPORT_PREFIX || path.startsWith(`${SUPPORT_PREFIX}/`)) {
     const authCheck = support.authenticateSupport(bearerToken(req), false);

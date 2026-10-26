@@ -1,6 +1,9 @@
 import { inject, Injectable } from '@angular/core';
 import { isValidEmail, normalizeEmail } from '../../shared/identifiers/email';
+import { normalizeDocument } from '../../shared/identifiers/normalize';
 import type {
+  AccessLogEntry,
+  AccessLogResponse,
   CurrentSupportSessionResponse,
   FieldError,
   Problem,
@@ -14,6 +17,10 @@ import type {
   TicketStatus,
   TicketSummary,
   UserStatus,
+  WorkshopAccount,
+  WorkshopAccountsResponse,
+  WorkshopListResponse,
+  WorkshopSummary,
 } from './api.models';
 import { mockProblem, newId, type MockResult } from './mock-api.store';
 import { MockAuthStore } from './mock-auth.store';
@@ -39,6 +46,10 @@ const LOCK_DURATION_MS = 15 * 60 * 1000;
 const HELP_RATE_LIMIT_MAX = 20;
 const HELP_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Contract `GET /support/workshops.q`: 1 to 120 characters after trimming. */
+const WORKSHOP_QUERY_MAX_LENGTH = 120;
+/** Contract `GET /support/workshops` and `GET /support/access-log`: fixed page size (FR-027). */
+const SUPPORT_PAGE_SIZE = 50;
 
 const SEED_SUPPORT_ACCOUNT = {
   name: 'Soporte Demo MotorSync',
@@ -276,6 +287,65 @@ function validationFailed<T>(errors: FieldErrors): MockResult<T> {
   return fail(400, 'VALIDATION_ERROR', { errors: errors.list });
 }
 
+/** Lowercase without diacritics, for the name search of US4-AC2. */
+function normalizeSearchText(value: string): string {
+  return value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+}
+
+/** Contract `q` of GET /support/workshops: trimmed, 1 to 120 characters. */
+function readWorkshopQuery(raw: string | null | undefined, errors: FieldErrors): string | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const trimmed = raw.trim();
+  if (unicodeLength(trimmed) < 1 || unicodeLength(trimmed) > WORKSHOP_QUERY_MAX_LENGTH) {
+    errors.add(
+      'q',
+      'VALIDATION_ERROR',
+      `La búsqueda admite entre 1 y ${WORKSHOP_QUERY_MAX_LENGTH} caracteres`,
+    );
+    return undefined;
+  }
+  return trimmed;
+}
+
+/** 1-based page number; anything that is not an integer greater than or equal to 1 is a 400. */
+function readPage(raw: string | null | undefined, errors: FieldErrors): number {
+  if (raw === undefined || raw === null) return 1;
+  const trimmed = raw.trim();
+  const page = Number(trimmed);
+  if (trimmed === '' || !Number.isInteger(page) || page < 1) {
+    errors.add('page', 'VALIDATION_ERROR', 'La página debe ser un entero mayor o igual a 1');
+    return 1;
+  }
+  return page;
+}
+
+/** Optional uuid filter of GET /support/access-log; a non-uuid value is a 400 on its field. */
+function readOptionalUuid(
+  raw: string | null | undefined,
+  field: string,
+  errors: FieldErrors,
+): string | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const trimmed = raw.trim();
+  if (!UUID_PATTERN.test(trimmed)) {
+    errors.add(field, 'VALIDATION_ERROR', 'Debe ser un uuid');
+    return undefined;
+  }
+  return trimmed;
+}
+
+/**
+ * US4-AC2: a value that normalizes to digits is a RUC prefix (with or without spaces/dashes);
+ * anything else is part of the commercial name, without case or diacritics. `%` and `_` are literal.
+ */
+function matchesWorkshop(workshop: WorkshopSummary, query: string): boolean {
+  const normalizedDocument = normalizeDocument(query);
+  if (/^\d+$/.test(normalizedDocument)) {
+    return workshop.ruc !== null && workshop.ruc.startsWith(normalizedDocument);
+  }
+  return normalizeSearchText(workshop.name).includes(normalizeSearchText(query));
+}
+
 @Injectable({ providedIn: 'root' })
 export class MockSupportStore {
   private readonly authStore = inject(MockAuthStore);
@@ -289,6 +359,8 @@ export class MockSupportStore {
   private readonly helpRateByOrigin = new Map<string, number[]>();
   /** Tickets by id, in creation order. */
   private readonly tickets = new Map<string, MockTicket>();
+  /** Support access log: one entry per successful workshop accounts query, in insertion order (FR-018). */
+  private readonly accessLog: AccessLogEntry[] = [];
   private nextTicketNumber = 101;
   private lastTimestampMs = 0;
   /** Simulated HttpOnly cookie `ms_support_refresh` of this browser. */
@@ -639,6 +711,124 @@ export class MockSupportStore {
         temporaryPasswordExpiresAt: applyResult.body.temporaryPasswordExpiresAt,
         sessionsClosed: applyResult.body.sessionsClosed,
         ticket: detail,
+      },
+    };
+  }
+
+  /**
+   * GET /support/workshops (US4-AC1, US4-AC2): 50 per page, ordered by name, only id/name/ruc/createdAt.
+   * `q` searches by RUC prefix (with or without separators) or by part of the name, without case or
+   * diacritics; `%` and `_` are literal. `page` is a 1-based integer.
+   */
+  listWorkshops(
+    token: string | null,
+    query: { q?: string | null; page?: string | null } = {},
+  ): MockResult<WorkshopListResponse> {
+    const check = this.authenticateSupport(token, false);
+    if (!check.ok) return check;
+
+    const errors = new FieldErrors();
+    const q = readWorkshopQuery(query.q, errors);
+    const page = readPage(query.page, errors);
+    if (errors.list.length > 0) {
+      return validationFailed(errors);
+    }
+
+    const workshops = this.authStore
+      .listWorkshopsForSupport()
+      .filter((workshop) => q === undefined || matchesWorkshop(workshop, q));
+    const start = (page - 1) * SUPPORT_PAGE_SIZE;
+    const items: WorkshopSummary[] = workshops.slice(start, start + SUPPORT_PAGE_SIZE).map((workshop) => ({
+      id: workshop.id,
+      name: workshop.name,
+      ruc: workshop.ruc,
+      createdAt: workshop.createdAt,
+    }));
+    return {
+      ok: true,
+      status: 200,
+      body: { items, page, pageSize: SUPPORT_PAGE_SIZE, total: workshops.length },
+    };
+  }
+
+  /**
+   * GET /support/workshops/{workshopId}/accounts (US4-AC3, US4-AC6, US4-AC7): every account of the
+   * workshop, active and inactive, with `hasOpenTicket`. A missing or non-uuid id is the same 404 and
+   * writes nothing. A successful query adds exactly one entry to the support access log.
+   */
+  listWorkshopAccounts(token: string | null, workshopId: string): MockResult<WorkshopAccountsResponse> {
+    const check = this.authenticateSupport(token, false);
+    if (!check.ok) return check;
+
+    if (!UUID_PATTERN.test(workshopId)) {
+      return fail(404, 'NOT_FOUND');
+    }
+    const workshop = this.authStore.findWorkshopForSupport(workshopId);
+    if (workshop === null) {
+      return fail(404, 'NOT_FOUND');
+    }
+
+    const openAccountIds = new Set(
+      [...this.tickets.values()]
+        .filter((ticket) => ticket.status === 'open')
+        .map((ticket) => ticket.accountId),
+    );
+    const items: WorkshopAccount[] = this.authStore
+      .listAccountsForWorkshop(workshopId)
+      .map((account) => ({
+        name: account.name,
+        email: account.email,
+        role: account.role,
+        status: account.status,
+        hasOpenTicket: openAccountIds.has(account.id),
+      }));
+
+    this.accessLog.push({
+      id: newId(),
+      occurredAt: this.nextIsoTimestamp(),
+      agent: { id: check.account.id, name: check.account.name },
+      workshop: { id: workshop.id, name: workshop.name, ruc: workshop.ruc },
+      ip: '127.0.0.1',
+      channel: 'support_panel',
+    });
+
+    return { ok: true, status: 200, body: { workshop, items } };
+  }
+
+  /**
+   * GET /support/access-log (US4-AC8, US4-AC9, FR-027): newest first, 50 per page, optional and
+   * combinable workshop/agent filters, and never the agent's email. Reading it writes nothing.
+   */
+  listAccessLog(
+    token: string | null,
+    query: { workshopId?: string | null; agentId?: string | null; page?: string | null } = {},
+  ): MockResult<AccessLogResponse> {
+    const check = this.authenticateSupport(token, false);
+    if (!check.ok) return check;
+
+    const errors = new FieldErrors();
+    const workshopId = readOptionalUuid(query.workshopId, 'workshopId', errors);
+    const agentId = readOptionalUuid(query.agentId, 'agentId', errors);
+    const page = readPage(query.page, errors);
+    if (errors.list.length > 0) {
+      return validationFailed(errors);
+    }
+
+    const entries = this.accessLog
+      .filter((entry) => workshopId === undefined || entry.workshop.id === workshopId)
+      .filter((entry) => agentId === undefined || entry.agent.id === agentId)
+      .sort(
+        (a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || a.id.localeCompare(b.id),
+      );
+    const start = (page - 1) * SUPPORT_PAGE_SIZE;
+    return {
+      ok: true,
+      status: 200,
+      body: {
+        items: entries.slice(start, start + SUPPORT_PAGE_SIZE),
+        page,
+        pageSize: SUPPORT_PAGE_SIZE,
+        total: entries.length,
       },
     };
   }

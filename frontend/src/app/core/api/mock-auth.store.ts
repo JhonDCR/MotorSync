@@ -41,6 +41,24 @@ const LOCK_DURATION_MS = 15 * 60 * 1000;
 
 interface MockWorkshop extends Workshop {
   ruc: string;
+  createdAt: string;
+}
+
+/** Workshop summary of the support panel: only the fields of FR-016 (no business indicators). */
+export interface SupportWorkshopSummary {
+  id: string;
+  name: string;
+  ruc: string | null;
+  createdAt: string;
+}
+
+/** Account of a workshop as seen from the support panel: never a hash, password or session. */
+export interface SupportWorkshopAccountSummary {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  status: UserStatus;
 }
 
 interface MockAccount {
@@ -103,6 +121,16 @@ interface CallerInfo {
 }
 
 type CallerCheck = { ok: true; caller: CallerInfo } | { ok: false; problem: Problem };
+
+/** Only the contract `WorkshopSummary` fields: never accounts, sessions or business data. */
+function toSupportWorkshopSummary(workshop: MockWorkshop): SupportWorkshopSummary {
+  return {
+    id: workshop.id,
+    name: workshop.name,
+    ruc: workshop.ruc,
+    createdAt: workshop.createdAt,
+  };
+}
 
 function toUserAccount(account: MockAccount): UserAccount {
   return {
@@ -370,9 +398,9 @@ export class MockAuthStore {
   private supportEmailCheck: ((email: string) => boolean) | null = null;
 
   constructor() {
-    const workshop: MockWorkshop = { id: newId(), ...SEED_WORKSHOP };
-    this.workshops.set(workshop.id, workshop);
     const nowIso = new Date().toISOString();
+    const workshop: MockWorkshop = { id: newId(), ...SEED_WORKSHOP, createdAt: nowIso };
+    this.workshops.set(workshop.id, workshop);
     for (const account of SEED_ACCOUNTS) {
       this.accounts.set(account.email, {
         id: newId(),
@@ -420,8 +448,8 @@ export class MockAuthStore {
       return fail(409, 'REGISTRATION_FAILED');
     }
 
-    const workshop: MockWorkshop = { id: newId(), name: workshopName, ruc };
     const nowIso = new Date().toISOString();
+    const workshop: MockWorkshop = { id: newId(), name: workshopName, ruc, createdAt: nowIso };
     const account: MockAccount = {
       id: newId(),
       workshopId: workshop.id,
@@ -1123,6 +1151,39 @@ export class MockAuthStore {
       workshopName: workshop?.name ?? '',
       workshopRuc: workshop?.ruc ?? null,
     };
+  }
+
+  /** All workshops as support summaries (US4-AC1): only id, name, ruc and createdAt. */
+  listWorkshopsForSupport(): SupportWorkshopSummary[] {
+    return [...this.workshops.values()]
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+      .map((workshop) => toSupportWorkshopSummary(workshop));
+  }
+
+  /** Workshop summary by id, or null when it does not exist. */
+  findWorkshopForSupport(workshopId: string): SupportWorkshopSummary | null {
+    const workshop = this.workshops.get(workshopId);
+    return workshop === undefined ? null : toSupportWorkshopSummary(workshop);
+  }
+
+  /**
+   * All the accounts of a workshop, active and inactive (US4-AC3), in the backend order
+   * (`status, name, id`). Passwords, hashes and sessions never leave this store.
+   */
+  listAccountsForWorkshop(workshopId: string): SupportWorkshopAccountSummary[] {
+    return [...this.accounts.values()]
+      .filter((account) => account.workshopId === workshopId)
+      .sort(
+        (a, b) =>
+          a.status.localeCompare(b.status) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id),
+      )
+      .map((account) => ({
+        id: account.id,
+        name: account.name,
+        email: account.email,
+        role: account.role,
+        status: account.status,
+      }));
   }
 
   /**

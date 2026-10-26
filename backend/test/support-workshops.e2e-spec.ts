@@ -23,7 +23,7 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
-import pg from 'pg';
+import pg, { type QueryResultRow } from 'pg';
 import request, { type Response } from 'supertest';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../src/app.module.js';
@@ -178,7 +178,7 @@ describe('Support workshops: listado, búsqueda y cuentas (e2e, T061, US4)', () 
   }
 
   /** Runs `sql` as the migrator with app.tenant_id pinned (FORCE RLS tables). */
-  async function readTenantRows<T>(
+  async function readTenantRows<T extends QueryResultRow>(
     tenantId: string,
     sql: string,
     params: unknown[] = [],

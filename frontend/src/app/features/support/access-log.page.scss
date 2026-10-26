@@ -1,0 +1,164 @@
+@use '../../shared/styles/touch';
+
+.access-log-page {
+  .page-header {
+    margin-bottom: 1.25rem;
+
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: 1.5rem;
+      color: #0f172a;
+    }
+
+    .page-description {
+      margin: 0;
+      color: #475569;
+      font-size: 0.9375rem;
+    }
+  }
+}
+
+.active-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  background: #f1f5f9;
+  border-radius: 0.5rem;
+
+  .filters-label {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #334155;
+  }
+
+  .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem 0.25rem 0.75rem;
+    background: #e2e8f0;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    color: #1e293b;
+
+    .chip-remove-btn {
+      @include touch.touch-target;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      color: #64748b;
+      font-size: 1.25rem;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 50%;
+      box-sizing: border-box;
+
+      &:hover {
+        color: #0f172a;
+        background: #cbd5e1;
+      }
+    }
+  }
+}
+
+.access-log-error {
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: #fef2f2;
+  border: 1px solid #ef4444;
+  color: #991b1b;
+}
+
+.access-log-empty,
+.access-log-loading {
+  padding: 1.25rem;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.access-log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+
+  th,
+  td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+
+  th {
+    background: #f1f5f9;
+    color: #1e293b;
+    font-weight: 600;
+  }
+}
+
+.filter-link-btn {
+  @include touch.touch-target;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: #1d4ed8;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  box-sizing: border-box;
+
+  &:hover {
+    color: #1e40af;
+    background: #eff6ff;
+    border-radius: 0.25rem;
+  }
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+
+  .pagination-btn {
+    @include touch.touch-target;
+    padding: 0.5rem 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    background: #ffffff;
+    color: #1e293b;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    box-sizing: border-box;
+
+    &:hover:not(:disabled) {
+      background: #f1f5f9;
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+
+  .pagination-info {
+    font-size: 0.875rem;
+    color: #475569;
+  }
+}

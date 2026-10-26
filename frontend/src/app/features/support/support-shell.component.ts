@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, Injector, signal } from '@angular/core';
-import { Router, RouterLink, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { SupportApiService } from '../../core/api/support-api.service';
 import { SUPPORT_LOGIN_PATH } from '../../core/support/support.guards';
 import { SupportSessionStore } from '../../core/support/support-session.store';
@@ -11,7 +11,7 @@ import { SupportSessionStore } from '../../core/support/support-session.store';
 @Component({
   selector: 'app-support-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
   templateUrl: './support-shell.component.html',
   styleUrl: './support-shell.component.scss',
 })

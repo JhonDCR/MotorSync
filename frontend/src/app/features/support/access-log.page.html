@@ -1,0 +1,121 @@
+<section class="access-log-page" aria-labelledby="access-log-title">
+  <div class="page-header">
+    <h1 id="access-log-title">Bitácora de soporte</h1>
+    <p class="page-description">Registro de auditoría de consultas de cuentas de talleres realizadas por el equipo de soporte.</p>
+  </div>
+
+  @if (workshopId() || agentId()) {
+    <div class="active-filters">
+      <span class="filters-label">Filtros activos:</span>
+      @if (workshopId(); as wsId) {
+        <span class="filter-chip" data-testid="filter-chip-workshop">
+          Taller: {{ wsId }}
+          <button
+            type="button"
+            class="chip-remove-btn"
+            data-testid="remove-workshop-filter"
+            aria-label="Quitar filtro de taller"
+            (click)="removeWorkshopFilter()"
+          >
+            ×
+          </button>
+        </span>
+      }
+      @if (agentId(); as agId) {
+        <span class="filter-chip" data-testid="filter-chip-agent">
+          Agente: {{ agId }}
+          <button
+            type="button"
+            class="chip-remove-btn"
+            data-testid="remove-agent-filter"
+            aria-label="Quitar filtro de agente"
+            (click)="removeAgentFilter()"
+          >
+            ×
+          </button>
+        </span>
+      }
+    </div>
+  }
+
+  @if (error(); as errorMessage) {
+    <p class="access-log-error" role="alert" data-testid="access-log-error">{{ errorMessage }}</p>
+  } @else if (loading()) {
+    <p class="access-log-loading" role="status">Cargando bitácora de soporte…</p>
+  } @else if (entries().length === 0) {
+    <p class="access-log-empty" data-testid="access-log-empty">No hay registros de bitácora que coincidan con los filtros.</p>
+  } @else {
+    <div class="table-wrapper">
+      <table class="access-log-table" data-testid="access-log-table">
+        <thead>
+          <tr>
+            <th scope="col">Fecha y hora</th>
+            <th scope="col">Agente</th>
+            <th scope="col">Taller</th>
+            <th scope="col">RUC</th>
+            <th scope="col">IP</th>
+            <th scope="col">Canal</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (entry of entries(); track entry.id) {
+            <tr data-testid="access-log-row">
+              <td data-testid="log-occurred-at">{{ formatDate(entry.occurredAt) }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="filter-link-btn"
+                  data-testid="log-agent-name"
+                  (click)="filterByAgent(entry.agent.id)"
+                  title="Filtrar por este agente"
+                >
+                  {{ entry.agent.name }}
+                </button>
+              </td>
+              <td>
+                <button
+                  type="button"
+                  class="filter-link-btn"
+                  data-testid="log-workshop-name"
+                  (click)="filterByWorkshop(entry.workshop.id)"
+                  title="Filtrar por este taller"
+                >
+                  {{ entry.workshop.name }}
+                </button>
+              </td>
+              <td data-testid="log-workshop-ruc">{{ entry.workshop.ruc ?? '—' }}</td>
+              <td data-testid="log-ip">{{ entry.ip ?? 'Sin IP' }}</td>
+              <td data-testid="log-channel">{{ channelLabel(entry.channel) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (totalPages() > 1 || total() > pageSize()) {
+      <div class="pagination">
+        <button
+          type="button"
+          class="pagination-btn"
+          data-testid="pagination-prev"
+          [disabled]="page() <= 1"
+          (click)="goToPage(page() - 1)"
+        >
+          Anterior
+        </button>
+        <span class="pagination-info" data-testid="pagination-info">
+          Página {{ page() }} de {{ totalPages() }}
+        </span>
+        <button
+          type="button"
+          class="pagination-btn"
+          data-testid="pagination-next"
+          [disabled]="page() >= totalPages()"
+          (click)="goToPage(page() + 1)"
+        >
+          Siguiente
+        </button>
+      </div>
+    }
+  }
+</section>

@@ -1,0 +1,73 @@
+<section class="workshop-accounts-page" aria-labelledby="accounts-page-title">
+  <div class="nav-bar">
+    <a routerLink="/support/workshops" class="back-link" data-testid="back-to-workshops">
+      ← Volver a talleres
+    </a>
+  </div>
+
+  @if (notFound()) {
+    <div class="not-found-state" role="alert" data-testid="accounts-not-found">
+      <h1>Taller no encontrado</h1>
+      <p>El taller solicitado no existe o su identificador es inválido.</p>
+    </div>
+  } @else if (error(); as errorMessage) {
+    <p class="accounts-error" role="alert" data-testid="accounts-error">{{ errorMessage }}</p>
+  } @else if (loading()) {
+    <p class="accounts-loading" role="status">Cargando cuentas del taller…</p>
+  } @else if (workshop(); as ws) {
+    <header class="workshop-header" data-testid="workshop-header">
+      <div class="workshop-info">
+        <h1 id="accounts-page-title" data-testid="workshop-name">{{ ws.name }}</h1>
+        <div class="workshop-meta">
+          <span>RUC: <strong data-testid="workshop-ruc">{{ ws.ruc ?? '—' }}</strong></span>
+          <span>Alta: <strong data-testid="workshop-created-at">{{ formatDate(ws.createdAt) }}</strong></span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <a
+          class="access-log-link"
+          [routerLink]="['/support/access-log']"
+          [queryParams]="{ workshopId: ws.id }"
+          data-testid="workshop-access-log-link"
+        >
+          Ver bitácora de este taller
+        </a>
+      </div>
+    </header>
+
+    @if (accounts().length === 0) {
+      <p class="accounts-empty" data-testid="accounts-empty">Este taller no tiene cuentas de usuario registradas.</p>
+    } @else {
+      <div class="table-wrapper">
+        <table class="accounts-table" data-testid="accounts-table">
+          <thead>
+            <tr>
+              <th scope="col">Nombre</th>
+              <th scope="col">Correo electrónico</th>
+              <th scope="col">Rol</th>
+              <th scope="col">Estado</th>
+              <th scope="col">Ticket de soporte</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (account of accounts(); track account.email) {
+              <tr data-testid="account-row">
+                <td data-testid="account-name">{{ account.name }}</td>
+                <td data-testid="account-email">{{ account.email }}</td>
+                <td data-testid="account-role">{{ roleLabel(account.role) }}</td>
+                <td data-testid="account-status">{{ statusLabel(account.status) }}</td>
+                <td>
+                  @if (account.hasOpenTicket) {
+                    <span class="badge-open-ticket" data-testid="account-open-ticket">Ticket abierto</span>
+                  } @else {
+                    <span class="subtle">—</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</section>

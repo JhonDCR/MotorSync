@@ -441,7 +441,7 @@ Al terminar, el agente busca talleres y ve sus cuentas (solo los campos permitid
 
 ## Cierre PR3
 
-- [ ] T068 Revisar el diff del PR3 contra la spec y la **constitución 1.3.0**. Foco:
+- [x] T068 Revisar el diff del PR3 contra la spec y la **constitución 1.3.0**. Foco:
   - principio I (1.3.0), caso (b): funciones de solo lectura, compuertas, columnas de FR-016 y privilegios por columna; ningún listado de cuentas fuera de un taller o un ticket; búsqueda por nombre con comodines escapados;
   - bitácora append-only escrita en la misma llamada que devuelve las cuentas; la vista de la bitácora no se registra y no expone correos de agentes;
   - ningún dato de negocio ni de auditoría del taller en el panel;

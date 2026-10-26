@@ -116,7 +116,9 @@ describe('SupportApiService workshops and access log (T064)', () => {
       let received: unknown;
       service.listWorkshops(undefined, 0).subscribe({ error: (err: unknown) => (received = err) });
 
-      httpMock.expectOne(SUPPORT_WORKSHOPS_URL).flush(body, problemFlush(400));
+      httpMock
+        .expectOne((request) => request.url === SUPPORT_WORKSHOPS_URL && request.params.get('page') === '0')
+        .flush(body, problemFlush(400));
 
       expect(received).toEqual(body);
       expect(received).not.toBeInstanceOf(HttpErrorResponse);
@@ -241,7 +243,12 @@ describe('SupportApiService workshops and access log (T064)', () => {
         .listAccessLog({ workshopId: 'no-es-uuid' })
         .subscribe({ error: (err: Problem) => (received = err) });
 
-      httpMock.expectOne(SUPPORT_ACCESS_LOG_URL).flush(body, problemFlush(400));
+      httpMock
+        .expectOne(
+          (request) =>
+            request.url === SUPPORT_ACCESS_LOG_URL && request.params.get('workshopId') === 'no-es-uuid',
+        )
+        .flush(body, problemFlush(400));
 
       expect(received).toEqual(body);
       expect(received?.code).toBe('VALIDATION_ERROR');

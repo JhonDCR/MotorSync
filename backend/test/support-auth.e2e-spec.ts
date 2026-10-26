@@ -1221,11 +1221,16 @@ describe('Support auth: acceso al panel (e2e, T025, US2)', () => {
 
     expect(code, stderr.join('\n')).toBe(0);
     for (const response of responses) {
-      expect([200, 401], JSON.stringify(response.body)).toContain(
+      // A login of a deactivated account counts as a failed attempt (US2-AC3, FR-009): if the
+      // deactivation lands early, 5 of the 10 logins fail and the rest see the lock (429).
+      expect([200, 401, 429], JSON.stringify(response.body)).toContain(
         response.status,
       );
       if (response.status === 401) {
         expect(response.body).toMatchObject({ code: 'INVALID_CREDENTIALS' });
+      }
+      if (response.status === 429) {
+        expect(response.body).toMatchObject({ code: 'ACCOUNT_LOCKED' });
       }
     }
 

@@ -428,7 +428,7 @@ Al terminar, el agente busca talleres y ve sus cuentas (solo los campos permitid
 - [x] T063 [US4] Implementar `backend/src/support/support-workshops.service.ts` y `support-workshops.controller.ts` (`@SupportArea()`; `GET /support/workshops` y `GET /support/workshops/:workshopId/accounts`; `normalizeDocument` para decidir el prefijo de RUC y escape de `%`, `_` y `\` en el nombre; uuid inválido → 404; `P0002` → 404; las filas con cuenta `NULL` no van a `items`), `backend/src/support/dto/list-workshops.dto.ts` ("1–120 caracteres"; `page` "entero ≥ 1; tamaño fijo 50"), `backend/src/support/support-access-log.service.ts` y `support-access-log.controller.ts` (`GET /support/access-log`), `backend/src/support/dto/list-access-log.dto.ts` (`workshopId` y `agentId` "opcionales, uuid"; `page` "entero ≥ 1; tamaño fijo 50"), su registro en `backend/src/support/support.module.ts`, y el comando `access-log [--email …] [--since …]` en `backend/scripts/support-account.ts`. Deja T061, T062 y la parte de T013 sobre los controladores de `SupportModule` en verde — implementer-backend
 - [x] T064 [P] [US4] Pruebas en `frontend/src/app/core/api/support-api.service.workshops.spec.ts` (nuevo: `listWorkshops(q, page)`, `listWorkshopAccounts(id)` y `listAccessLog({ workshopId, agentId, page })` con rutas y query del contrato) y `frontend/src/app/core/api/mock-api.interceptor.support-workshops.spec.ts` (nuevo): búsqueda por RUC y por nombre sin tildes, 50 por página, cuentas con `hasOpenTicket`, la consulta de cuentas agrega una entrada a la bitácora simulada y la consulta de la bitácora no, filtros combinables, 404 de taller inexistente y 403 con token de taller — tester
 - [x] T065 [US4] Implementar esos métodos en `frontend/src/app/core/api/support-api.service.ts`, los talleres y la bitácora en `frontend/src/app/core/api/mock-support.store.ts` y las rutas en `mock-api.interceptor.ts` — implementer-frontend
-- [ ] T066 [US4] Pruebas en `frontend/src/app/features/support/workshops-list.page.spec.ts`, `workshop-accounts.page.spec.ts` y `access-log.page.spec.ts`:
+- [x] T066 [US4] Pruebas en `frontend/src/app/features/support/workshops-list.page.spec.ts`, `workshop-accounts.page.spec.ts` y `access-log.page.spec.ts`:
   - **US4-AC1 / US4-AC2**: lista con nombre comercial, RUC y fecha de alta (hora de Ecuador), búsqueda y paginación de 50.
   - **US4-AC3**: cuentas con nombre, correo, rol, estado y "ticket abierto"; enlace "Ver bitácora de este taller" a `/support/access-log?workshopId=…`.
   - **US4-AC7**: 404 → "no encontrado".
@@ -437,7 +437,7 @@ Al terminar, el agente busca talleres y ve sus cuentas (solo los campos permitid
   - **FR-026**: objetivos táctiles de 44 px; usable en tablet.
 
   — tester
-- [ ] T067 [US4] Implementar `frontend/src/app/features/support/workshops-list.page.*`, `workshop-accounts.page.*` y `access-log.page.*`, las rutas `/support/workshops`, `/support/workshops/:id` y `/support/access-log` con `supportAuthGuard` en `frontend/src/app/app.routes.ts` y los enlaces en `support-shell.component.*` — implementer-frontend
+- [x] T067 [US4] Implementar `frontend/src/app/features/support/workshops-list.page.*`, `workshop-accounts.page.*` y `access-log.page.*`, las rutas `/support/workshops`, `/support/workshops/:id` y `/support/access-log` con `supportAuthGuard` en `frontend/src/app/app.routes.ts` y los enlaces en `support-shell.component.*` — implementer-frontend
 
 ## Cierre PR3
 

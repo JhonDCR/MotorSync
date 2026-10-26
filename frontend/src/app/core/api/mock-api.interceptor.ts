@@ -44,6 +44,7 @@ const SUPPORT_PASSWORD_PATH = '/api/v1/support/auth/password';
 const SUPPORT_TICKETS_PATH = '/api/v1/support/tickets';
 const SUPPORT_TICKET_BY_ID = /^\/api\/v1\/support\/tickets\/([^/]+)$/;
 const SUPPORT_TICKET_DISCARD = /^\/api\/v1\/support\/tickets\/([^/]+)\/discard$/;
+const SUPPORT_TICKET_TEMP_PASSWORD = /^\/api\/v1\/support\/tickets\/([^/]+)\/temporary-password$/;
 const USERS_PATH = '/api/v1/users';
 const USER_BY_ID = /^\/api\/v1\/users\/([^/]+)$/;
 const USER_ROLE = /^\/api\/v1\/users\/([^/]+)\/role$/;
@@ -155,6 +156,13 @@ function route(
     return respond(
       req,
       support.discardTicket(bearerToken(req), decodeURIComponent(supportTicketDiscard[1]), req.body),
+    );
+  }
+  const supportTicketTempPassword = SUPPORT_TICKET_TEMP_PASSWORD.exec(path);
+  if (supportTicketTempPassword !== null && req.method === 'POST') {
+    return respond(
+      req,
+      support.generateTemporaryPassword(bearerToken(req), decodeURIComponent(supportTicketTempPassword[1]), req.body),
     );
   }
   const supportTicketById = SUPPORT_TICKET_BY_ID.exec(path);

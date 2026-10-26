@@ -12,16 +12,18 @@ import {
   formatSupportDateTime,
   TICKET_STATUS_LABELS,
 } from './support-format';
+import { TemporaryPasswordDialogComponent } from './temporary-password.dialog';
 
 const REQUIRED_MESSAGE = fieldErrorMessage({ field: '', code: 'REQUIRED', message: '' });
+const VERIFICATION_NOTE_REQUIRED_MESSAGE = 'Indique cómo verificó la identidad de la persona';
 
 /**
- * Ticket detail and discard action for support agents (US2, FR-009, FR-012).
+ * Ticket detail, temporary password generation and discard action for support agents (US2, US3, FR-009, FR-012, FR-019, FR-023).
  */
 @Component({
   selector: 'app-ticket-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink],
+  imports: [RouterLink, TemporaryPasswordDialogComponent],
   templateUrl: './ticket-detail.page.html',
   styleUrl: './ticket-detail.page.scss',
 })
@@ -35,6 +37,12 @@ export class TicketDetailPage implements OnInit {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
+  protected readonly verificationNote = signal('');
+  protected readonly verificationNoteError = signal<string | null>(null);
+  protected readonly generatePasswordError = signal<string | null>(null);
+  protected readonly generating = signal(false);
+  protected readonly generatedTemporaryPassword = signal<string | null>(null);
+
   protected readonly discardReason = signal('');
   protected readonly discardReasonError = signal<string | null>(null);
   protected readonly discardError = signal<string | null>(null);
@@ -44,6 +52,23 @@ export class TicketDetailPage implements OnInit {
     const paramMap = this.route.snapshot.paramMap;
     const id = paramMap.get('id') ?? paramMap.get('ticketId') ?? '';
     this.loadTicket(id);
+  }
+
+  toJSON(): Record<string, unknown> {
+    return {
+      ticket: this.ticket(),
+      loading: this.loading(),
+      error: this.error(),
+      verificationNote: this.verificationNote(),
+      verificationNoteError: this.verificationNoteError(),
+      generatePasswordError: this.generatePasswordError(),
+      generating: this.generating(),
+      generatedTemporaryPassword: this.generatedTemporaryPassword(),
+      discardReason: this.discardReason(),
+      discardReasonError: this.discardReasonError(),
+      discardError: this.discardError(),
+      discarding: this.discarding(),
+    };
   }
 
   protected formatDate(iso: string): string {
@@ -60,6 +85,65 @@ export class TicketDetailPage implements OnInit {
 
   protected accountStatusLabel(status: UserStatus): string {
     return ACCOUNT_STATUS_LABELS[status];
+  }
+
+  protected updateVerificationNote(event: Event): void {
+    const value = (event.target as HTMLTextAreaElement | HTMLInputElement).value;
+    this.verificationNote.set(value);
+    if (this.verificationNoteError() !== null) {
+      this.verificationNoteError.set(null);
+    }
+  }
+
+  protected submitGeneratePassword(event: Event): void {
+    event.preventDefault();
+    if (this.generating()) return;
+    const currentTicket = this.ticket();
+    if (!currentTicket || currentTicket.status !== 'open') return;
+
+    this.generatePasswordError.set(null);
+    const trimmed = this.verificationNote().trim();
+    if (trimmed === '') {
+      this.verificationNoteError.set(VERIFICATION_NOTE_REQUIRED_MESSAGE);
+      return;
+    }
+
+    this.verificationNoteError.set(null);
+    this.generating.set(true);
+    this.api
+      .generateTemporaryPassword(currentTicket.id, trimmed)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          this.generating.set(false);
+          this.ticket.set(res.ticket);
+          this.verificationNote.set('');
+          this.generatedTemporaryPassword.set(res.temporaryPassword);
+        },
+        error: (err: unknown) => {
+          this.generating.set(false);
+          if (!isProblem(err)) {
+            this.generatePasswordError.set(NETWORK_ERROR_MESSAGE);
+            return;
+          }
+          if (err.code === 'VALIDATION_ERROR') {
+            const noteFieldErr = err.errors?.find((e) => e.field === 'verificationNote');
+            if (noteFieldErr) {
+              this.verificationNoteError.set(
+                noteFieldErr.code === 'REQUIRED'
+                  ? VERIFICATION_NOTE_REQUIRED_MESSAGE
+                  : fieldErrorMessage(noteFieldErr),
+              );
+              return;
+            }
+          }
+          this.generatePasswordError.set(problemMessage(err));
+        },
+      });
+  }
+
+  protected closeTemporaryPasswordDialog(): void {
+    this.generatedTemporaryPassword.set(null);
   }
 
   protected updateDiscardReason(event: Event): void {

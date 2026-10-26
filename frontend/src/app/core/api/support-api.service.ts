@@ -5,8 +5,10 @@ import type {
   ChangePasswordRequest,
   CurrentSupportSessionResponse,
   DiscardTicketRequest,
+  GenerateTemporaryPasswordRequest,
   SupportLoginRequest,
   SupportSessionResponse,
+  TemporaryPasswordResponse,
   TicketDetail,
   TicketListResponse,
 } from './api.models';
@@ -74,6 +76,23 @@ export class SupportApiService {
     const request: DiscardTicketRequest = { reason };
     return this.http
       .post<TicketDetail>(`${SUPPORT_TICKETS_URL}/${encodeURIComponent(ticketId)}/discard`, request)
+      .pipe(toProblem);
+  }
+
+  generateTemporaryPassword(
+    ticketId: string,
+    verificationNoteOrRequest: string | GenerateTemporaryPasswordRequest,
+  ): Observable<TemporaryPasswordResponse> {
+    const verificationNote =
+      typeof verificationNoteOrRequest === 'string'
+        ? verificationNoteOrRequest
+        : verificationNoteOrRequest.verificationNote;
+    const request: GenerateTemporaryPasswordRequest = { verificationNote };
+    return this.http
+      .post<TemporaryPasswordResponse>(
+        `${SUPPORT_TICKETS_URL}/${encodeURIComponent(ticketId)}/temporary-password`,
+        request,
+      )
       .pipe(toProblem);
   }
 }

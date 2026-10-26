@@ -3,6 +3,7 @@ import { isValidRuc } from '../../shared/identifiers/ec-document';
 import { isValidEmail, normalizeEmail } from '../../shared/identifiers/email';
 import { normalizeDocument } from '../../shared/identifiers/normalize';
 import type {
+  AuditActorRole,
   CurrentSessionResponse,
   FieldError,
   Problem,
@@ -62,9 +63,9 @@ interface MockAuditEntry {
   id: string;
   userId: string;
   workshopId: string;
-  action: 'user.role_changed' | 'user.deactivated' | 'user.reactivated' | 'user.password_reset';
+  action: UserAuditEntry['action'];
   actorName: string;
-  actorRole: Role;
+  actorRole: AuditActorRole;
   occurredAt: string;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
@@ -1121,6 +1122,63 @@ export class MockAuthStore {
       workshopId: account.workshopId,
       workshopName: workshop?.name ?? '',
       workshopRuc: workshop?.ruc ?? null,
+    };
+  }
+
+  /**
+   * Applies a support-generated temporary password to an active workshop account (US3, research R9/R11/R13).
+   * Closes live sessions, clears login throttle, preserves role & status, sets updatedByName to
+   * `"Soporte MotorSync (<agentName>)"`, and records `user.password_reset_by_support` in the workshop audit history.
+   */
+  applySupportTemporaryPassword(input: {
+    accountId: string;
+    temporaryPassword: string;
+    agentName: string;
+    supportTicketNumber: number;
+    occurredAt: string;
+  }): MockResult<{ temporaryPasswordExpiresAt: string; sessionsClosed: number }> {
+    const account = this.accountById(input.accountId);
+    if (account === undefined) {
+      return fail(404, 'NOT_FOUND');
+    }
+    if (account.status === 'inactive') {
+      return fail(409, 'ACCOUNT_INACTIVE');
+    }
+
+    const previousMustChangePassword = account.mustChangePassword;
+    const expiresIso = new Date(Date.parse(input.occurredAt) + 72 * 3600 * 1000).toISOString();
+    account.password = input.temporaryPassword;
+    account.mustChangePassword = true;
+    account.temporaryPasswordExpiresAt = expiresIso;
+    account.updatedAt = input.occurredAt;
+    account.updatedByName = `Soporte MotorSync (${input.agentName})`;
+
+    const sessionsClosed = this.revokeLiveSessions(account.id);
+    this.throttles.delete(account.email);
+
+    this.auditEntries.unshift({
+      id: newId(),
+      userId: account.id,
+      workshopId: account.workshopId,
+      action: 'user.password_reset_by_support',
+      actorName: input.agentName,
+      actorRole: 'platform_support',
+      occurredAt: input.occurredAt,
+      before: { mustChangePassword: previousMustChangePassword },
+      after: {
+        mustChangePassword: true,
+        temporaryPasswordExpiresAt: expiresIso,
+        sessionsClosed,
+        supportTicketNumber: input.supportTicketNumber,
+      },
+      ip: '127.0.0.1',
+      channel: 'support_panel',
+    });
+
+    return {
+      ok: true,
+      status: 200,
+      body: { temporaryPasswordExpiresAt: expiresIso, sessionsClosed },
     };
   }
 }

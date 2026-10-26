@@ -72,6 +72,50 @@
     </div>
 
     @if (item.status === 'open') {
+      <section class="action-card" aria-labelledby="generate-password-heading" data-testid="generate-password-form">
+        <h2 id="generate-password-heading">Generar contraseña temporal</h2>
+
+        @if (generatePasswordError(); as genErr) {
+          <p class="form-error" role="alert" data-testid="generate-password-error">{{ genErr }}</p>
+        }
+
+        <form novalidate (submit)="submitGeneratePassword($event)">
+          <div class="field">
+            <label for="verification-note-input">Nota de verificación de identidad</label>
+            <p class="field-warning" id="verification-note-warning" data-testid="verification-note-warning">
+              No escriba contraseñas en la nota
+            </p>
+            <textarea
+              id="verification-note-input"
+              rows="3"
+              data-testid="verification-note"
+              [value]="verificationNote()"
+              [attr.aria-invalid]="verificationNoteError() ? 'true' : null"
+              [attr.aria-describedby]="
+                verificationNoteError()
+                  ? 'verification-note-warning verification-note-error'
+                  : 'verification-note-warning'
+              "
+              (input)="updateVerificationNote($event)"
+            ></textarea>
+            @if (verificationNoteError(); as noteErr) {
+              <p class="field-error" id="verification-note-error" data-testid="error-verification-note">
+                {{ noteErr }}
+              </p>
+            }
+          </div>
+
+          <button
+            type="submit"
+            class="generate-button"
+            data-testid="generate-password-submit"
+            [disabled]="verificationNote().trim() === '' || generating()"
+          >
+            {{ generating() ? 'Generando contraseña temporal…' : 'Generar contraseña temporal' }}
+          </button>
+        </form>
+      </section>
+
       <section class="action-card" aria-labelledby="discard-ticket-heading" data-testid="discard-form">
         <h2 id="discard-ticket-heading">Descartar ticket</h2>
 
@@ -149,5 +193,12 @@
         </dl>
       </section>
     }
+  }
+
+  @if (generatedTemporaryPassword(); as tempPwd) {
+    <app-temporary-password-dialog
+      [temporaryPassword]="tempPwd"
+      (closed)="closeTemporaryPasswordDialog()"
+    />
   }
 </section>

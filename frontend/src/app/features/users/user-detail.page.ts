@@ -1,10 +1,10 @@
-import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import type { Role, UserAccount, UserAuditEntry } from '../../core/api/api.models';
 import { isProblem, problemMessage } from '../../core/api/problem';
 import { UsersApiService } from '../../core/api/users-api.service';
 import { SessionStore } from '../../core/auth/session.store';
+import { formatSupportDateTime } from '../support/support-format';
 import { ResetPasswordDialog } from './reset-password.dialog';
 
 const ACTION_LABELS: Record<UserAuditEntry['action'], string> = {
@@ -12,12 +12,13 @@ const ACTION_LABELS: Record<UserAuditEntry['action'], string> = {
   'user.deactivated': 'Desactivación de cuenta',
   'user.reactivated': 'Reactivación de cuenta',
   'user.password_reset': 'Restablecimiento de contraseña',
+  'user.password_reset_by_support': 'Restablecimiento de contraseña por soporte',
 };
 
 @Component({
   selector: 'app-user-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, DatePipe, ResetPasswordDialog],
+  imports: [RouterLink, ResetPasswordDialog],
   templateUrl: './user-detail.page.html',
   styleUrl: './user-detail.page.scss',
 })
@@ -86,8 +87,33 @@ export class UserDetailPage implements OnInit {
     });
   }
 
-  protected actionLabel(action: UserAuditEntry['action']): string {
-    return ACTION_LABELS[action] ?? action;
+  protected formatDate(iso: string): string {
+    return formatSupportDateTime(iso);
+  }
+
+  protected actionLabel(entryOrAction: UserAuditEntry | UserAuditEntry['action']): string {
+    if (typeof entryOrAction === 'string') {
+      return ACTION_LABELS[entryOrAction] ?? entryOrAction;
+    }
+    if (entryOrAction.action === 'user.password_reset_by_support') {
+      const ticketNumber = entryOrAction.after?.['supportTicketNumber'];
+      if (
+        (typeof ticketNumber === 'number' && Number.isFinite(ticketNumber)) ||
+        (typeof ticketNumber === 'string' && ticketNumber.trim() !== '')
+      ) {
+        return `Restablecimiento de contraseña por soporte (ticket #${ticketNumber})`;
+      }
+      return 'Restablecimiento de contraseña por soporte';
+    }
+    return ACTION_LABELS[entryOrAction.action] ?? entryOrAction.action;
+  }
+
+  protected actorLabel(entry: UserAuditEntry): string {
+    if (entry.actorRole === 'platform_support') {
+      return `Soporte MotorSync (${entry.actorName})`;
+    }
+    const roleLabel = entry.actorRole === 'admin' ? 'Administrador' : 'Asesor';
+    return `${entry.actorName} (${roleLabel})`;
   }
 
   protected promptChangeRole(): void {

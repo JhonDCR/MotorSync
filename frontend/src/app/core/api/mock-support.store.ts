@@ -6,6 +6,7 @@ import type {
   Problem,
   SupportAgent,
   SupportSessionResponse,
+  TemporaryPasswordResponse,
   TicketDetail,
   TicketDiscard,
   TicketListResponse,
@@ -24,10 +25,13 @@ import { MockAuthStore } from './mock-auth.store';
 const LOGIN_FIELDS = ['email', 'password'] as const;
 const CHANGE_PASSWORD_FIELDS = ['currentPassword', 'newPassword'] as const;
 const DISCARD_TICKET_FIELDS = ['reason'] as const;
+const GENERATE_TEMP_PASSWORD_FIELDS = ['verificationNote'] as const;
 const EMAIL_MAX_LENGTH = 254;
 const PASSWORD_MIN_LENGTH = 8;
 const PASSWORD_MAX_LENGTH = 128;
 const REASON_MAX_LENGTH = 500;
+const VERIFICATION_NOTE_MAX_LENGTH = 1000;
+const TEMP_PASSWORD_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const ACCESS_TOKEN_TTL_SECONDS = 900;
 const SUPPORT_JWT_AUDIENCE = 'motorsync-support';
 const MAX_FAILED_ATTEMPTS = 5;
@@ -563,6 +567,82 @@ export class MockSupportStore {
     return { ok: true, status: 200, body: detail };
   }
 
+  generateTemporaryPassword(
+    token: string | null,
+    ticketId: string,
+    raw: unknown,
+  ): MockResult<TemporaryPasswordResponse> {
+    const check = this.authenticateSupport(token, false);
+    if (!check.ok) return check;
+
+    if (!isRecord(raw)) return notAnObject();
+    const body = definedEntries(raw);
+    const errors = new FieldErrors();
+    checkUnknownFields(body, GENERATE_TEMP_PASSWORD_FIELDS, errors);
+    const rawNote = readRequiredText(body, 'verificationNote', errors);
+    let verificationNote: string | null = null;
+    if (rawNote !== null) {
+      const trimmed = rawNote.trim();
+      if (unicodeLength(trimmed) > VERIFICATION_NOTE_MAX_LENGTH) {
+        errors.add(
+          'verificationNote',
+          'VALIDATION_ERROR',
+          `Admite como máximo ${VERIFICATION_NOTE_MAX_LENGTH} caracteres`,
+        );
+      } else {
+        verificationNote = trimmed;
+      }
+    }
+    if (errors.list.length > 0 || verificationNote === null) {
+      return validationFailed(errors);
+    }
+
+    if (!UUID_PATTERN.test(ticketId)) {
+      return fail(404, 'NOT_FOUND');
+    }
+    const ticket = this.tickets.get(ticketId);
+    if (ticket === undefined) {
+      return fail(404, 'NOT_FOUND');
+    }
+    if (ticket.status !== 'open') {
+      return fail(409, 'TICKET_NOT_OPEN');
+    }
+
+    const temporaryPassword = randomTemporaryPassword();
+    const resolvedAt = this.nextIsoTimestamp();
+    const applyResult = this.authStore.applySupportTemporaryPassword({
+      accountId: ticket.accountId,
+      temporaryPassword,
+      agentName: check.account.name,
+      supportTicketNumber: ticket.number,
+      occurredAt: resolvedAt,
+    });
+    if (!applyResult.ok) {
+      return applyResult;
+    }
+
+    ticket.status = 'resolved';
+    ticket.resolution = {
+      verificationNote,
+      resolvedByName: check.account.name,
+      resolvedAt,
+    };
+    const detail = this.toTicketDetail(ticket);
+    if (detail === null) {
+      return fail(404, 'NOT_FOUND');
+    }
+    return {
+      ok: true,
+      status: 200,
+      body: {
+        temporaryPassword,
+        temporaryPasswordExpiresAt: applyResult.body.temporaryPasswordExpiresAt,
+        sessionsClosed: applyResult.body.sessionsClosed,
+        ticket: detail,
+      },
+    };
+  }
+
   /**
    * Validates the support token and session.
    * Any valid JWT that does not carry `aud: 'motorsync-support'` (e.g. a workshop token) is rejected with 403 FORBIDDEN (US2-AC5).
@@ -683,4 +763,22 @@ function toSupportAgent(account: MockSupportAccount): SupportAgent {
     mustChangePassword: account.mustChangePassword,
     temporaryPasswordExpiresAt: account.temporaryPasswordExpiresAt,
   };
+}
+
+function randomTemporaryPassword(): string {
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  const chars = Array.from(bytes, (b) => TEMP_PASSWORD_ALPHABET[b % TEMP_PASSWORD_ALPHABET.length]);
+  return [
+    chars.slice(0, 4).join(''),
+    chars.slice(4, 8).join(''),
+    chars.slice(8, 12).join(''),
+    chars.slice(12, 16).join(''),
+  ].join('-');
 }

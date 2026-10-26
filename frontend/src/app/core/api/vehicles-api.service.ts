@@ -1,5 +1,5 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { inject, Injectable } from '@angular/core';
+import { inject, Injectable, Injector } from '@angular/core';
 import type { Observable } from 'rxjs';
 import type {
   OwnershipHistoryResponse,
@@ -20,7 +20,11 @@ function vehicleUrl(vehicleId: string): string {
 /** Vehicles endpoints of contracts/openapi.yaml. */
 @Injectable({ providedIn: 'root' })
 export class VehiclesApiService {
-  private readonly http = inject(HttpClient);
+  private readonly injector = inject(Injector);
+
+  private get http(): HttpClient {
+    return this.injector.get(HttpClient);
+  }
 
   create(body: VehicleCreate): Observable<VehicleDetail> {
     return this.http.post<VehicleDetail>(VEHICLES_URL, body).pipe(toProblem);

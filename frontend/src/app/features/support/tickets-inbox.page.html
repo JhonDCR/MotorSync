@@ -1,0 +1,60 @@
+<section class="inbox-page" aria-labelledby="tickets-inbox-title">
+  <h1 id="tickets-inbox-title">Tickets abiertos</h1>
+
+  @if (error(); as errorMessage) {
+    <p class="tickets-error" role="alert" data-testid="tickets-error">{{ errorMessage }}</p>
+  } @else if (loading()) {
+    <p class="tickets-loading" role="status">Cargando tickets abiertos…</p>
+  } @else if (tickets().length === 0) {
+    <p class="tickets-empty" data-testid="tickets-empty">No hay tickets abiertos pendientes de revisión.</p>
+  } @else {
+    <div class="table-wrapper">
+      <table class="tickets-table" data-testid="tickets-table">
+        <thead>
+          <tr>
+            <th scope="col">Ticket</th>
+            <th scope="col">Apertura</th>
+            <th scope="col">Última solicitud</th>
+            <th scope="col">Solicitudes</th>
+            <th scope="col">Cuenta</th>
+            <th scope="col">Rol / Estado</th>
+            <th scope="col">Taller</th>
+            <th scope="col">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (ticket of tickets(); track ticket.id) {
+            <tr data-testid="ticket-row">
+              <td>#{{ ticket.number }}</td>
+              <td data-testid="ticket-created-at">{{ formatDate(ticket.createdAt) }}</td>
+              <td data-testid="ticket-last-requested-at">{{ formatDate(ticket.lastRequestedAt) }}</td>
+              <td data-testid="ticket-request-count">{{ ticket.requestCount }}</td>
+              <td>
+                <div data-testid="ticket-account-name">{{ ticket.account.name }}</div>
+                <div class="subtle" data-testid="ticket-account-email">{{ ticket.account.email }}</div>
+              </td>
+              <td>
+                <span data-testid="ticket-account-role">{{ roleLabel(ticket.account.role) }}</span>
+                ·
+                <span data-testid="ticket-account-status">{{ statusLabel(ticket.account.status) }}</span>
+              </td>
+              <td>
+                <div data-testid="ticket-workshop-name">{{ ticket.workshop.name }}</div>
+                <div class="subtle" data-testid="ticket-workshop-ruc">{{ ticket.workshop.ruc ?? '—' }}</div>
+              </td>
+              <td>
+                <a
+                  class="detail-link"
+                  [routerLink]="['/support/tickets', ticket.id]"
+                  data-testid="ticket-detail-link"
+                >
+                  Ver detalle
+                </a>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

@@ -12,6 +12,7 @@ import { decodeSessionToken } from '../auth/current-session';
 import { MockApiStore, mockActor, mockProblem, type MockActor, type MockResult } from './mock-api.store';
 import { REQUESTED_WITH_HEADER, REQUESTED_WITH_VALUE } from './auth-api.service';
 import { MockAuthStore } from './mock-auth.store';
+import { MockSupportStore } from './mock-support.store';
 import { USE_MOCK_API } from './use-mock-api';
 
 // API simulada en memoria (research R8). Solo actúa con USE_MOCK_API en true y en rutas /api/.
@@ -33,6 +34,16 @@ const AUTH_REFRESH_PATH = '/api/v1/auth/refresh';
 const AUTH_LOGOUT_PATH = '/api/v1/auth/logout';
 const AUTH_ME_PATH = '/api/v1/auth/me';
 const AUTH_PASSWORD_PATH = '/api/v1/auth/password';
+const AUTH_FORGOT_PASSWORD_PATH = '/api/v1/auth/forgot-password';
+const SUPPORT_PREFIX = '/api/v1/support';
+const SUPPORT_LOGIN_PATH = '/api/v1/support/auth/login';
+const SUPPORT_REFRESH_PATH = '/api/v1/support/auth/refresh';
+const SUPPORT_LOGOUT_PATH = '/api/v1/support/auth/logout';
+const SUPPORT_ME_PATH = '/api/v1/support/auth/me';
+const SUPPORT_PASSWORD_PATH = '/api/v1/support/auth/password';
+const SUPPORT_TICKETS_PATH = '/api/v1/support/tickets';
+const SUPPORT_TICKET_BY_ID = /^\/api\/v1\/support\/tickets\/([^/]+)$/;
+const SUPPORT_TICKET_DISCARD = /^\/api\/v1\/support\/tickets\/([^/]+)\/discard$/;
 const USERS_PATH = '/api/v1/users';
 const USER_BY_ID = /^\/api\/v1\/users\/([^/]+)$/;
 const USER_ROLE = /^\/api\/v1\/users\/([^/]+)\/role$/;
@@ -88,10 +99,19 @@ function respond(req: HttpRequest<unknown>, result: MockResult<unknown>, locatio
   return of(new HttpResponse({ body: result.body, headers, status: result.status, url: req.urlWithParams }));
 }
 
-function route(req: HttpRequest<unknown>, store: MockApiStore, auth: MockAuthStore): Observable<HttpEvent<unknown>> {
+function route(
+  req: HttpRequest<unknown>,
+  store: MockApiStore,
+  auth: MockAuthStore,
+  support: MockSupportStore,
+): Observable<HttpEvent<unknown>> {
   const path = pathOf(req.url);
 
-  // Public auth routes of contract 002 (no token needed).
+  // Public auth routes of contracts 002 and 003 (no token needed).
+  if (path === AUTH_FORGOT_PASSWORD_PATH && req.method === 'POST') {
+    const origin = req.headers.get('X-Forwarded-For')?.trim() || '127.0.0.1';
+    return respond(req, support.forgotPassword(req.body, origin));
+  }
   if (path === AUTH_REGISTER_PATH && req.method === 'POST') {
     return respond(req, auth.register(req.body));
   }
@@ -109,6 +129,44 @@ function route(req: HttpRequest<unknown>, store: MockApiStore, auth: MockAuthSto
   }
   if (path === AUTH_PASSWORD_PATH && req.method === 'POST') {
     return respond(req, auth.changePassword(bearerToken(req), req.body));
+  }
+
+  // Support panel routes of contract 003 (PR1).
+  if (path === SUPPORT_LOGIN_PATH && req.method === 'POST') {
+    return respond(req, support.login(req.body));
+  }
+  if (path === SUPPORT_REFRESH_PATH && req.method === 'POST') {
+    return respond(req, support.refresh(hasCsrfHeader(req)));
+  }
+  if (path === SUPPORT_LOGOUT_PATH && req.method === 'POST') {
+    return respond(req, support.logout(hasCsrfHeader(req)));
+  }
+  if (path === SUPPORT_ME_PATH && req.method === 'GET') {
+    return respond(req, support.me(bearerToken(req)));
+  }
+  if (path === SUPPORT_PASSWORD_PATH && req.method === 'POST') {
+    return respond(req, support.changePassword(bearerToken(req), req.body));
+  }
+  if (path === SUPPORT_TICKETS_PATH && req.method === 'GET') {
+    return respond(req, support.listOpenTickets(bearerToken(req)));
+  }
+  const supportTicketDiscard = SUPPORT_TICKET_DISCARD.exec(path);
+  if (supportTicketDiscard !== null && req.method === 'POST') {
+    return respond(
+      req,
+      support.discardTicket(bearerToken(req), decodeURIComponent(supportTicketDiscard[1]), req.body),
+    );
+  }
+  const supportTicketById = SUPPORT_TICKET_BY_ID.exec(path);
+  if (supportTicketById !== null && req.method === 'GET') {
+    return respond(req, support.getTicket(bearerToken(req), decodeURIComponent(supportTicketById[1])));
+  }
+  if (path === SUPPORT_PREFIX || path.startsWith(`${SUPPORT_PREFIX}/`)) {
+    const authCheck = support.authenticateSupport(bearerToken(req), false);
+    if (!authCheck.ok) {
+      return respond(req, authCheck);
+    }
+    return respond(req, { ok: false, problem: mockProblem(404, 'NOT_FOUND') });
   }
 
   // Users routes of contract 002 (US4 - solo administrador)
@@ -196,5 +254,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
   const store = inject(MockApiStore);
   const auth = inject(MockAuthStore);
-  return timer(MOCK_LATENCY_MS).pipe(mergeMap(() => route(req, store, auth)));
+  const support = inject(MockSupportStore);
+  return timer(MOCK_LATENCY_MS).pipe(mergeMap(() => route(req, store, auth, support)));
 };

@@ -9,6 +9,9 @@ export default defineConfig({
     root: './',
     include: ['**/*.spec.ts'],
     // Test-only default (research R9): the 001 suites keep using tokens without sid.
-    env: { AUTH_ALLOW_SESSIONLESS_TOKENS: 'true' },
+    env: {
+      AUTH_ALLOW_SESSIONLESS_TOKENS: 'true',
+      SUPPORT_JWT_SECRET: 'test-only-support-secret-0123456789abcdef',
+    },
   },
 });

@@ -1,11 +1,17 @@
-import { createHash, randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import type { DataSource, EntityManager } from 'typeorm';
 import { getTenantContext } from '../database/tenant-context.js';
 import { withAuthTransaction } from './auth-transaction.js';
 import type { AuthUser } from './auth-user.js';
+import {
+  classifyRotation,
+  hashRefreshToken,
+  newRefreshToken,
+} from './refresh-token-policy.js';
+import type { TokenRotationState } from './refresh-token-policy.js';
 
-const REFRESH_TOKEN_BYTES = 32;
+export { hashRefreshToken } from './refresh-token-policy.js';
+export type { TokenRotationState } from './refresh-token-policy.js';
 
 /** user_sessions.revoke_reason values (data-model). */
 export type RevokeReason =
@@ -43,9 +49,6 @@ export interface LockedSession {
   temporaryPasswordExpiresAt: Date | null;
 }
 
-/** State of the presented token, re-read once the session is locked (concurrent refreshes). */
-export type TokenRotationState = 'current' | 'recently_rotated' | 'reused';
-
 interface SessionIdRow {
   id: string;
 }
@@ -69,20 +72,8 @@ interface LockedSessionRow {
 }
 
 interface TokenStateRow {
-  rotated: boolean;
-  recent: boolean;
-}
-
-/** Window in which reusing a rotated token is a benign race between tabs (research R5). */
-const REUSE_WINDOW = "interval '10 seconds'";
-
-/** SHA-256 hex of a refresh token: what refresh_tokens.token_hash stores (research R5). */
-export function hashRefreshToken(token: string): string {
-  return createHash('sha256').update(token, 'utf8').digest('hex');
-}
-
-function newRefreshToken(): string {
-  return randomBytes(REFRESH_TOKEN_BYTES).toString('base64url');
+  rotated_at: Date | null;
+  now: Date;
 }
 
 /**
@@ -101,10 +92,10 @@ export class SessionsService {
     )) as SessionIdRow[];
     const sessionId = rows[0].id;
     const refreshToken = newRefreshToken();
-    await manager.query('INSERT INTO refresh_tokens (session_id, token_hash) VALUES ($1, $2)', [
-      sessionId,
-      hashRefreshToken(refreshToken),
-    ]);
+    await manager.query(
+      'INSERT INTO refresh_tokens (session_id, token_hash) VALUES ($1, $2)',
+      [sessionId, hashRefreshToken(refreshToken)],
+    );
     return { sessionId, refreshToken };
   }
 
@@ -119,14 +110,21 @@ export class SessionsService {
     )) as FoundTokenRow[];
     const row = rows[0];
     if (!row) return undefined;
-    return { tokenId: row.token_id, tenantId: row.tenant_id, sessionId: row.session_id };
+    return {
+      tokenId: row.token_id,
+      tenantId: row.tenant_id,
+      sessionId: row.session_id,
+    };
   }
 
   /**
    * Locks the session (FOR UPDATE: concurrent refreshes of one session are serialized) and reads
    * its account. Under RLS: a session of another tenant is never found.
    */
-  async lockSession(manager: EntityManager, sessionId: string): Promise<LockedSession | undefined> {
+  async lockSession(
+    manager: EntityManager,
+    sessionId: string,
+  ): Promise<LockedSession | undefined> {
     const rows = (await manager.query(
       `SELECT s.user_id, s.revoked_at IS NOT NULL AS revoked,
               s.last_activity_at <= now() - interval '30 minutes' AS inactive,
@@ -153,17 +151,18 @@ export class SessionsService {
     };
   }
 
-  /** Whether the token is the current one, was rotated within 10 s, or was rotated before. */
-  async tokenState(manager: EntityManager, tokenId: string): Promise<TokenRotationState> {
+  /** Whether the token is fresh, was rotated within 10 s, or was rotated before. */
+  async tokenState(
+    manager: EntityManager,
+    tokenId: string,
+  ): Promise<TokenRotationState> {
     const rows = (await manager.query(
-      `SELECT rotated_at IS NOT NULL AS rotated,
-              COALESCE(rotated_at >= now() - ${REUSE_WINDOW}, false) AS recent
-         FROM refresh_tokens WHERE id = $1`,
+      `SELECT rotated_at, now() AS now FROM refresh_tokens WHERE id = $1`,
       [tokenId],
     )) as TokenStateRow[];
     const row = rows[0];
-    if (!row || !row.rotated) return 'current';
-    return row.recent ? 'recently_rotated' : 'reused';
+    if (!row) return 'fresh';
+    return classifyRotation(row.rotated_at, row.now);
   }
 
   /**
@@ -171,26 +170,38 @@ export class SessionsService {
    * session, prunes the tokens of the session rotated more than 1 day ago and records the
    * activity (FR-012). Returns the new refresh token.
    */
-  async rotate(manager: EntityManager, tokenId: string, sessionId: string): Promise<string> {
-    await manager.query('UPDATE refresh_tokens SET rotated_at = now() WHERE id = $1', [tokenId]);
+  async rotate(
+    manager: EntityManager,
+    tokenId: string,
+    sessionId: string,
+  ): Promise<string> {
+    await manager.query(
+      'UPDATE refresh_tokens SET rotated_at = now() WHERE id = $1',
+      [tokenId],
+    );
     const refreshToken = newRefreshToken();
-    await manager.query('INSERT INTO refresh_tokens (session_id, token_hash) VALUES ($1, $2)', [
-      sessionId,
-      hashRefreshToken(refreshToken),
-    ]);
+    await manager.query(
+      'INSERT INTO refresh_tokens (session_id, token_hash) VALUES ($1, $2)',
+      [sessionId, hashRefreshToken(refreshToken)],
+    );
     await manager.query(
       `DELETE FROM refresh_tokens
         WHERE session_id = $1 AND rotated_at < now() - interval '1 day'`,
       [sessionId],
     );
-    await manager.query('UPDATE user_sessions SET last_activity_at = now() WHERE id = $1', [
-      sessionId,
-    ]);
+    await manager.query(
+      'UPDATE user_sessions SET last_activity_at = now() WHERE id = $1',
+      [sessionId],
+    );
     return refreshToken;
   }
 
   /** Revokes one session; a session already revoked keeps its revoked_at and reason (US3-AC6). */
-  async revoke(manager: EntityManager, sessionId: string, reason: RevokeReason): Promise<void> {
+  async revoke(
+    manager: EntityManager,
+    sessionId: string,
+    reason: RevokeReason,
+  ): Promise<void> {
     await manager.query(
       `UPDATE user_sessions SET revoked_at = now(), revoke_reason = $2
         WHERE id = $1 AND revoked_at IS NULL`,

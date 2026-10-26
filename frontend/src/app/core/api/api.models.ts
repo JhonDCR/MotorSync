@@ -1,10 +1,12 @@
-// Tipos escritos a mano desde specs/001-clientes-vehiculos/contracts/openapi.yaml (research.md R8)
-// y specs/002-autenticacion/contracts/openapi.yaml. Si cambia un contrato, este archivo cambia con él.
+// Tipos escritos a mano desde specs/001-clientes-vehiculos/contracts/openapi.yaml (research.md R8),
+// specs/002-autenticacion/contracts/openapi.yaml y specs/003-soporte-plataforma/contracts/openapi.yaml.
+// Si cambia un contrato, este archivo cambia con él.
 
 export type ClientType = 'natural' | 'company';
 export type DocumentType = 'cedula' | 'ruc' | 'passport';
 export type BodyType = 'sedan' | 'suv' | 'pickup' | 'motorcycle' | 'other';
 export type Role = 'asesor' | 'admin';
+export type AuditActorRole = Role | 'platform_support';
 
 /** Motivo de 10 a 500 caracteres (FR-019). */
 export type Reason = string;
@@ -251,6 +253,157 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
+// --- Soporte de la plataforma y recuperación de acceso (contrato 003) ---
+
+export type TicketStatus = 'open' | 'resolved' | 'discarded';
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface SupportLoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface SupportAgent {
+  id: string;
+  name: string;
+  email: string;
+  mustChangePassword: boolean;
+  temporaryPasswordExpiresAt: string | null;
+}
+
+export type SupportAgentProfile = SupportAgent;
+
+export interface SupportSessionResponse {
+  /** JWT de soporte; el frontend lo guarda en localStorage `motorsync.support.token`. */
+  accessToken: string;
+  expiresIn: number;
+  agent: SupportAgent;
+}
+
+export interface CurrentSupportSession {
+  agent: SupportAgent;
+}
+
+export type CurrentSupportSessionResponse = CurrentSupportSession;
+
+export interface TicketAccountSummary {
+  email: string;
+  name: string;
+  role: Role;
+  status: UserStatus;
+}
+
+export type TicketAccount = TicketAccountSummary;
+
+export interface TicketWorkshopSummary {
+  name: string;
+  ruc: string | null;
+}
+
+export type TicketWorkshop = TicketWorkshopSummary;
+
+export interface TicketSummary {
+  id: string;
+  number: number;
+  createdAt: string;
+  lastRequestedAt: string;
+  requestCount: number;
+  account: TicketAccountSummary;
+  workshop: TicketWorkshopSummary;
+}
+
+export interface TicketResolution {
+  verificationNote: string;
+  resolvedByName: string;
+  resolvedAt: string;
+}
+
+export interface TicketDiscard {
+  reason: string;
+  discardedByName: string;
+  discardedAt: string;
+}
+
+export interface TicketDetail extends TicketSummary {
+  status: TicketStatus;
+  resolution?: TicketResolution | null;
+  discard?: TicketDiscard | null;
+}
+
+export interface TicketListResponse {
+  items: TicketSummary[];
+}
+
+export interface DiscardTicketRequest {
+  reason: string;
+}
+
+export interface GenerateTemporaryPasswordRequest {
+  verificationNote: string;
+}
+
+export interface TemporaryPasswordResponse {
+  temporaryPassword: string;
+  temporaryPasswordExpiresAt: string;
+  sessionsClosed: number;
+  ticket: TicketDetail;
+}
+
+export interface WorkshopSummary {
+  id: string;
+  name: string;
+  ruc: string | null;
+  createdAt: string;
+}
+
+export interface WorkshopListResponse {
+  items: WorkshopSummary[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface WorkshopAccount {
+  name: string;
+  email: string;
+  role: Role;
+  status: UserStatus;
+  hasOpenTicket: boolean;
+}
+
+export interface WorkshopAccountsResponse {
+  workshop: WorkshopSummary;
+  items: WorkshopAccount[];
+}
+
+export interface WorkshopSummaryRef {
+  id: string;
+  name: string;
+  ruc: string | null;
+}
+
+export interface AccessLogEntry {
+  id: string;
+  occurredAt: string;
+  agent: {
+    id: string;
+    name: string;
+  };
+  workshop: WorkshopSummaryRef;
+  ip: string | null;
+  channel: string;
+}
+
+export interface AccessLogResponse {
+  items: AccessLogEntry[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
 // --- Errores (application/problem+json, RFC 9457) ---
 
 export const PROBLEM_CODES = [
@@ -281,6 +434,10 @@ export const PROBLEM_CODES = [
   'LAST_ADMIN',
   'SELF_RESET_NOT_ALLOWED',
   'FORBIDDEN',
+  // Contrato 003
+  'HELP_RATE_LIMITED',
+  'TICKET_NOT_OPEN',
+  'ACCOUNT_INACTIVE',
 ] as const;
 
 export type ProblemCode = (typeof PROBLEM_CODES)[number];

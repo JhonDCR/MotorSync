@@ -1,0 +1,23 @@
+<header class="support-header" data-testid="support-header">
+  <a routerLink="/support" class="support-brand">Soporte MotorSync</a>
+
+  @if (session.agent(); as agent) {
+    <div class="support-session-bar">
+      <span class="support-agent-name" data-testid="support-agent-name">{{ agent.name }}</span>
+      <button
+        type="button"
+        class="support-logout"
+        data-testid="support-logout"
+        [disabled]="loggingOut()"
+        [attr.aria-busy]="loggingOut() ? 'true' : null"
+        (click)="logout()"
+      >
+        Cerrar sesión
+      </button>
+    </div>
+  }
+</header>
+
+<div class="support-content">
+  <router-outlet />
+</div>

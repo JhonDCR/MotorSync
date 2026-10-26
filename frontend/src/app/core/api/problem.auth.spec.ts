@@ -9,7 +9,7 @@
 //       REGISTRATION_FAILED         "No se pudo completar el registro con estos datos; si ya tiene una cuenta, inicie sesión" (US1-AC5)
 //       INVALID_CREDENTIALS         "Correo o contraseña incorrectos"                                (US2-AC3)
 //       ACCOUNT_LOCKED              "Demasiados intentos fallidos. Intente de nuevo en unos minutos" (US2-AC5)
-//       TEMPORARY_PASSWORD_EXPIRED  "Su contraseña temporal venció. Pida al administrador de su taller que la restablezca" (US5-AC9)
+//       TEMPORARY_PASSWORD_EXPIRED  "Su contraseña temporal venció. Pida al administrador de su taller que la restablezca o use ¿Olvidaste tu contraseña?" (US5-AC9; FR-022 de la 003)
 //     El resto de códigos nuevos: mensaje propio en español, distinto del código y del title del servidor.
 //     Todos los mensajes de PROBLEM_CODES siguen siendo distintos entre sí (lo exige también problem.spec.ts).
 //   - fieldErrorMessage(): PASSWORD_TOO_SHORT menciona "8 caracteres"; PASSWORD_TOO_LONG menciona "128 caracteres".

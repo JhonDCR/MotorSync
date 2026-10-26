@@ -128,6 +128,7 @@ interface TokenClaims {
   tenantId: string | null;
   role: Role | null;
   name: string;
+  aud: string | null;
 }
 
 interface LoginThrottle {
@@ -214,6 +215,7 @@ function readClaims(token: string | null): TokenClaims | null {
     tenantId: stringClaim(payload, 'tenant_id'),
     role: role === 'admin' || role === 'asesor' ? role : null,
     name: stringClaim(payload, 'name') ?? '',
+    aud: stringClaim(payload, 'aud'),
   };
 }
 
@@ -363,6 +365,8 @@ export class MockAuthStore {
   private readonly auditEntries: MockAuditEntry[] = [];
   /** The HttpOnly cookie ms_refresh of this "browser", simulated in memory: id of its session. Never in a body. */
   private refreshCookie: string | null = null;
+  /** FR-024: callback to check if an email belongs to a support account. */
+  private supportEmailCheck: ((email: string) => boolean) | null = null;
 
   constructor() {
     const workshop: MockWorkshop = { id: newId(), ...SEED_WORKSHOP };
@@ -411,7 +415,7 @@ export class MockAuthStore {
     if ([...this.workshops.values()].some((workshop) => workshop.ruc === normalizedRuc)) {
       return fail(409, 'RUC_ALREADY_REGISTERED');
     }
-    if (this.accounts.has(email)) {
+    if (this.accounts.has(email) || this.supportEmailCheck?.(email) === true) {
       return fail(409, 'REGISTRATION_FAILED');
     }
 
@@ -476,6 +480,9 @@ export class MockAuthStore {
       throw new Error('MockAuthStore.addAccount: a temporary password needs temporaryPasswordExpiresAt');
     }
     const email = normalizeEmail(input.email);
+    if (this.accounts.has(email) || this.supportEmailCheck?.(email) === true) {
+      throw new Error(`MockAuthStore.addAccount: email already in use: ${email}`);
+    }
     const nowIso = new Date().toISOString();
     this.accounts.set(email, {
       id: input.id ?? newId(),
@@ -531,7 +538,13 @@ export class MockAuthStore {
    */
   me(token: string | null): MockResult<CurrentSessionResponse> {
     const claims = readClaims(token);
-    if (claims === null || claims.role === null) {
+    if (claims === null) {
+      return fail(401, 'UNAUTHORIZED');
+    }
+    if (claims.aud === 'motorsync-support') {
+      return fail(403, 'FORBIDDEN');
+    }
+    if (claims.role === null) {
       return fail(401, 'UNAUTHORIZED');
     }
     if (claims.sid === null) {
@@ -564,7 +577,11 @@ export class MockAuthStore {
    * Null when the request may go on.
    */
   workshopAccessProblem(token: string | null): Problem | null {
-    const sid = readClaims(token)?.sid ?? null;
+    const claims = readClaims(token);
+    if (claims?.aud === 'motorsync-support') {
+      return mockProblem(403, 'FORBIDDEN');
+    }
+    const sid = claims?.sid ?? null;
     if (sid === null) return null;
     const check = this.checkSession(sid);
     if (!check.ok) return check.problem;
@@ -576,7 +593,11 @@ export class MockAuthStore {
    * the temporary password, revokes the OTHER sessions (US5-AC3) and answers a token of the same session.
    */
   changePassword(token: string | null, raw: unknown): MockResult<SessionResponse> {
-    const sid = readClaims(token)?.sid ?? null;
+    const claims = readClaims(token);
+    if (claims?.aud === 'motorsync-support') {
+      return fail(403, 'FORBIDDEN');
+    }
+    const sid = claims?.sid ?? null;
     if (sid === null) return fail(401, 'UNAUTHORIZED');
     const check = this.checkSession(sid);
     if (!check.ok) return check;
@@ -670,7 +691,7 @@ export class MockAuthStore {
       return validationFailed(errors);
     }
 
-    if (this.accounts.has(email)) {
+    if (this.accounts.has(email) || this.supportEmailCheck?.(email) === true) {
       return fail(409, 'EMAIL_UNAVAILABLE');
     }
 
@@ -924,7 +945,13 @@ export class MockAuthStore {
 
   private callerOf(token: string | null): CallerCheck {
     const claims = readClaims(token);
-    if (claims === null || claims.role === null) {
+    if (claims === null) {
+      return { ok: false, problem: mockProblem(401, 'UNAUTHORIZED') };
+    }
+    if (claims.aud === 'motorsync-support') {
+      return { ok: false, problem: mockProblem(403, 'FORBIDDEN') };
+    }
+    if (claims.role === null) {
       return { ok: false, problem: mockProblem(401, 'UNAUTHORIZED') };
     }
     if (claims.sid !== null) {
@@ -1030,6 +1057,70 @@ export class MockAuthStore {
       expiresIn: ACCESS_TOKEN_TTL_SECONDS,
       user,
       workshop: { id: account.workshopId, name: workshop?.name ?? '' },
+    };
+  }
+
+  // --- Helpers for MockSupportStore (003) ---
+
+  /** Registers the support email uniqueness check for FR-024. */
+  registerSupportEmailCheck(check: (email: string) => boolean): void {
+    this.supportEmailCheck = check;
+  }
+
+  /** True when a workshop account exists for this normalized email. */
+  hasEmail(normalizedEmail: string): boolean {
+    return this.accounts.has(normalizedEmail);
+  }
+
+  /** Workshop account and workshop summary for a normalized email, if it exists. */
+  findAccountByEmail(normalizedEmail: string): {
+    id: string;
+    email: string;
+    name: string;
+    role: Role;
+    status: UserStatus;
+    workshopId: string;
+    workshopName: string;
+    workshopRuc: string | null;
+  } | null {
+    const account = this.accounts.get(normalizedEmail);
+    if (account === undefined) return null;
+    const workshop = this.workshops.get(account.workshopId);
+    return {
+      id: account.id,
+      email: account.email,
+      name: account.name,
+      role: account.role,
+      status: account.status,
+      workshopId: account.workshopId,
+      workshopName: workshop?.name ?? '',
+      workshopRuc: workshop?.ruc ?? null,
+    };
+  }
+
+  /** Workshop account and workshop summary by account id, if it exists. */
+  findAccountById(accountId: string): {
+    id: string;
+    email: string;
+    name: string;
+    role: Role;
+    status: UserStatus;
+    workshopId: string;
+    workshopName: string;
+    workshopRuc: string | null;
+  } | null {
+    const account = this.accountById(accountId);
+    if (account === undefined) return null;
+    const workshop = this.workshops.get(account.workshopId);
+    return {
+      id: account.id,
+      email: account.email,
+      name: account.name,
+      role: account.role,
+      status: account.status,
+      workshopId: account.workshopId,
+      workshopName: workshop?.name ?? '',
+      workshopRuc: workshop?.ruc ?? null,
     };
   }
 }

@@ -30,17 +30,17 @@ Una sola prueba: `npx vitest run src/ruta/archivo.spec.ts`. Pruebas relacionadas
 Arranque local del backend, en orden (los scripts de BD ejecutan `dist/`, por eso `build` va primero):
 
 ```bash
-docker compose up -d                 # en la raíz; requiere .env copiado de .env.example
+docker compose up -d                 # en la raíz; requiere .env copiado de .env.example (incluye SUPPORT_JWT_SECRET)
 cd backend && npm run build
-npm run db:bootstrap                 # roles motorsync_migrator, motorsync_app y motorsync_auth + extensiones (idempotente)
+npm run db:bootstrap                 # roles motorsync_migrator, motorsync_app, motorsync_auth y motorsync_support + extensiones (idempotente)
 npm run db:migrate                   # como motorsync_migrator (idempotente)
-npm run db:seed:dev                  # talleres A y B con clientes, vehículos y usuarios (admin y asesor por taller); imprime la contraseña de desarrollo
+npm run db:seed:dev                  # talleres A y B con clientes, vehículos y usuarios, más la cuenta de soporte soporte@motorsync.test; imprime la contraseña de desarrollo
 npm run start:dev                    # API en http://localhost:3000/api/v1
 ```
 
-Al actualizar desde una versión anterior a la feature 002, vuelve a correr `npm run db:bootstrap` antes de migrar: crea el rol `motorsync_auth`.
+Al actualizar desde una versión anterior a la feature 002 o la 003, vuelve a correr `npm run db:bootstrap` antes de migrar: crea los roles `motorsync_auth` (002) y `motorsync_support` (003). `SUPPORT_JWT_SECRET` es obligatoria en `.env` (copiar de `.env.example`, de al menos 32 caracteres y distinta de `JWT_SECRET`; la API no arranca sin ella).
 
-Iniciar sesión en local: `POST /api/v1/auth/login` (o la página `/login` del frontend) con un usuario del seed, por ejemplo `admin@taller-a.test`. `npm run token:dev -- --tenant <uuid> --role asesor --name "Ana"` sigue sirviendo para pruebas rápidas, pero emite un token **sin sesión** que solo se acepta con `AUTH_ALLOW_SESSIONLESS_TOKENS=true`; la API no arranca con ese valor y `NODE_ENV=production` (FR-T01).
+Iniciar sesión en local: `POST /api/v1/auth/login` (o la página `/login` del frontend) con un usuario del seed, por ejemplo `admin@taller-a.test`. Para el panel de soporte (`/support/login`), usa `soporte@motorsync.test` (creada por `db:seed:dev`) o gestiona cuentas de soporte fuera de la app con `npm run support:account -- create|deactivate|reactivate|reset-password|list` (y `access-log` a partir del PR3 de la 003), que exige `--confirm` en cambios destructivos e imprime la contraseña temporal una sola vez en `stdout`. `npm run token:dev -- --tenant <uuid> --role asesor --name "Ana"` sigue sirviendo para pruebas rápidas de taller (no emite tokens de soporte), pero emite un token **sin sesión** que solo se acepta con `AUTH_ALLOW_SESSIONLESS_TOKENS=true`; la API no arranca con ese valor y `NODE_ENV=production` (FR-T01).
 
 `npm run test:perf` siembra 10 talleres × 30 000 clientes y 50 000 vehículos (de 1 a 9 min según la carga de la máquina) y falla si el p95 de búsqueda por placa, documento o VIN llega a 200 ms (US1-AC10). Corre en CI después de las e2e; en local úsalo solo al tocar consultas o índices de búsqueda.
 
@@ -78,5 +78,5 @@ Los permisos de cada rol los impone `.claude/hooks/guard-paths.mjs`. Si un hook 
 
 Cuando un agente cometa el mismo error dos veces, agrega aquí la regla que lo evita (una línea, en imperativo).
 
-- Una migración que cree, reemplace o borre funciones `auth_*` debe hacerlo como su dueño: `GRANT CREATE ON SCHEMA public TO motorsync_auth; SET ROLE motorsync_auth; …; RESET ROLE; REVOKE CREATE …` (specs/002-autenticacion/data-model.md, "Mantenimiento"). Sin el `SET ROLE`, un `REVOKE`/`GRANT` sobre ellas solo emite un WARNING y no hace nada.
+- Una migración que cree, reemplace o borre funciones `auth_*` o `support_*` (y los triggers de FR-024) debe hacerlo como su dueño (`motorsync_auth` o `motorsync_support`): `GRANT CREATE ON SCHEMA public TO <rol>; SET ROLE <rol>; …; RESET ROLE; REVOKE CREATE …` (`specs/002-autenticacion/data-model.md` y `specs/003-soporte-plataforma/data-model.md`, "Mantenimiento"). Sin el `SET ROLE`, un `REVOKE`/`GRANT` sobre ellas solo emite un WARNING y no hace nada.
 - Si dos agentes corren e2e a la vez, cada uno usa su propio puerto de PostgreSQL y su propio archivo de variables en el scratchpad; nunca un `env.sh` compartido.

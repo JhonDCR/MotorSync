@@ -29,7 +29,8 @@
 //                               sigue (no borra el token ni navega).
 //   401 TEMPORARY_PASSWORD_EXPIRED → SessionStore.clear() y navega a `/login?reason=temporary-expired`, donde la
 //                               página de login muestra "Su contraseña temporal venció. Pida al administrador de su
-//                               taller que la restablezca" (US5-AC9; lo prueba login.page.session.spec.ts).
+//                               taller que la restablezca o use ¿Olvidaste tu contraseña?" (US5-AC9; FR-022 de la 003;
+//                               lo prueba login.page.session.spec.ts).
 //   fallo de red (status 0)   → form-error no vacío.
 // Ninguna contraseña aparece en el texto ni en el HTML de la página (FR-006, US5-AC7).
 // Mobile-first (FR-025): inputs y botón con min-height de al menos 44 px.

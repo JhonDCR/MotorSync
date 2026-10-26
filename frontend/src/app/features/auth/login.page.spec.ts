@@ -21,7 +21,7 @@
 //                                      el mismo mensaje sea cual sea la causa.
 //     429 ACCOUNT_LOCKED               "Demasiados intentos fallidos. Intente de nuevo en unos minutos" (US2-AC5)
 //     401 TEMPORARY_PASSWORD_EXPIRED   "Su contraseña temporal venció. Pida al administrador de su taller que la
-//                                      restablezca" (US5-AC9)
+//                                      restablezca o use ¿Olvidaste tu contraseña?" (US5-AC9; FR-022 de la 003)
 //     fallo de red (status 0)          un mensaje no vacío.
 //   En ningún error se guarda token ni se navega, y la contraseña no aparece en el texto de la página (FR-006).
 // Cuerpo enviado: exactamente { email, password } (US2-AC10); email tal cual o normalizado; password tal cual.

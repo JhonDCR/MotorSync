@@ -7,6 +7,9 @@
 // tenant + plate), so a second run inserts nothing and says so.
 // Feature 002 (T023): each workshop gets a valid RUC and one admin and one asesor account, with a
 // development password printed on the console (npm run token:dev keeps working without them).
+// Feature 003 (T030): also creates the platform support account soporte@motorsync.test, active and
+// without a temporary password in development, for the panel at /support/login. It uses the same
+// development password as the workshop accounts.
 import pg from 'pg';
 import { PasswordHasher } from '../src/auth/password-hasher.js';
 import { requireEnv } from '../src/config/env.js';
@@ -31,6 +34,13 @@ const SEED_ACTOR_ID = '00000000-0000-4000-8000-000000000001';
 const SEED_ACTOR_NAME = 'Seed dev';
 /** Development only: never use it outside a local database. */
 const DEV_PASSWORD = 'MotorSync-dev-2026';
+
+/** Platform support account for the /support/login panel (feature 003, T030). */
+const SUPPORT_ACCOUNT = {
+  id: '0c000000-0000-4000-8000-00000000000c',
+  name: 'Soporte MotorSync (dev)',
+  email: 'soporte@motorsync.test',
+} as const;
 
 interface SeedUser {
   id: string;
@@ -242,12 +252,23 @@ const DOCUMENT_VALIDATORS = {
 
 /** Fails before touching the database if an example would be rejected by the API. */
 function assertSeedIsValid(tenants: readonly SeedTenant[]): void {
+  if (
+    !isValidEmail(SUPPORT_ACCOUNT.email) ||
+    normalizeEmail(SUPPORT_ACCOUNT.email) !== SUPPORT_ACCOUNT.email
+  ) {
+    throw new Error(`Seed: invalid support email ${SUPPORT_ACCOUNT.email}`);
+  }
   for (const tenant of tenants) {
     if (!isValidRuc(tenant.ruc)) {
-      throw new Error(`Seed: invalid RUC ${tenant.ruc} for workshop ${tenant.key}`);
+      throw new Error(
+        `Seed: invalid RUC ${tenant.ruc} for workshop ${tenant.key}`,
+      );
     }
     for (const user of tenant.users) {
-      if (!isValidEmail(user.email) || normalizeEmail(user.email) !== user.email) {
+      if (
+        !isValidEmail(user.email) ||
+        normalizeEmail(user.email) !== user.email
+      ) {
         throw new Error(`Seed: invalid email ${user.email}`);
       }
     }
@@ -284,6 +305,33 @@ interface SeedCounts {
   users: number;
   clients: number;
   vehicles: number;
+  supportAccounts: number;
+}
+
+/**
+ * Platform support account, outside any workshop. The fixed id and the unique email make the
+ * second run a no-op. In development it is active and has no temporary password.
+ */
+async function seedSupportAccount(
+  db: pg.Client,
+  hasher: PasswordHasher,
+  counts: SeedCounts,
+): Promise<void> {
+  // support_accounts is a platform table: leave the context unpinned so no workshop leaks in.
+  await db.query(`SELECT set_config('app.tenant_id', '', true)`);
+  const result = await db.query(
+    `INSERT INTO support_accounts (id, name, email, password_hash, status,
+                                   must_change_password, temp_password_expires_at)
+     VALUES ($1, $2, $3, $4, 'active', false, NULL)
+     ON CONFLICT DO NOTHING`,
+    [
+      SUPPORT_ACCOUNT.id,
+      SUPPORT_ACCOUNT.name,
+      SUPPORT_ACCOUNT.email,
+      await hasher.hash(DEV_PASSWORD),
+    ],
+  );
+  counts.supportAccounts += result.rowCount ?? 0;
 }
 
 async function seedTenant(
@@ -385,11 +433,20 @@ async function main(): Promise<void> {
   });
   await db.connect();
   const hasher = new PasswordHasher();
-  const counts: SeedCounts = { tenants: 0, users: 0, clients: 0, vehicles: 0 };
+  const counts: SeedCounts = {
+    tenants: 0,
+    users: 0,
+    clients: 0,
+    vehicles: 0,
+    supportAccounts: 0,
+  };
   try {
     await db.query('BEGIN');
     try {
-      for (const tenant of TENANTS) await seedTenant(db, tenant, hasher, counts);
+      await seedSupportAccount(db, hasher, counts);
+      for (const tenant of TENANTS) {
+        await seedTenant(db, tenant, hasher, counts);
+      }
       await db.query('COMMIT');
     } catch (error: unknown) {
       await db.query('ROLLBACK');
@@ -399,13 +456,23 @@ async function main(): Promise<void> {
     await db.end();
   }
 
-  if (counts.tenants + counts.users + counts.clients + counts.vehicles === 0) {
+  if (
+    counts.tenants +
+      counts.users +
+      counts.clients +
+      counts.vehicles +
+      counts.supportAccounts ===
+    0
+  ) {
     console.log('Seed data already present: nothing was inserted.');
   } else {
     console.log(
-      `Seed inserted or updated ${counts.tenants} tenants, ${counts.users} users, ${counts.clients} clients and ${counts.vehicles} vehicles.`,
+      `Seed inserted or updated ${counts.tenants} tenants, ${counts.users} users, ${counts.clients} clients, ${counts.vehicles} vehicles and ${counts.supportAccounts} support accounts.`,
     );
   }
+  console.log(
+    `Soporte: ${SUPPORT_ACCOUNT.email}  (${SUPPORT_ACCOUNT.name}; panel /support/login)`,
+  );
   for (const tenant of TENANTS) {
     const plates = tenant.vehicles.map((vehicle) => vehicle.plate).join(', ');
     console.log(
@@ -416,7 +483,7 @@ async function main(): Promise<void> {
     }
   }
   console.log(
-    `Contraseña de desarrollo de todas las cuentas: ${DEV_PASSWORD} (solo para la base local).`,
+    `Contraseña de desarrollo de todas las cuentas (talleres y soporte): ${DEV_PASSWORD} (solo para la base local).`,
   );
 }
 

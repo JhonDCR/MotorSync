@@ -1,0 +1,153 @@
+<section class="ticket-detail-page" aria-labelledby="ticket-detail-title">
+  <p class="back-nav">
+    <a routerLink="/support" class="back-link" data-testid="back-to-inbox">← Volver a tickets abiertos</a>
+  </p>
+
+  @if (error(); as errorMessage) {
+    <p class="ticket-error" role="alert" data-testid="ticket-error">{{ errorMessage }}</p>
+  } @else if (loading()) {
+    <p class="ticket-loading" role="status">Cargando detalle del ticket…</p>
+  } @else if (ticket(); as item) {
+    <header class="ticket-header">
+      <h1 id="ticket-detail-title">
+        Ticket <span data-testid="ticket-number">#{{ item.number }}</span>
+      </h1>
+      <span class="ticket-status" data-testid="ticket-status">{{ ticketStatusLabel(item.status) }}</span>
+    </header>
+
+    <div class="cards-grid">
+      <article class="info-card" aria-labelledby="ticket-meta-heading">
+        <h2 id="ticket-meta-heading">Solicitud</h2>
+        <dl>
+          <div>
+            <dt>Fecha de apertura</dt>
+            <dd data-testid="ticket-created-at">{{ formatDate(item.createdAt) }}</dd>
+          </div>
+          <div>
+            <dt>Última solicitud</dt>
+            <dd data-testid="ticket-last-requested-at">{{ formatDate(item.lastRequestedAt) }}</dd>
+          </div>
+          <div>
+            <dt>Solicitudes acumuladas</dt>
+            <dd data-testid="ticket-request-count">{{ item.requestCount }}</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="info-card" aria-labelledby="ticket-account-heading">
+        <h2 id="ticket-account-heading">Cuenta solicitante</h2>
+        <dl>
+          <div>
+            <dt>Nombre</dt>
+            <dd data-testid="ticket-account-name">{{ item.account.name }}</dd>
+          </div>
+          <div>
+            <dt>Correo electrónico</dt>
+            <dd data-testid="ticket-account-email">{{ item.account.email }}</dd>
+          </div>
+          <div>
+            <dt>Rol</dt>
+            <dd data-testid="ticket-account-role">{{ roleLabel(item.account.role) }}</dd>
+          </div>
+          <div>
+            <dt>Estado</dt>
+            <dd data-testid="ticket-account-status">{{ accountStatusLabel(item.account.status) }}</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="info-card" aria-labelledby="ticket-workshop-heading">
+        <h2 id="ticket-workshop-heading">Taller</h2>
+        <dl>
+          <div>
+            <dt>Nombre del taller</dt>
+            <dd data-testid="ticket-workshop-name">{{ item.workshop.name }}</dd>
+          </div>
+          <div>
+            <dt>RUC</dt>
+            <dd data-testid="ticket-workshop-ruc">{{ item.workshop.ruc ?? '—' }}</dd>
+          </div>
+        </dl>
+      </article>
+    </div>
+
+    @if (item.status === 'open') {
+      <section class="action-card" aria-labelledby="discard-ticket-heading" data-testid="discard-form">
+        <h2 id="discard-ticket-heading">Descartar ticket</h2>
+
+        @if (discardError(); as formMessage) {
+          <p class="form-error" role="alert" data-testid="discard-error">{{ formMessage }}</p>
+        }
+
+        <form novalidate (submit)="submitDiscard($event)">
+          <div class="field">
+            <label for="discard-reason-input">Motivo de descarte</label>
+            <textarea
+              id="discard-reason-input"
+              rows="3"
+              data-testid="discard-reason"
+              [value]="discardReason()"
+              [attr.aria-invalid]="discardReasonError() ? 'true' : null"
+              [attr.aria-describedby]="discardReasonError() ? 'discard-reason-error' : null"
+              (input)="updateDiscardReason($event)"
+            ></textarea>
+            @if (discardReasonError(); as reasonErr) {
+              <p class="field-error" id="discard-reason-error" data-testid="error-discard-reason">
+                {{ reasonErr }}
+              </p>
+            }
+          </div>
+
+          <button
+            type="submit"
+            class="discard-button"
+            data-testid="discard-submit"
+            [disabled]="discarding()"
+          >
+            {{ discarding() ? 'Descartando…' : 'Descartar ticket' }}
+          </button>
+        </form>
+      </section>
+    }
+
+    @if (item.status === 'discarded' && item.discard; as discard) {
+      <section class="info-card" aria-labelledby="discard-info-heading" data-testid="discard-info">
+        <h2 id="discard-info-heading">Detalle del descarte</h2>
+        <dl>
+          <div>
+            <dt>Motivo</dt>
+            <dd data-testid="discard-reason-value">{{ discard.reason }}</dd>
+          </div>
+          <div>
+            <dt>Descartado por</dt>
+            <dd data-testid="discard-by">{{ discard.discardedByName }}</dd>
+          </div>
+          <div>
+            <dt>Fecha de descarte</dt>
+            <dd data-testid="discard-at">{{ formatDate(discard.discardedAt) }}</dd>
+          </div>
+        </dl>
+      </section>
+    }
+
+    @if (item.status === 'resolved' && item.resolution; as resolution) {
+      <section class="info-card" aria-labelledby="resolution-info-heading" data-testid="resolution-info">
+        <h2 id="resolution-info-heading">Detalle de la resolución</h2>
+        <dl>
+          <div>
+            <dt>Nota de verificación</dt>
+            <dd data-testid="resolution-note">{{ resolution.verificationNote }}</dd>
+          </div>
+          <div>
+            <dt>Resuelto por</dt>
+            <dd data-testid="resolution-by">{{ resolution.resolvedByName }}</dd>
+          </div>
+          <div>
+            <dt>Fecha de resolución</dt>
+            <dd data-testid="resolution-at">{{ formatDate(resolution.resolvedAt) }}</dd>
+          </div>
+        </dl>
+      </section>
+    }
+  }
+</section>

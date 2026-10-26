@@ -1,0 +1,56 @@
+<section class="auth-page" aria-labelledby="support-login-title">
+  <h1 id="support-login-title">Acceso de soporte</h1>
+  <p class="intro">Entre con el correo y la contraseña de su cuenta de soporte.</p>
+
+  @if (reason(); as message) {
+    <p class="session-reason" role="status" data-testid="session-reason">{{ message }}</p>
+  }
+
+  @if (formError(); as message) {
+    <p class="form-error" role="alert" data-testid="form-error">{{ message }}</p>
+  }
+
+  @let fieldErrors = errors();
+  <form novalidate (submit)="submit($event)">
+    <div class="field">
+      <label for="support-login-email">Correo electrónico</label>
+      <input
+        id="support-login-email"
+        type="email"
+        inputmode="email"
+        autocomplete="username"
+        autocapitalize="off"
+        spellcheck="false"
+        data-testid="email"
+        [attr.aria-invalid]="fieldErrors.email ? 'true' : null"
+        [attr.aria-describedby]="fieldErrors.email ? 'support-login-email-error' : null"
+        (input)="update('email', $event)"
+      />
+      @if (fieldErrors.email) {
+        <p class="field-error" id="support-login-email-error" data-testid="error-email">{{ fieldErrors.email }}</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="support-login-password">Contraseña</label>
+      <input
+        id="support-login-password"
+        type="password"
+        autocomplete="current-password"
+        data-testid="password"
+        [attr.aria-invalid]="fieldErrors.password ? 'true' : null"
+        [attr.aria-describedby]="fieldErrors.password ? 'support-login-password-error' : null"
+        (input)="update('password', $event)"
+      />
+      @if (fieldErrors.password) {
+        <p class="field-error" id="support-login-password-error" data-testid="error-password">
+          {{ fieldErrors.password }}
+        </p>
+      }
+    </div>
+
+    <button type="submit" class="primary" data-testid="submit" [disabled]="submitting()">
+      {{ submitting() ? 'Entrando…' : 'Iniciar sesión' }}
+    </button>
+  </form>
+</section>

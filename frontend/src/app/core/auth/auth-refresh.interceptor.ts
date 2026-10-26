@@ -13,6 +13,7 @@ import type { ProblemCode, SessionResponse } from '../api/api.models';
 import { REQUESTED_WITH_HEADER, REQUESTED_WITH_VALUE } from '../api/auth-api.service';
 import { isProblem } from '../api/problem';
 import { CHANGE_PASSWORD_PATH, LOGIN_PATH } from './auth.guards';
+import { isSupportApiUrl } from './auth-token.interceptor';
 import { SessionStore } from './session.store';
 
 const AUTH_PATH_PREFIX = '/api/v1/auth/';
@@ -119,7 +120,7 @@ function withToken(req: HttpRequest<unknown>, token: string): HttpRequest<unknow
  * refresh, logout, password and me errors reach their screens as they are and the refresh never loops.
  */
 export const authRefreshInterceptor: HttpInterceptorFn = (req, next): Observable<HttpEvent<unknown>> => {
-  if (pathOf(req.url).startsWith(AUTH_PATH_PREFIX)) {
+  if (pathOf(req.url).startsWith(AUTH_PATH_PREFIX) || isSupportApiUrl(req.url)) {
     return next(req);
   }
   const coordinator = inject(SessionRefreshCoordinator);

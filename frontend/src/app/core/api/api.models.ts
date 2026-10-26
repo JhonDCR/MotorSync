@@ -178,9 +178,14 @@ export interface UserAccount {
 
 export interface UserAuditEntry {
   id: string;
-  action: 'user.role_changed' | 'user.deactivated' | 'user.reactivated' | 'user.password_reset';
+  action:
+    | 'user.role_changed'
+    | 'user.deactivated'
+    | 'user.reactivated'
+    | 'user.password_reset'
+    | 'user.password_reset_by_support';
   actorName: string;
-  actorRole: Role;
+  actorRole: AuditActorRole;
   occurredAt: string;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;

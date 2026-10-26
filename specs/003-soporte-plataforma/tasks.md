@@ -308,20 +308,20 @@ Al terminar, el agente genera la temporal de la cuenta de un ticket abierto con 
 
 ## Phase 6: Base del PR2
 
-- [ ] T044 [P] E2e de BD en `backend/test/db/support-roles-password.e2e-spec.ts` (nuevo):
+- [x] T044 [P] E2e de BD en `backend/test/db/support-roles-password.e2e-spec.ts` (nuevo):
   - el CHECK `audit_log_actor_role_check` acepta `platform_support` y sigue rechazando otros valores;
   - `support_lock_open_ticket` y `support_resolve_ticket`: `prosecdef = true`, dueño `motorsync_support`, `search_path` fijo, sin `EXECUTE` para `PUBLIC` y con `EXECUTE` para `motorsync_app`;
   - `support_lock_open_ticket` con sesión válida y sin taller devuelve `tenant_id, user_id, number, status` (también para un ticket cerrado) y 0 filas con un id inexistente; con el taller fijado o sin sesión válida lanza `28000`;
   - `support_resolve_ticket`: con el taller del ticket fijado y nota → devuelve `resolved_at`, deja el ticket `resolved` con la nota recortada y `resolved_by` = la cuenta de la sesión, e inserta el evento `temporary_password_generated`; con nota de solo espacios lanza `22023`; **sin taller fijado o con el taller B fijado** para un ticket de A lanza `55000` sin cambios; sobre un ticket ya `resolved` lanza `55000`.
 
   — tester
-- [ ] T045 Crear `backend/src/database/migrations/1761000001300-AllowSupportAuditActor.ts` y `1761000001400-CreateSupportPasswordFunctions.ts` con el DDL de data-model.md **literal** (incluido `support_resolve_ticket … RETURNS timestamptz`), con el `GRANT CREATE` / `SET ROLE motorsync_support` / `RESET ROLE` / `REVOKE CREATE` de la lección también en `down()`, y registrarlas en `backend/src/database/data-source.ts`. Deja T044 en verde — implementer-backend
-- [ ] T046 [P] Pruebas unitarias del núcleo compartido y de la auditoría:
+- [x] T045 Crear `backend/src/database/migrations/1761000001300-AllowSupportAuditActor.ts` y `1761000001400-CreateSupportPasswordFunctions.ts` con el DDL de data-model.md **literal** (incluido `support_resolve_ticket … RETURNS timestamptz`), con el `GRANT CREATE` / `SET ROLE motorsync_support` / `RESET ROLE` / `REVOKE CREATE` de la lección también en `down()`, y registrarlas en `backend/src/database/data-source.ts`. Deja T044 en verde — implementer-backend
+- [x] T046 [P] Pruebas unitarias del núcleo compartido y de la auditoría:
   - `backend/src/users/apply-temporary-password.spec.ts` (manager falso): ejecuta, en este orden, la revocación de las sesiones del objetivo con `revoke_reason = 'password_reset'` y `RETURNING id`, el `UPDATE users` (hash, `must_change_password = true`, vencimiento a 72 h, `updated_by`, `updated_by_name`), y `auth_clear_login_failures`; devuelve `sessionsClosed`, el `mustChangePassword` anterior y el vencimiento; nunca toca `role` ni `status` (US3-AC13).
   - `backend/src/audit/audit.service.support.spec.ts` (nuevo): `recordAsSupport(manager, agent, ip, entry)` escribe con el manager recibido, `actor_user_id` = id del agente, `actor_name` = su nombre (nunca su correo), `actor_role = platform_support`, `channel = support_panel`, `reason = NULL`; `record()` de la 001 no cambia.
 
   — tester
-- [ ] T047 Implementar `backend/src/users/apply-temporary-password.ts`, usarlo en `UsersService.resetPassword` de `backend/src/users/users.service.ts` **sin cambio de comportamiento** (las e2e `users*.e2e-spec.ts` de la 002 siguen en verde sin tocarse), ampliar `AUDIT_ACTIONS` con `user.password_reset_by_support` y `AuditActorRole = AuthRole | 'platform_support'` en `backend/src/audit/audit-log.entity.ts`, y agregar `recordAsSupport` en `backend/src/audit/audit.service.ts`. Ajustar el mapper del historial de `UsersService` al `UserAuditEntry` ampliado del contrato — implementer-backend
+- [x] T047 Implementar `backend/src/users/apply-temporary-password.ts`, usarlo en `UsersService.resetPassword` de `backend/src/users/users.service.ts` **sin cambio de comportamiento** (las e2e `users*.e2e-spec.ts` de la 002 siguen en verde sin tocarse), ampliar `AUDIT_ACTIONS` con `user.password_reset_by_support` y `AuditActorRole = AuthRole | 'platform_support'` en `backend/src/audit/audit-log.entity.ts`, y agregar `recordAsSupport` en `backend/src/audit/audit.service.ts`. Ajustar el mapper del historial de `UsersService` al `UserAuditEntry` ampliado del contrato — implementer-backend
 
 ## Phase 7: User Story 3, generar una contraseña temporal sobre un ticket abierto (P1) (PR2)
 
@@ -329,7 +329,7 @@ Al terminar, el agente genera la temporal de la cuenta de un ticket abierto con 
 
 **Independent Test**: quickstart §3, tabla "Temporal por soporte"; e2e `backend/test/support-password.e2e-spec.ts` y `support-password-concurrency.e2e-spec.ts`.
 
-- [ ] T048 [US3] E2e en `backend/test/support-password.e2e-spec.ts` (Ana, única admin del taller A, con 2 sesiones y bloqueada por intentos; Luis, asesor de A; Marta, del taller B):
+- [x] T048 [US3] E2e en `backend/test/support-password.e2e-spec.ts` (Ana, única admin del taller A, con 2 sesiones y bloqueada por intentos; Luis, asesor de A; Marta, del taller B):
   - **US3-AC1**: `POST /support/tickets/{id}/temporary-password` con nota → 200; la contraseña anterior da `INVALID_CREDENTIALS`; `must_change_password = true` y vencimiento ≈ ahora + 72 h; las 2 sesiones dan 401 `SESSION_REVOKED` en su siguiente petición; la fila de `login_attempts` de Ana desaparece; ticket `resolved` con la nota recortada, `resolved_by` y el evento `temporary_password_generated`.
   - **US3-AC2**: la respuesta trae `temporaryPassword` con el formato del contrato, `temporaryPasswordExpiresAt`, `sessionsClosed = 2` y `ticket` con `status = resolved` y `resolution`, y el header `Cache-Control: no-store`. La cadena de la temporal **no aparece** en: `GET /support/tickets/{id}`, `GET /support/tickets`, `GET /users/{id}/history` y `GET /users/{id}` del admin, ninguna fila de `support_tickets`, `support_ticket_events` ni `audit_log`, ni la salida capturada del `Logger` de Nest y de `process.stdout`/`stderr` durante la prueba. Una segunda generación → 409 `TICKET_NOT_OPEN`.
   - **US3-AC3 / FR-023**: sin `verificationNote`, vacía o `"   "` → 400 `REQUIRED` en `verificationNote` y nada cambia (contraseña, sesiones, auditoría, ticket `open`); nota de 1001 caracteres → 400. Con nota, la nota está en el ticket y **no** en ningún campo de `audit_log`.
@@ -343,7 +343,7 @@ Al terminar, el agente genera la temporal de la cuenta de un ticket abierto con 
   - **Separación**: con el token del admin de A → 403 `FORBIDDEN` y nada cambia; con la sesión de soporte con temporal pendiente → 403 `PASSWORD_CHANGE_REQUIRED`.
 
   — tester
-- [ ] T049 [US3] E2e de concurrencia y atomicidad en `backend/test/support-password-concurrency.e2e-spec.ts` (cada caso 10 iteraciones con peticiones paralelas reales; ninguna respuesta 500 ni error `40P01` en ninguna; aserción explícita del orden de locks de research R9 en la cabecera del archivo):
+- [x] T049 [US3] E2e de concurrencia y atomicidad en `backend/test/support-password-concurrency.e2e-spec.ts` (cada caso 10 iteraciones con peticiones paralelas reales; ninguna respuesta 500 ni error `40P01` en ninguna; aserción explícita del orden de locks de research R9 en la cabecera del archivo):
   - **US3-AC7**: con un trigger temporal del migrator que rechaza el `UPDATE` de `support_tickets` (creado en `beforeEach` y borrado en `afterEach`), la generación responde 500 y no cambian la contraseña, las sesiones, `login_attempts`, `audit_log` ni el ticket; lo mismo con un trigger que rechaza el `INSERT` en `support_ticket_events` (fallo después de la auditoría).
   - **US3-AC11 (frente al restablecimiento del administrador)**: a la vez, la temporal de soporte para Luis y `POST /users/{Luis}/password-reset` del admin de A → ambas 200; exactamente dos registros en `audit_log` de A (`user.password_reset_by_support` y `user.password_reset`); Luis sin sesiones abiertas; exactamente **una** de las dos temporales sirve para el login (la de la operación aplicada última, según el orden de `occurred_at`).
   - **US3-AC12 (dos agentes)**: dos agentes generan a la vez sobre el mismo ticket → exactamente un 200 y un 409 `TICKET_NOT_OPEN`, un registro de auditoría y un evento; **generar frente a descartar**: exactamente una de las dos se completa y el ticket queda `resolved` o `discarded` con sus datos coherentes; si ganó el descarte, la contraseña de Luis no cambió.
@@ -352,13 +352,13 @@ Al terminar, el agente genera la temporal de la cuenta de un ticket abierto con 
   - **Frente a "¿Olvidaste tu contraseña?" de la misma cuenta**: a la vez, la generación y una solicitud de ayuda con el correo de Luis → nunca hay dos tickets `open`; o bien la solicitud se contó en el ticket antes de resolverse (`request_count` + 1) o bien creó un ticket `open` nuevo después (US1-AC5); ninguna solicitud se pierde.
 
   — tester
-- [ ] T050 [US3] Implementar `backend/src/support/support-password.service.ts` con los pasos 0 a 9 de research R9 en la transacción de `SupportTransactionInterceptor`: generar la temporal (T010) y su hash **antes** de cualquier lock; `support_lock_open_ticket` (404 / 409 `TICKET_NOT_OPEN`); `support_get_ticket` todavía sin taller (paso 2b); `set_config('app.tenant_id', <tenant del ticket>, true)`; `TENANT_ADMINS_LOCK_SQL`; estado vigente de la cuenta bajo RLS (409 `ACCOUNT_INACTIVE`); `applyTemporaryPassword` con `updated_by_name = "Soporte MotorSync (<nombre>)"`; `AuditService.recordAsSupport`; `support_resolve_ticket`. **No publica `tenantStorage`**. Agregar `POST /support/tickets/:ticketId/temporary-password` a `backend/src/support/support-tickets.controller.ts` con `Cache-Control: no-store`, y `backend/src/support/dto/generate-temporary-password.dto.ts` (`verificationNote` recortada, "obligatoria; 1–1000 caracteres tras recortar", vacía o solo espacios → `REQUIRED`; `forbidNonWhitelisted`). La temporal nunca pasa por el logger. Deja T048 y T049 en verde — implementer-backend
+- [x] T050 [US3] Implementar `backend/src/support/support-password.service.ts` con los pasos 0 a 9 de research R9 en la transacción de `SupportTransactionInterceptor`: generar la temporal (T010) y su hash **antes** de cualquier lock; `support_lock_open_ticket` (404 / 409 `TICKET_NOT_OPEN`); `support_get_ticket` todavía sin taller (paso 2b); `set_config('app.tenant_id', <tenant del ticket>, true)`; `TENANT_ADMINS_LOCK_SQL`; estado vigente de la cuenta bajo RLS (409 `ACCOUNT_INACTIVE`); `applyTemporaryPassword` con `updated_by_name = "Soporte MotorSync (<nombre>)"`; `AuditService.recordAsSupport`; `support_resolve_ticket`. **No publica `tenantStorage`**. Agregar `POST /support/tickets/:ticketId/temporary-password` a `backend/src/support/support-tickets.controller.ts` con `Cache-Control: no-store`, y `backend/src/support/dto/generate-temporary-password.dto.ts` (`verificationNote` recortada, "obligatoria; 1–1000 caracteres tras recortar", vacía o solo espacios → `REQUIRED`; `forbidNonWhitelisted`). La temporal nunca pasa por el logger. Deja T048 y T049 en verde — implementer-backend
 
 ## Phase 8: Frontend del PR2 (US3)
 
-- [ ] T051 [P] [US3] Pruebas en `frontend/src/app/core/api/support-api.service.password.spec.ts` (nuevo: `generateTemporaryPassword(ticketId, verificationNote)` con ruta, verbo y body del contrato) y `frontend/src/app/core/api/mock-api.interceptor.support-password.spec.ts` (nuevo): temporal con el formato del contrato, una sola por ticket (`TICKET_NOT_OPEN` en la segunda), `ACCOUNT_INACTIVE`, `REQUIRED`, `UNKNOWN_FIELD` con `userId`; la temporal actualiza la cuenta de `mock-auth.store.ts` (temporal de 72 h, sesiones cerradas) y agrega al historial un `user.password_reset_by_support` con `actorRole = platform_support` — tester
-- [ ] T052 [US3] Implementar `generateTemporaryPassword` en `frontend/src/app/core/api/support-api.service.ts`, la regla en `frontend/src/app/core/api/mock-support.store.ts` y `mock-api.interceptor.ts`, y el `UserAuditEntry` ampliado en `frontend/src/app/core/api/api.models.ts` — implementer-frontend
-- [ ] T053 [US3] Pruebas en `frontend/src/app/features/support/ticket-detail.page.password.spec.ts` (nuevo) y `frontend/src/app/features/support/temporary-password.dialog.spec.ts`:
+- [x] T051 [P] [US3] Pruebas en `frontend/src/app/core/api/support-api.service.password.spec.ts` (nuevo: `generateTemporaryPassword(ticketId, verificationNote)` con ruta, verbo y body del contrato) y `frontend/src/app/core/api/mock-api.interceptor.support-password.spec.ts` (nuevo): temporal con el formato del contrato, una sola por ticket (`TICKET_NOT_OPEN` en la segunda), `ACCOUNT_INACTIVE`, `REQUIRED`, `UNKNOWN_FIELD` con `userId`; la temporal actualiza la cuenta de `mock-auth.store.ts` (temporal de 72 h, sesiones cerradas) y agrega al historial un `user.password_reset_by_support` con `actorRole = platform_support` — tester
+- [x] T052 [US3] Implementar `generateTemporaryPassword` en `frontend/src/app/core/api/support-api.service.ts`, la regla en `frontend/src/app/core/api/mock-support.store.ts` y `mock-api.interceptor.ts`, y el `UserAuditEntry` ampliado en `frontend/src/app/core/api/api.models.ts` — implementer-frontend
+- [x] T053 [US3] Pruebas en `frontend/src/app/features/support/ticket-detail.page.password.spec.ts` (nuevo) y `frontend/src/app/features/support/temporary-password.dialog.spec.ts`:
   - **US3-AC3**: campo de nota con la advertencia "No escriba contraseñas en la nota"; "Generar contraseña temporal" deshabilitado sin nota; con nota de solo espacios o con `REQUIRED` del servidor → "Indique cómo verificó la identidad de la persona" en el campo.
   - **US3-AC2**: el diálogo muestra la temporal una sola vez, en fuente monoespaciada, con "Copiar", el aviso "Escríbala tal cual, con los guiones y en mayúsculas" y el aviso de que no se volverá a mostrar; al cerrarlo la temporal no queda en el estado de la página, en el store ni en `localStorage`, y el ticket se ve Resuelto.
   - **US3-AC5**: `TICKET_NOT_OPEN` → "Solo se puede generar una contraseña temporal sobre un ticket abierto".
@@ -366,13 +366,13 @@ Al terminar, el agente genera la temporal de la cuenta de un ticket abierto con 
   - El formulario solo envía `verificationNote` (US3-AC9).
 
   — tester
-- [ ] T054 [US3] Implementar la nota y la generación en `frontend/src/app/features/support/ticket-detail.page.*` y `frontend/src/app/features/support/temporary-password.dialog.*` — implementer-frontend
-- [ ] T055 [US3] Pruebas en `frontend/src/app/features/users/user-detail.page.support.spec.ts` (nuevo; la spec de la 002 no se toca): **US3-AC6** un registro `user.password_reset_by_support` se muestra con el actor "Soporte MotorSync (<nombre>)" (spec, Assumptions), sin correo del agente, y la acción "Restablecimiento de contraseña por soporte (ticket #123)" con su fecha en hora de Ecuador — tester
-- [ ] T056 [US3] Implementar el actor de soporte y la acción nueva en `frontend/src/app/features/users/user-detail.page.ts` (+ plantilla) — implementer-frontend
+- [x] T054 [US3] Implementar la nota y la generación en `frontend/src/app/features/support/ticket-detail.page.*` y `frontend/src/app/features/support/temporary-password.dialog.*` — implementer-frontend
+- [x] T055 [US3] Pruebas en `frontend/src/app/features/users/user-detail.page.support.spec.ts` (nuevo; la spec de la 002 no se toca): **US3-AC6** un registro `user.password_reset_by_support` se muestra con el actor "Soporte MotorSync (<nombre>)" (spec, Assumptions), sin correo del agente, y la acción "Restablecimiento de contraseña por soporte (ticket #123)" con su fecha en hora de Ecuador — tester
+- [x] T056 [US3] Implementar el actor de soporte y la acción nueva en `frontend/src/app/features/users/user-detail.page.ts` (+ plantilla) — implementer-frontend
 
 ## Cierre PR2
 
-- [ ] T057 Revisar el diff del PR2 contra la spec y la **constitución 1.3.0**. Foco:
+- [x] T057 Revisar el diff del PR2 contra la spec y la **constitución 1.3.0**. Foco:
   - principio I (1.3.0): el tenant sale solo de la fila del ticket leída en la base; el taller se fija solo entre los pasos 3 y 9; `SupportPasswordService` no publica `tenantStorage`; la única escritura de soporte sobre un taller es la temporal de un ticket abierto;
   - principio IV (1.3.0): `user.password_reset_by_support` en la misma transacción que la contraseña, las sesiones, el bloqueo y el cierre del ticket; actor y rol de soporte; sin contraseñas ni nota;
   - orden de locks de research R9 y ningún camino que tome un ticket después del advisory lock;
@@ -382,7 +382,7 @@ Al terminar, el agente genera la temporal de la cuenta de un ticket abierto con 
   - pruebas con ID para US3-AC1 a AC13, FR-019 a FR-021, FR-023, SC-006 y SC-007.
 
   — reviewer
-- [ ] T058 Verificar el PR2: lo mismo que en T043 (lint, unitarias, e2e, perf en local, builds y CI), más quickstart §3, tabla "Temporal por soporte", y §5, pasos 2 a 4 (con mock y con backend) en computadora y tablet para el panel y en 360 px para el cambio de contraseña del taller con la temporal. Confirmar que las e2e de concurrencia (T049) pasan en CI sin `40P01` — leader
+- [x] T058 Verificar el PR2: lo mismo que en T043 (lint, unitarias, e2e, perf en local, builds y CI), más quickstart §3, tabla "Temporal por soporte", y §5, pasos 2 a 4 (con mock y con backend) en computadora y tablet para el panel y en 360 px para el cambio de contraseña del taller con la temporal. Confirmar que las e2e de concurrencia (T049) pasan en CI sin `40P01` — leader
 
 ---
 

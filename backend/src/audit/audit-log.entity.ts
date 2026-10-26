@@ -11,8 +11,11 @@ export const AUDIT_ACTIONS = [
   'user.deactivated',
   'user.reactivated',
   'user.password_reset',
+  'user.password_reset_by_support',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+
+export type AuditActorRole = AuthRole | 'platform_support';
 
 export type AuditEntityType = 'client' | 'vehicle' | 'user';
 
@@ -39,7 +42,7 @@ export class AuditLog {
   actorName: string;
 
   @Column({ type: 'text', name: 'actor_role' })
-  actorRole: AuthRole;
+  actorRole: AuditActorRole;
 
   @Column({ type: 'text', name: 'action' })
   action: AuditAction;

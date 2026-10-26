@@ -114,6 +114,12 @@
   }
 }
 
+.field-warning {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #92400e;
+}
+
 .field-error {
   margin: 0;
   color: #b91c1c;
@@ -128,6 +134,27 @@
   background: #fef2f2;
   border: 1px solid #ef4444;
   color: #991b1b;
+}
+
+.generate-button {
+  @include touch.touch-target;
+  padding: 0.625rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: #1d4ed8;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: #1e40af;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }
 
 .discard-button {

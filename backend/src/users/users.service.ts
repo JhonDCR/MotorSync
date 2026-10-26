@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { AuditAction } from '../audit/audit-log.entity.js';
+import type { AuditAction, AuditActorRole } from '../audit/audit-log.entity.js';
 import { AuditService } from '../audit/audit.service.js';
 import type { AuthRole } from '../auth/auth-user.js';
 import { PasswordHasher } from '../auth/password-hasher.js';
 import { ProblemException } from '../common/problem-details.filter.js';
 import { translatePgError } from '../database/pg-errors.js';
 import { getManager, getTenantContext } from '../database/tenant-context.js';
+import { applyTemporaryPassword } from './apply-temporary-password.js';
 import type { ChangeRoleDto } from './dto/change-role.dto.js';
 import type { CreateUserDto } from './dto/create-user.dto.js';
 import type { ResetPasswordDto } from './dto/reset-password.dto.js';
@@ -38,7 +39,7 @@ export interface UserAuditEntry {
   id: string;
   action: AuditAction;
   actorName: string;
-  actorRole: AuthRole;
+  actorRole: AuditActorRole;
   occurredAt: string;
   before: Record<string, string | number | boolean | null> | null;
   after: Record<string, string | number | boolean | null> | null;
@@ -63,7 +64,7 @@ interface AuditLogRow {
   id: string;
   action: AuditAction;
   actorName: string;
-  actorRole: AuthRole;
+  actorRole: AuditActorRole;
   occurredAt: Date | string;
   before: Record<string, string | number | boolean | null> | null;
   after: Record<string, string | number | boolean | null> | null;
@@ -443,38 +444,16 @@ export class UsersService {
     const current = currentRows[0];
     const passwordHash = await this.hasher.hash(dto.temporaryPassword);
 
-    // Sessions before the account: the session -> users order of POST /auth/password (R8).
-    const rawRevoked = await manager.query(
-      `UPDATE user_sessions
-          SET revoked_at = now(), revoke_reason = $2
-        WHERE user_id = $1 AND revoked_at IS NULL
-        RETURNING id`,
-      [targetUserId, 'password_reset'],
-    );
-    const sessionsClosed = extractRowCount(rawRevoked);
+    const applied = await applyTemporaryPassword({
+      manager,
+      targetUserId,
+      passwordHash,
+      updatedBy: user.userId,
+      updatedByName: user.name,
+      previousMustChangePassword: Boolean(current.mustChangePassword),
+    });
 
-    const rawUpdated = await manager.query(
-      `UPDATE users
-          SET password_hash = $2,
-              must_change_password = true,
-              temp_password_expires_at = now() + interval '72 hours',
-              updated_at = now(),
-              updated_by = $3,
-              updated_by_name = $4
-        WHERE id = $1
-        RETURNING id, name, email, role, status,
-                  must_change_password AS "mustChangePassword",
-                  temp_password_expires_at AS "temporaryPasswordExpiresAt",
-                  created_at AS "createdAt",
-                  updated_at AS "updatedAt",
-                  updated_by_name AS "updatedByName"`,
-      [targetUserId, passwordHash, user.userId, user.name],
-    );
-    const updatedRows = extractRows<UserAccountRow>(rawUpdated);
-
-    await manager.query('SELECT auth_clear_login_failures($1)', [targetUserId]);
-
-    const updatedAccount = toUserAccount(updatedRows[0]);
+    const updatedAccount = toUserAccount(applied.updatedUser);
 
     await this.audit.record({
       action: 'user.password_reset',
@@ -484,7 +463,7 @@ export class UsersService {
       after: {
         mustChangePassword: true,
         temporaryPasswordExpiresAt: updatedAccount.temporaryPasswordExpiresAt,
-        sessionsClosed,
+        sessionsClosed: applied.sessionsClosed,
       },
     });
 

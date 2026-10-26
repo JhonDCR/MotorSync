@@ -392,7 +392,7 @@ Al terminar, el agente busca talleres y ve sus cuentas (solo los campos permitid
 
 ## Phase 9: Base del PR3
 
-- [ ] T059 [P] E2e de BD en `backend/test/db/support-roles-access-log.e2e-spec.ts` (nuevo):
+- [x] T059 [P] E2e de BD en `backend/test/db/support-roles-access-log.e2e-spec.ts` (nuevo):
   - `support_access_log`: RLS `ENABLE` sin `FORCE`; la app sin ningún privilegio; `motorsync_support` con solo `SELECT, INSERT`; como migrator, `UPDATE` y `DELETE` lanzan la excepción append-only (FR-018);
   - `support_list_workshops`, `support_list_workshop_accounts` y `support_list_access_log`: `prosecdef = true`, dueño `motorsync_support`, `search_path` fijo, sin `EXECUTE` para `PUBLIC` y con `EXECUTE` para la app; `support_list_access_log` es `STABLE` (`provolatile = 's'`);
   - compuertas: sin sesión válida o con un taller fijado, las tres lanzan `28000`;
@@ -400,7 +400,7 @@ Al terminar, el agente busca talleres y ve sus cuentas (solo los campos permitid
   - `support_list_access_log` no inserta filas, devuelve exactamente sus 10 columnas (sin correo del agente) en orden `occurred_at DESC` y respeta `LEAST(p_limit, 50)` y los filtros.
 
   — tester
-- [ ] T060 Crear `backend/src/database/migrations/1761000001500-CreateSupportAccessLog.ts` con el DDL de data-model.md **literal** (`action IN ('workshop.accounts_viewed')`, `channel DEFAULT 'support_panel'`, los dos índices, el trigger append-only y las tres funciones), con el `SET ROLE motorsync_support` de la lección también en `down()`, y registrarla en `backend/src/database/data-source.ts`. Deja T059 en verde — implementer-backend
+- [x] T060 Crear `backend/src/database/migrations/1761000001500-CreateSupportAccessLog.ts` con el DDL de data-model.md **literal** (`action IN ('workshop.accounts_viewed')`, `channel DEFAULT 'support_panel'`, los dos índices, el trigger append-only y las tres funciones), con el `SET ROLE motorsync_support` de la lección también en `down()`, y registrarla en `backend/src/database/data-source.ts`. Deja T059 en verde — implementer-backend
 
 ## Phase 10: User Story 4, consultar talleres y sus cuentas (P2) (PR3)
 

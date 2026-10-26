@@ -17,10 +17,27 @@ export interface ForgotPasswordClock {
   wait(ms: number): Promise<void>;
 }
 
-/** Real clock: monotonic `performance.now` and `setTimeout`. */
+/**
+ * Real clock: monotonic `performance.now` and `setTimeout`. Node timers can fire
+ * up to ~1 ms early against `performance.now` (cached, ms-rounded loop clock), so
+ * `wait` re-arms until the monotonic target is actually reached.
+ */
 export const SYSTEM_FORGOT_PASSWORD_CLOCK: ForgotPasswordClock = {
   now: () => performance.now(),
-  wait: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  wait: (ms) => {
+    const target = performance.now() + ms;
+    return new Promise<void>((resolve) => {
+      const tick = (): void => {
+        const left = target - performance.now();
+        if (left <= 0) {
+          resolve();
+          return;
+        }
+        setTimeout(tick, Math.max(1, Math.ceil(left)));
+      };
+      tick();
+    });
+  },
 };
 
 interface OutcomeRow {

@@ -7,6 +7,7 @@
 //   reactivate --email <correo> --confirm
 //   reset-password --email <correo> --confirm
 //   list
+//   access-log --email <correo> [--since <fecha ISO 8601>]
 //
 // It connects as motorsync_migrator (DATABASE_MIGRATOR_URL): the platform operations credential,
 // which the API never uses. Every argument is validated before a client is taken from the pool.
@@ -35,6 +36,7 @@ const USAGE = [
   '  reactivate --email <correo> --confirm',
   '  reset-password --email <correo> --confirm',
   '  list',
+  '  access-log --email <correo> [--since <fecha ISO 8601>]',
 ].join('\n');
 
 const SUPPORT_COMMANDS = [
@@ -43,6 +45,7 @@ const SUPPORT_COMMANDS = [
   'reactivate',
   'reset-password',
   'list',
+  'access-log',
 ] as const;
 
 type SupportCommand = (typeof SUPPORT_COMMANDS)[number];
@@ -61,6 +64,7 @@ export interface SupportAccountDeps {
 interface Flags {
   name?: string;
   email?: string;
+  since?: string;
   confirm: boolean;
 }
 
@@ -73,12 +77,17 @@ type Operation =
   | { command: 'deactivate'; email: string }
   | { command: 'reactivate'; email: string }
   | { command: 'reset-password'; email: string }
-  | { command: 'list' };
+  | { command: 'list' }
+  | { command: 'access-log'; email: string; since: Date | null };
 
 type Validated =
   { ok: true; operation: Operation } | { ok: false; message: string };
 
 type FieldResult = { ok: true; value: string } | { ok: false; message: string };
+
+type SinceResult =
+  | { ok: true; value: Date | null }
+  | { ok: false; message: string };
 
 interface AccountRef {
   id: string;
@@ -91,6 +100,18 @@ interface ListRow {
   status: string;
   created_at: Date | string;
 }
+
+interface AccessLogRow {
+  occurred_at: Date | string;
+  workshop_name: string;
+  workshop_ruc: string | null;
+  ip: string | null;
+  channel: string;
+}
+
+/** ISO 8601 date or date-time; a value without an offset is read in the server's local time. */
+const ISO_8601_RE =
+  /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2}))?$/;
 
 function isSupportCommand(value: string): value is SupportCommand {
   return (SUPPORT_COMMANDS as readonly string[]).includes(value);
@@ -113,13 +134,14 @@ function parseInvocation(argv: string[]): Parsed {
       flags.confirm = true;
       continue;
     }
-    if (token === '--name' || token === '--email') {
+    if (token === '--name' || token === '--email' || token === '--since') {
       const value = argv[index + 1];
       if (value === undefined || value.startsWith('--')) {
         return { ok: false, message: `Falta el valor de ${token}.` };
       }
       if (token === '--name') flags.name = value;
-      else flags.email = value;
+      else if (token === '--email') flags.email = value;
+      else flags.since = value;
       index += 1;
       continue;
     }
@@ -152,12 +174,31 @@ function readEmail(flags: Flags): FieldResult {
   return { ok: true, value };
 }
 
+function readSince(flags: Flags): SinceResult {
+  const raw = flags.since;
+  if (raw === undefined) return { ok: true, value: null };
+  const value = new Date(raw);
+  if (!ISO_8601_RE.test(raw) || Number.isNaN(value.getTime())) {
+    return { ok: false, message: '--since no es una fecha ISO 8601 válida.' };
+  }
+  return { ok: true, value };
+}
+
 /** Command-specific validation, always before the pool is used. */
 function validateOperation(command: SupportCommand, flags: Flags): Validated {
   if (command === 'list') return { ok: true, operation: { command: 'list' } };
 
   const email = readEmail(flags);
   if (!email.ok) return email;
+
+  if (command === 'access-log') {
+    const since = readSince(flags);
+    if (!since.ok) return since;
+    return {
+      ok: true,
+      operation: { command, email: email.value, since: since.value },
+    };
+  }
 
   if (command === 'create') {
     const name = readName(flags);
@@ -334,11 +375,49 @@ async function listAccounts(client: PoolClient): Promise<ListRow[]> {
   return result.rows;
 }
 
+/**
+ * Access log of one support account, newest first (FR-027, research R10). The migrator owns the
+ * table, so this operational read does not need a support session nor the support_* functions.
+ * Only the workshop and the IP/channel are returned: never the agent's email.
+ */
+async function listAccessLogEntries(
+  client: PoolClient,
+  email: string,
+  since: Date | null,
+): Promise<AccessLogRow[]> {
+  const account = await client.query<{ id: string }>(
+    'SELECT id FROM support_accounts WHERE email = $1',
+    [email],
+  );
+  const accountId = account.rows[0]?.id;
+  if (accountId === undefined) {
+    throw new Error(`No existe una cuenta de soporte con el correo ${email}.`);
+  }
+  const result = await client.query<AccessLogRow>(
+    `SELECT l.occurred_at, t.name AS workshop_name, t.ruc AS workshop_ruc,
+            l.ip, l.channel
+       FROM support_access_log l
+       JOIN tenants t ON t.id = l.tenant_id
+      WHERE l.support_account_id = $1
+        AND ($2::timestamptz IS NULL OR l.occurred_at >= $2)
+      ORDER BY l.occurred_at DESC, l.id`,
+    [accountId, since],
+  );
+  return result.rows;
+}
+
 /** `YYYY-MM-DD HH:mm` in UTC; the raw value if it is not a date. */
 function formatCreatedAt(value: Date | string): string {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toISOString().replace('T', ' ').slice(0, 16);
+}
+
+/** ISO 8601 in UTC; the raw value if it is not a date. */
+function formatOccurredAt(value: Date | string): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toISOString();
 }
 
 function emit(write: (line: string) => void, text: string): void {
@@ -450,6 +529,17 @@ export async function runSupportAccount(
         for (const row of rows) {
           stdout(
             `${row.name} | ${row.email} | ${row.status} | ${formatCreatedAt(row.created_at)}`,
+          );
+        }
+        break;
+      }
+      case 'access-log': {
+        const rows = await withTransaction(activePool, (client) =>
+          listAccessLogEntries(client, operation.email, operation.since),
+        );
+        for (const row of rows) {
+          stdout(
+            `${row.workshop_name} | ${row.workshop_ruc ?? ''} | ${formatOccurredAt(row.occurred_at)} | ${row.ip ?? 'sin IP'} | ${row.channel}`,
           );
         }
         break;

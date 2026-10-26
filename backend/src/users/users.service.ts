@@ -453,20 +453,7 @@ export class UsersService {
       previousMustChangePassword: Boolean(current.mustChangePassword),
     });
 
-    const updatedAccount = applied.updatedUser
-      ? toUserAccount(applied.updatedUser)
-      : {
-          id: current.id,
-          name: current.name,
-          email: current.email,
-          role: current.role,
-          status: current.status,
-          mustChangePassword: true,
-          temporaryPasswordExpiresAt: applied.temporaryPasswordExpiresAt.toISOString(),
-          createdAt: new Date(current.createdAt).toISOString(),
-          updatedAt: new Date().toISOString(),
-          updatedByName: user.name,
-        };
+    const updatedAccount = toUserAccount(applied.updatedUser);
 
     await this.audit.record({
       action: 'user.password_reset',

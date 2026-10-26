@@ -28,7 +28,7 @@ export interface AppliedTemporaryPassword {
   sessionsClosed: number;
   previousMustChangePassword: boolean;
   temporaryPasswordExpiresAt: Date;
-  updatedUser?: UserAccountRow;
+  updatedUser: UserAccountRow;
 }
 
 /**
@@ -106,14 +106,17 @@ export async function applyTemporaryPassword(
   );
   const updatedRows = extractRows<UserAccountRow>(rawUpdated);
   const updatedUser = updatedRows[0];
+  if (!updatedUser) {
+    throw new Error(`applyTemporaryPassword: user ${targetUserId} was not updated`);
+  }
 
   // 3. Clear failed login attempts / lockouts.
   await manager.query('SELECT auth_clear_login_failures($1)', [targetUserId]);
 
-  const rawExpires = updatedUser?.temporaryPasswordExpiresAt;
-  const temporaryPasswordExpiresAt = rawExpires
-    ? new Date(rawExpires)
-    : new Date(Date.now() + 72 * 3600 * 1000);
+  if (updatedUser.temporaryPasswordExpiresAt === null) {
+    throw new Error(`applyTemporaryPassword: user ${targetUserId} has no temporary password expiry`);
+  }
+  const temporaryPasswordExpiresAt = new Date(updatedUser.temporaryPasswordExpiresAt);
 
   return {
     sessionsClosed,

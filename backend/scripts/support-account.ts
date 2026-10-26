@@ -109,7 +109,10 @@ interface AccessLogRow {
   channel: string;
 }
 
-/** ISO 8601 date or date-time; a value without an offset is read in the server's local time. */
+/**
+ * ISO 8601 date or date-time. A date-only value is UTC midnight; a date-time without an offset is
+ * read in the server's local time.
+ */
 const ISO_8601_RE =
   /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2}))?$/;
 

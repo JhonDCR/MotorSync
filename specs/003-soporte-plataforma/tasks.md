@@ -449,7 +449,7 @@ Al terminar, el agente busca talleres y ve sus cuentas (solo los campos permitid
   - pruebas con ID para US4-AC1 a AC9, FR-016 a FR-018, FR-027 y SC-004.
 
   — reviewer
-- [ ] T069 Verificar el PR3: lo mismo que en T043 (lint, unitarias, e2e, perf en local, builds y CI), más quickstart §2 (`access-log`), §3, tabla "Consulta de talleres", y §5, paso 6, en computadora y tablet (con mock y con backend). Con la 003 completa, recorrer el quickstart entero una vez — leader
+- [x] T069 Verificar el PR3: lo mismo que en T043 (lint, unitarias, e2e, perf en local, builds y CI), más quickstart §2 (`access-log`), §3, tabla "Consulta de talleres", y §5, paso 6, en computadora y tablet (con mock y con backend). Con la 003 completa, recorrer el quickstart entero una vez — leader
 
 ---
 

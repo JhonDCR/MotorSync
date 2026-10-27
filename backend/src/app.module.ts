@@ -18,6 +18,7 @@ import { SupportSessionValidator } from './support/support-session-validator.js'
 import { SupportTransactionInterceptor } from './support/support-transaction.interceptor.js';
 import { UsersModule } from './users/users.module.js';
 import { VehiclesModule } from './vehicles/vehicles.module.js';
+import { WorkOrdersModule } from './work-orders/work-orders.module.js';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { VehiclesModule } from './vehicles/vehicles.module.js';
     VehiclesModule,
     CheckinsModule,
     BudgetsModule,
+    WorkOrdersModule,
     UsersModule,
     SupportModule,
   ],

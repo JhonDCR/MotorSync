@@ -2,7 +2,8 @@ import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { workOrderErrorMessage, WorkOrderService } from '../../work-orders/work-order.service';
 import { catchError, map, type Observable, of, startWith, switchMap } from 'rxjs';
 import {
   type BudgetDetail,
@@ -29,6 +30,8 @@ type Transition = 'send' | 'approve' | 'reject';
 })
 export class BudgetDetailComponent {
   private readonly api = inject(BudgetService);
+  private readonly workOrders = inject(WorkOrderService);
+  private readonly router = inject(Router);
 
   protected readonly kindLabels = LINE_KIND_LABELS;
   protected readonly state = signal<DetailState>({ kind: 'loading' });
@@ -59,6 +62,24 @@ export class BudgetDetailComponent {
       error: (err: unknown) => {
         this.busy.set(false);
         this.actionError.set(budgetErrorMessage(err));
+      },
+    });
+  }
+
+  protected createWorkOrder(budget: BudgetDetail): void {
+    if (this.busy()) {
+      return;
+    }
+    this.busy.set(true);
+    this.actionError.set(null);
+    this.workOrders.create(budget.id).subscribe({
+      next: (order) => {
+        this.busy.set(false);
+        void this.router.navigate(['/work-orders', order.id]);
+      },
+      error: (err: unknown) => {
+        this.busy.set(false);
+        this.actionError.set(workOrderErrorMessage(err));
       },
     });
   }

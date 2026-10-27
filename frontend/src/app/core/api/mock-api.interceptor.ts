@@ -20,6 +20,7 @@ import { REQUESTED_WITH_HEADER, REQUESTED_WITH_VALUE } from './auth-api.service'
 import { MockAuthStore } from './mock-auth.store';
 import { MockBudgetStore } from './mock-budget.store';
 import { MockCheckinStore } from './mock-checkin.store';
+import { MockWorkOrderStore } from './mock-work-order.store';
 import { MockSupportStore } from './mock-support.store';
 import { USE_MOCK_API } from './use-mock-api';
 
@@ -43,6 +44,12 @@ const CHECKIN_BUDGETS = /^\/api\/v1\/checkins\/([^/]+)\/budgets$/;
 const VEHICLE_BUDGETS = /^\/api\/v1\/vehicles\/([^/]+)\/budgets$/;
 const BUDGET_BY_ID = /^\/api\/v1\/budgets\/([^/]+)$/;
 const BUDGET_TRANSITION = /^\/api\/v1\/budgets\/([^/]+)\/(send|approve|reject)$/;
+const BUDGET_WORK_ORDERS = /^\/api\/v1\/budgets\/([^/]+)\/work-orders$/;
+const WORK_ORDERS_PATH = '/api/v1/work-orders';
+const VEHICLE_WORK_ORDERS = /^\/api\/v1\/vehicles\/([^/]+)\/work-orders$/;
+const WORK_ORDER_BY_ID = /^\/api\/v1\/work-orders\/([^/]+)$/;
+const WORK_ORDER_ACTION =
+  /^\/api\/v1\/work-orders\/([^/]+)\/(start|finish|deliver|cancel|assignee|notes)$/;
 const AUTH_REGISTER_PATH = '/api/v1/auth/register';
 const AUTH_LOGIN_PATH = '/api/v1/auth/login';
 const AUTH_REFRESH_PATH = '/api/v1/auth/refresh';
@@ -131,6 +138,7 @@ function route(
   support: MockSupportStore,
   checkins: MockCheckinStore,
   budgets: MockBudgetStore,
+  workOrders: MockWorkOrderStore,
 ): Observable<HttpEvent<unknown>> {
   const path = pathOf(req.url);
 
@@ -310,6 +318,39 @@ function route(
   if (checkinById !== null && req.method === 'GET') {
     return respond(req, checkins.get(decodeURIComponent(checkinById[1])));
   }
+  // Work orders of contract 006.
+  const budgetWorkOrders = BUDGET_WORK_ORDERS.exec(path);
+  if (budgetWorkOrders !== null && req.method === 'POST') {
+    return respond(req, workOrders.create(decodeURIComponent(budgetWorkOrders[1]), actorOf(req)));
+  }
+  if (path === WORK_ORDERS_PATH && req.method === 'GET') {
+    return respond(req, workOrders.list(queryParam(req, 'status')));
+  }
+  const vehicleWorkOrders = VEHICLE_WORK_ORDERS.exec(path);
+  if (vehicleWorkOrders !== null && req.method === 'GET') {
+    return respond(req, workOrders.listByVehicle(decodeURIComponent(vehicleWorkOrders[1])));
+  }
+  const workOrderById = WORK_ORDER_BY_ID.exec(path);
+  if (workOrderById !== null && req.method === 'GET') {
+    return respond(req, workOrders.get(decodeURIComponent(workOrderById[1])));
+  }
+  const workOrderAction = WORK_ORDER_ACTION.exec(path);
+  if (workOrderAction !== null) {
+    const id = decodeURIComponent(workOrderAction[1]);
+    const action = workOrderAction[2];
+    if (action === 'assignee' && req.method === 'PATCH') {
+      return respond(req, workOrders.reassign(id, req.body, actorOf(req)));
+    }
+    if (action === 'notes' && req.method === 'POST') {
+      return respond(req, workOrders.addNote(id, req.body, actorOf(req)));
+    }
+    if (
+      (action === 'start' || action === 'finish' || action === 'deliver' || action === 'cancel') &&
+      req.method === 'POST'
+    ) {
+      return respond(req, workOrders.transition(id, action, req.body, actorOf(req)));
+    }
+  }
   // Budgets of contract 005.
   const checkinBudgets = CHECKIN_BUDGETS.exec(path);
   if (checkinBudgets !== null && req.method === 'POST') {
@@ -413,7 +454,8 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   const support = inject(MockSupportStore);
   const checkins = inject(MockCheckinStore);
   const budgets = inject(MockBudgetStore);
+  const workOrders = inject(MockWorkOrderStore);
   return timer(MOCK_LATENCY_MS).pipe(
-    mergeMap(() => route(req, store, auth, support, checkins, budgets)),
+    mergeMap(() => route(req, store, auth, support, checkins, budgets, workOrders)),
   );
 };

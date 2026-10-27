@@ -1,0 +1,156 @@
+openapi: 3.1.0
+info:
+  title: MotorSync - Presupuestos (005)
+  version: 0.5.0
+  description: |
+    Rutas de taller; sesión de la 002 (roles `asesor` o `admin`). Tenant y autor salen de la sesión.
+    Recursos de otro taller o inexistentes → 404 (US1-AC4, US3-AC2). Errores en Problem Details (001).
+    Montos y cantidades como string decimal con hasta 2 decimales; nunca números en coma flotante.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /checkins/{checkinId}/budgets:
+    parameters:
+      - { name: checkinId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Crear presupuesto en borrador (US1-AC1)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BudgetInput' } } } }
+      responses:
+        '201': { $ref: '#/components/responses/Detail' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    get:
+      summary: Presupuestos del check-in, más reciente primero (US3-AC1)
+      responses:
+        '200': { $ref: '#/components/responses/SummaryList' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /vehicles/{vehicleId}/budgets:
+    parameters:
+      - { name: vehicleId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Presupuestos del vehículo, más reciente primero (US3-AC1)
+      responses:
+        '200': { $ref: '#/components/responses/SummaryList' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /budgets/{budgetId}:
+    parameters:
+      - { name: budgetId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: Detalle (US3-AC1)
+      responses:
+        '200': { $ref: '#/components/responses/Detail' }
+        '404': { $ref: '#/components/responses/Problem' }
+    put:
+      summary: Reemplazar las líneas de un borrador (US1-AC2)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/BudgetInput' } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Detail' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /budgets/{budgetId}/send:
+    parameters:
+      - { name: budgetId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: borrador → enviado (US2-AC1)
+      responses:
+        '200': { $ref: '#/components/responses/Detail' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /budgets/{budgetId}/approve:
+    parameters:
+      - { name: budgetId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: enviado → aprobado; se audita (US2-AC1)
+      responses:
+        '200': { $ref: '#/components/responses/Detail' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /budgets/{budgetId}/reject:
+    parameters:
+      - { name: budgetId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: enviado → rechazado; se audita (US2-AC1)
+      responses:
+        '200': { $ref: '#/components/responses/Detail' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Conflict' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  responses:
+    Problem:
+      description: Error
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    Conflict:
+      description: Edición o transición no permitida en el estado actual (US2-AC2); incluye `currentStatus`
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+    Detail:
+      description: OK
+      content: { application/json: { schema: { $ref: '#/components/schemas/BudgetDetail' } } }
+    SummaryList:
+      description: OK
+      content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/BudgetSummary' } } } }
+  schemas:
+    Problem:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        errors: { type: object, additionalProperties: { type: string } }
+        currentStatus: { $ref: '#/components/schemas/Status' }
+    Status: { type: string, enum: [borrador, enviado, aprobado, rechazado] }
+    Money: { type: string, pattern: '^\d{1,10}(\.\d{1,2})?$', examples: ['18.50'] }
+    UserRef:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    LineInput:
+      type: object
+      required: [kind, description, quantity, unitPrice]
+      properties:
+        kind: { type: string, enum: [mano_obra, repuesto] }
+        description: { type: string, minLength: 1, maxLength: 200 }
+        quantity: { $ref: '#/components/schemas/Money' }
+        unitPrice: { $ref: '#/components/schemas/Money' }
+    BudgetInput:
+      type: object
+      required: [lines]
+      properties:
+        lines: { type: array, minItems: 1, maxItems: 50, items: { $ref: '#/components/schemas/LineInput' } }
+    BudgetSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: integer }
+        checkinId: { type: string, format: uuid }
+        vehicleId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/Status' }
+        total: { $ref: '#/components/schemas/Money' }
+        createdAt: { type: string, format: date-time }
+    BudgetDetail:
+      allOf:
+        - $ref: '#/components/schemas/BudgetSummary'
+        - type: object
+          properties:
+            taxRate: { type: string, examples: ['0.1500'] }
+            subtotal: { $ref: '#/components/schemas/Money' }
+            tax: { $ref: '#/components/schemas/Money' }
+            createdBy: { $ref: '#/components/schemas/UserRef' }
+            sentAt: { type: [string, 'null'], format: date-time }
+            decidedAt: { type: [string, 'null'], format: date-time }
+            decidedBy: { oneOf: [ { $ref: '#/components/schemas/UserRef' }, { type: 'null' } ] }
+            lines:
+              type: array
+              items:
+                allOf:
+                  - $ref: '#/components/schemas/LineInput'
+                  - type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      lineTotal: { $ref: '#/components/schemas/Money' }

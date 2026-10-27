@@ -16,6 +16,8 @@ export interface ProblemExtra {
   current?: unknown;
   /** 409 of feature 004 (US1-AC3): highest mileage already recorded for the vehicle. */
   lastMileage?: number;
+  /** 409 of feature 005 (US2-AC2): status the budget is actually in. */
+  currentStatus?: string;
 }
 
 /** Body of every error response (contract `Problem` schema), served as application/problem+json. */
@@ -59,6 +61,7 @@ function problem(status: number, code: string, extra: ProblemExtra = {}): Proble
   if (extra.existingId !== undefined) body.existingId = extra.existingId;
   if (extra.current !== undefined) body.current = extra.current;
   if (extra.lastMileage !== undefined) body.lastMileage = extra.lastMileage;
+  if (extra.currentStatus !== undefined) body.currentStatus = extra.currentStatus;
   return body;
 }
 

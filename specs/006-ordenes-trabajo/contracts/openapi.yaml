@@ -1,0 +1,133 @@
+openapi: 3.1.0
+info:
+  title: MotorSync - Órdenes de trabajo (006)
+  version: 0.6.0
+  description: |
+    Rutas de taller; sesión de la 002 (roles `asesor` o `admin`). Tenant y autor salen de la sesión.
+    Recursos de otro taller o inexistentes → 404 (US1-AC4, US3-AC2). Errores en Problem Details (001).
+    Conflictos de estado → 409 con `currentStatus` o `code`.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /budgets/{budgetId}/work-orders:
+    parameters:
+      - { name: budgetId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Crear OT desde un presupuesto aprobado (US1-AC1, US1-AC2)
+      responses:
+        '201': { $ref: '#/components/responses/Detail' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { description: 'code budget_not_approved | work_order_exists | checkin_has_active_work_order', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+  /work-orders:
+    get:
+      summary: Tablero del taller, más reciente primero (US3-AC1)
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/Status' } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 50 } }
+      responses:
+        '200': { $ref: '#/components/responses/SummaryList' }
+  /vehicles/{vehicleId}/work-orders:
+    parameters:
+      - { name: vehicleId, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      summary: OT del vehículo, más reciente primero (US3-AC1)
+      responses:
+        '200': { $ref: '#/components/responses/SummaryList' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /work-orders/{id}:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    get:
+      summary: Detalle con ítems, historial y notas (US3-AC1)
+      responses:
+        '200': { $ref: '#/components/responses/Detail' }
+        '404': { $ref: '#/components/responses/Problem' }
+  /work-orders/{id}/start:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    post: { summary: abierta → en_proceso (US2-AC1), responses: { '200': { $ref: '#/components/responses/Detail' }, '404': { $ref: '#/components/responses/Problem' }, '409': { $ref: '#/components/responses/Problem' } } }
+  /work-orders/{id}/finish:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    post: { summary: en_proceso → terminada (US2-AC1), responses: { '200': { $ref: '#/components/responses/Detail' }, '404': { $ref: '#/components/responses/Problem' }, '409': { $ref: '#/components/responses/Problem' } } }
+  /work-orders/{id}/deliver:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    post: { summary: terminada → entregada (US2-AC1), responses: { '200': { $ref: '#/components/responses/Detail' }, '404': { $ref: '#/components/responses/Problem' }, '409': { $ref: '#/components/responses/Problem' } } }
+  /work-orders/{id}/cancel:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    post:
+      summary: abierta|en_proceso → cancelada con motivo (US2-AC2)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [reason], properties: { reason: { type: string, minLength: 1, maxLength: 500 } } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Detail' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+  /work-orders/{id}/assignee:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    patch:
+      summary: Reasignar responsable, solo admin (US1-AC3)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [userId], properties: { userId: { type: string, format: uuid } } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/Detail' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { description: Usuario inexistente, de otro taller o inactivo, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+  /work-orders/{id}/notes:
+    parameters: [ { $ref: '#/components/parameters/Id' } ]
+    post:
+      summary: Agregar nota de avance (US2-AC4)
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [body], properties: { body: { type: string, minLength: 1, maxLength: 1000 } } } } } }
+      responses:
+        '201': { $ref: '#/components/responses/Detail' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    Detail: { description: OT, content: { application/json: { schema: { $ref: '#/components/schemas/WorkOrderDetail' } } } }
+    SummaryList: { description: Lista, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/WorkOrderSummary' } } } } }
+    Problem: { description: Problem Details, content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+  schemas:
+    Status: { type: string, enum: [abierta, en_proceso, terminada, entregada, cancelada] }
+    UserRef: { type: object, properties: { id: { type: string, format: uuid }, name: { type: string } } }
+    WorkOrderSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: integer }
+        status: { $ref: '#/components/schemas/Status' }
+        plate: { type: string }
+        vehicleId: { type: string, format: uuid }
+        assignee: { $ref: '#/components/schemas/UserRef' }
+        createdAt: { type: string, format: date-time }
+    WorkOrderDetail:
+      allOf:
+        - $ref: '#/components/schemas/WorkOrderSummary'
+        - type: object
+          properties:
+            budgetId: { type: string, format: uuid }
+            checkinId: { type: string, format: uuid }
+            createdBy: { $ref: '#/components/schemas/UserRef' }
+            items:
+              type: array
+              items: { type: object, properties: { position: { type: integer }, kind: { type: string, enum: [mano_obra, repuesto] }, description: { type: string }, quantity: { type: string, pattern: '^\d{1,8}(\.\d{1,2})?$' } } }
+            history:
+              type: array
+              items: { type: object, properties: { status: { $ref: '#/components/schemas/Status' }, changedBy: { $ref: '#/components/schemas/UserRef' }, changedAt: { type: string, format: date-time }, reason: { type: [string, 'null'] } } }
+            notes:
+              type: array
+              items: { type: object, properties: { body: { type: string }, createdBy: { $ref: '#/components/schemas/UserRef' }, createdAt: { type: string, format: date-time } } }
+    Problem:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string }
+        currentStatus: { $ref: '#/components/schemas/Status' }

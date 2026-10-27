@@ -445,8 +445,6 @@ export const PROBLEM_CODES = [
   'ACCOUNT_INACTIVE',
   // Contrato 004
   'MILEAGE_BELOW_LAST',
-  // Contrato 005
-  'INVALID_BUDGET_STATUS',
 ] as const;
 
 export type ProblemCode = (typeof PROBLEM_CODES)[number];
@@ -489,6 +487,4 @@ export interface Problem {
   current?: ClientDetail | VehicleDetail;
   /** Contrato 004 (409, US1-AC3): último kilometraje registrado. */
   lastMileage?: number;
-  /** Contrato 005 (409, US2-AC2): estado actual del presupuesto. */
-  currentStatus?: 'borrador' | 'enviado' | 'aprobado' | 'rechazado';
 }

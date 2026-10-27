@@ -5,7 +5,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AuthModule } from './auth/auth.module.js';
-import { BudgetsModule } from './budgets/budgets.module.js';
 import { CheckinsModule } from './checkins/checkins.module.js';
 import { JwtAuthGuard } from './auth/jwt-auth.guard.js';
 import { SessionValidator } from './auth/session-validator.js';
@@ -35,7 +34,6 @@ import { VehiclesModule } from './vehicles/vehicles.module.js';
     ClientsModule,
     VehiclesModule,
     CheckinsModule,
-    BudgetsModule,
     UsersModule,
     SupportModule,
   ],

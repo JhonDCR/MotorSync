@@ -12,14 +12,12 @@ export const AUDIT_ACTIONS = [
   'user.reactivated',
   'user.password_reset',
   'user.password_reset_by_support',
-  'budget.approved',
-  'budget.rejected',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 export type AuditActorRole = AuthRole | 'platform_support';
 
-export type AuditEntityType = 'client' | 'vehicle' | 'user' | 'budget';
+export type AuditEntityType = 'client' | 'vehicle' | 'user';
 
 /** JSON object stored in before and after (camelCase keys, data-model.md). */
 export type AuditSnapshot = Readonly<Record<string, string | number | boolean | null>>;

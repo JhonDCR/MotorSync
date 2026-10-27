@@ -69,6 +69,9 @@ const PROBLEM_MESSAGES: Record<ProblemCode, string> = {
   // Contrato 004
   MILEAGE_BELOW_LAST: 'El kilometraje no puede ser menor que el del último check-in',
   INVALID_BUDGET_STATUS: 'El presupuesto no admite esta acción en su estado actual',
+  INVALID_WORK_ORDER_STATUS: 'La orden de trabajo no admite esta acción en su estado actual',
+  budget_not_approved: 'El presupuesto no está aprobado',
+  work_order_exists: 'Este presupuesto ya tiene una orden de trabajo',
 };
 
 const NOT_FOUND_BY_RESOURCE: Record<NonNullable<ProblemContext['resource']>, string> = {

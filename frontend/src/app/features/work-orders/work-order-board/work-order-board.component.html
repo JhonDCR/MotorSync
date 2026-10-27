@@ -1,0 +1,41 @@
+<main class="page">
+  <h1>Órdenes de trabajo</h1>
+
+  <label for="status-filter">Estado</label>
+  <select id="status-filter" data-testid="status-filter" (change)="onFilter($event)">
+    <option value="">Todos</option>
+    @for (status of statuses; track status) {
+      <option [value]="status">{{ status }}</option>
+    }
+  </select>
+
+  <div aria-live="polite">
+    @switch (state().kind) {
+      @case ('loading') {
+        <p class="status" role="status">Cargando órdenes…</p>
+      }
+      @case ('error') {
+        <p class="notice-error" role="alert" data-testid="load-error">
+          No se pudieron cargar las órdenes. Revise la conexión e inténtelo de nuevo.
+        </p>
+      }
+    }
+  </div>
+
+  @if (state(); as current) {
+    @if (current.kind === 'loaded') {
+      <ul class="list">
+        @for (order of current.orders; track order.id) {
+          <li data-testid="wo-row">
+            <a [routerLink]="['/work-orders', order.id]"
+              >OT n.º {{ order.number }} – {{ order.plate }} – {{ order.assignee.name }} –
+              {{ order.status }}</a
+            >
+          </li>
+        } @empty {
+          <li data-testid="board-empty">No hay órdenes de trabajo.</li>
+        }
+      </ul>
+    }
+  }
+</main>

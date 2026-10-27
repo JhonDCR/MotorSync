@@ -26,6 +26,11 @@
           <li>
             <a routerLink="/clients/new" routerLinkActive="active" ariaCurrentWhenActive="page">Registrar cliente</a>
           </li>
+          @if (session.user()) {
+            <li>
+              <a routerLink="/work-orders" routerLinkActive="active" ariaCurrentWhenActive="page">Órdenes de trabajo</a>
+            </li>
+          }
           @if (session.user()?.role === 'admin') {
             <li>
               <a routerLink="/users" routerLinkActive="active" ariaCurrentWhenActive="page">Usuarios</a>

@@ -120,6 +120,17 @@
             Rechazar
           </button>
         }
+        @if (budget.status === 'aprobado') {
+          <button
+            type="button"
+            class="action"
+            data-testid="create-work-order"
+            [disabled]="busy()"
+            (click)="createWorkOrder(budget)"
+          >
+            Crear OT
+          </button>
+        }
         <a class="action" [routerLink]="['/checkins', budget.checkinId, 'budgets']"
           >Volver a los presupuestos</a
         >

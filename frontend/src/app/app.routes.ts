@@ -145,6 +145,21 @@ export function buildRoutes(devMode: boolean): Routes {
       loadComponent: () =>
         import('./features/budgets/budget-detail/budget-detail.component').then((m) => m.BudgetDetailComponent),
     },
+    // Órdenes de trabajo (006).
+    {
+      path: 'work-orders',
+      title: 'Órdenes de trabajo',
+      canMatch: [authGuard],
+      loadComponent: () =>
+        import('./features/work-orders/work-order-board/work-order-board.component').then((m) => m.WorkOrderBoardComponent),
+    },
+    {
+      path: 'work-orders/:id',
+      title: 'Detalle de la orden de trabajo',
+      canMatch: [authGuard],
+      loadComponent: () =>
+        import('./features/work-orders/work-order-detail/work-order-detail.component').then((m) => m.WorkOrderDetailComponent),
+    },
     {
       path: 'checkins/:id',
       title: 'Detalle del check-in',

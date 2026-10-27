@@ -14,12 +14,15 @@ export const AUDIT_ACTIONS = [
   'user.password_reset_by_support',
   'budget.approved',
   'budget.rejected',
+  'work_order.status_changed',
+  'work_order.cancelled',
+  'work_order.assignee_changed',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 export type AuditActorRole = AuthRole | 'platform_support';
 
-export type AuditEntityType = 'client' | 'vehicle' | 'user' | 'budget';
+export type AuditEntityType = 'client' | 'vehicle' | 'user' | 'budget' | 'work_order';
 
 /** JSON object stored in before and after (camelCase keys, data-model.md). */
 export type AuditSnapshot = Readonly<Record<string, string | number | boolean | null>>;

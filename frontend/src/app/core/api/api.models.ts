@@ -447,6 +447,9 @@ export const PROBLEM_CODES = [
   'MILEAGE_BELOW_LAST',
   // Contrato 005
   'INVALID_BUDGET_STATUS',
+  'INVALID_WORK_ORDER_STATUS',
+  'budget_not_approved',
+  'work_order_exists',
 ] as const;
 
 export type ProblemCode = (typeof PROBLEM_CODES)[number];
@@ -490,5 +493,14 @@ export interface Problem {
   /** Contrato 004 (409, US1-AC3): último kilometraje registrado. */
   lastMileage?: number;
   /** Contrato 005 (409, US2-AC2): estado actual del presupuesto. */
-  currentStatus?: 'borrador' | 'enviado' | 'aprobado' | 'rechazado';
+  currentStatus?:
+    | 'borrador'
+    | 'enviado'
+    | 'aprobado'
+    | 'rechazado'
+    | 'abierta'
+    | 'en_proceso'
+    | 'terminada'
+    | 'entregada'
+    | 'cancelada';
 }

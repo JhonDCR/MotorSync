@@ -1,0 +1,215 @@
+<main class="page">
+  <div aria-live="polite">
+    @switch (state().kind) {
+      @case ('loading') {
+        <p class="status" role="status">Cargando orden de trabajo…</p>
+      }
+      @case ('error') {
+        <p class="notice-error" role="alert" data-testid="load-error">
+          No se pudo cargar la orden de trabajo. Revise la conexión e inténtelo de nuevo.
+        </p>
+      }
+    }
+    @if (actionError(); as message) {
+      <p class="notice-error" role="alert" data-testid="wo-error">{{ message }}</p>
+    }
+  </div>
+
+  @if (state(); as current) {
+    @if (current.kind === 'not-found') {
+      <div class="notice-error" role="alert">
+        <h1 data-testid="not-found">Orden de trabajo no encontrada</h1>
+        <p>Puede que no exista o que pertenezca a otro taller.</p>
+        <a class="action" routerLink="/work-orders">Volver al tablero</a>
+      </div>
+    }
+
+    @if (current.kind === 'loaded') {
+      @let order = current.order;
+      <h1>Orden de trabajo n.º {{ order.number }}</h1>
+
+      <section class="card" aria-labelledby="summary-heading">
+        <h2 id="summary-heading">Resumen</h2>
+        <dl class="facts">
+          <div>
+            <dt>Estado</dt>
+            <dd data-testid="wo-status">{{ order.status }}</dd>
+          </div>
+          <div>
+            <dt>Placa</dt>
+            <dd>{{ order.plate }}</dd>
+          </div>
+          <div>
+            <dt>Responsable</dt>
+            <dd>{{ order.assignee.name }}</dd>
+          </div>
+          <div>
+            <dt>Fecha</dt>
+            <dd>
+              <time [attr.datetime]="order.createdAt">{{
+                order.createdAt | date: 'dd/MM/yyyy HH:mm'
+              }}</time>
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <div class="toolbar">
+        @if (can(order, 'start')) {
+          <button
+            type="button"
+            class="action"
+            data-testid="start-wo"
+            [disabled]="busy()"
+            (click)="run(order, 'start')"
+          >
+            Iniciar
+          </button>
+        }
+        @if (can(order, 'finish')) {
+          <button
+            type="button"
+            class="action"
+            data-testid="finish-wo"
+            [disabled]="busy()"
+            (click)="run(order, 'finish')"
+          >
+            Terminar
+          </button>
+        }
+        @if (can(order, 'deliver')) {
+          <button
+            type="button"
+            class="action"
+            data-testid="deliver-wo"
+            [disabled]="busy()"
+            (click)="run(order, 'deliver')"
+          >
+            Entregar
+          </button>
+        }
+        @if (canCancel(order)) {
+          <button
+            type="button"
+            class="action"
+            data-testid="cancel-wo"
+            [disabled]="busy()"
+            (click)="cancelling.set(true)"
+          >
+            Cancelar OT
+          </button>
+        }
+        <a class="action" routerLink="/work-orders">Volver al tablero</a>
+      </div>
+
+      @if (cancelling() && canCancel(order)) {
+        <section class="card" aria-labelledby="cancel-heading">
+          <h2 id="cancel-heading">Cancelar orden</h2>
+          <label for="cancel-reason">Motivo de la cancelación</label>
+          <textarea
+            id="cancel-reason"
+            data-testid="cancel-reason"
+            maxlength="500"
+            [value]="cancelReason()"
+            (input)="cancelReason.set(valueOf($event))"
+          ></textarea>
+          <div class="toolbar">
+            <button
+              type="button"
+              class="action"
+              data-testid="confirm-cancel"
+              [disabled]="busy() || cancelReason().trim() === ''"
+              (click)="confirmCancel(order)"
+            >
+              Confirmar cancelación
+            </button>
+            <button type="button" class="action" (click)="cancelling.set(false)">Volver</button>
+          </div>
+        </section>
+      }
+
+      @if (isAdmin() && !isClosed(order)) {
+        <section class="card" aria-labelledby="assignee-heading">
+          <h2 id="assignee-heading">Reasignar responsable</h2>
+          <label for="assignee-id">ID del usuario responsable</label>
+          <input
+            id="assignee-id"
+            data-testid="assignee-id"
+            [value]="assigneeId()"
+            (input)="assigneeId.set(valueOf($event))"
+          />
+          <button
+            type="button"
+            class="action"
+            data-testid="reassign-wo"
+            [disabled]="busy() || assigneeId().trim() === ''"
+            (click)="reassign(order)"
+          >
+            Reasignar
+          </button>
+        </section>
+      }
+
+      <section class="card" aria-labelledby="items-heading">
+        <h2 id="items-heading">Trabajos</h2>
+        <ul class="list">
+          @for (item of order.items; track item.position) {
+            <li>{{ item.description }} – {{ item.quantity }}</li>
+          }
+        </ul>
+      </section>
+
+      <section class="card" aria-labelledby="notes-heading">
+        <h2 id="notes-heading">Notas de avance</h2>
+        <ul class="list">
+          @for (note of order.notes; track $index) {
+            <li data-testid="note-item">
+              {{ note.body }} – {{ note.createdBy.name }},
+              <time [attr.datetime]="note.createdAt">{{
+                note.createdAt | date: 'dd/MM/yyyy HH:mm'
+              }}</time>
+            </li>
+          } @empty {
+            <li>Sin notas.</li>
+          }
+        </ul>
+        @if (!isClosed(order)) {
+          <label for="note-body">Nueva nota</label>
+          <textarea
+            id="note-body"
+            data-testid="note-body"
+            maxlength="1000"
+            [value]="noteBody()"
+            (input)="noteBody.set(valueOf($event))"
+          ></textarea>
+          <button
+            type="button"
+            class="action"
+            data-testid="add-note"
+            [disabled]="busy() || noteBody().trim() === ''"
+            (click)="addNote(order)"
+          >
+            Agregar nota
+          </button>
+        }
+      </section>
+
+      <section class="card" aria-labelledby="history-heading">
+        <h2 id="history-heading">Historial</h2>
+        <ul class="list">
+          @for (entry of order.history; track $index) {
+            <li data-testid="history-item">
+              {{ entry.status }} – {{ entry.changedBy.name }},
+              <time [attr.datetime]="entry.changedAt">{{
+                entry.changedAt | date: 'dd/MM/yyyy HH:mm'
+              }}</time>
+              @if (entry.reason) {
+                ({{ entry.reason }})
+              }
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  }
+</main>

@@ -34,7 +34,7 @@ npm run support:account -- create --name "Choque" --email admin@taller-a.test   
 npm run support:account -- list
 npm run support:account -- deactivate --email pedro@motorsync.ec --confirm          # revoca sus sesiones (US2-AC10)
 npm run support:account -- reactivate --email pedro@motorsync.ec --confirm
-npm run support:account -- access-log --since 2026-10-25                             # bitácora (PR3)
+npm run support:account -- access-log --email pedro@motorsync.ec --since 2026-10-25  # bitácora (PR3)
 ```
 
 Registrar después un taller con `pedro@motorsync.ec` (`POST /auth/register`) da 409 `REGISTRATION_FAILED`, como cualquier correo en uso (R5).
@@ -88,7 +88,7 @@ Con `curl`, guardando cookies (`-c`/`-b`) y con `X-Requested-With: motorsync` en
 | Paso | Petición | Esperado |
 |---|---|---|
 | Listado | `GET /support/workshops` | 200, `pageSize: 50`, solo `id`, `name`, `ruc`, `createdAt` (US4-AC1) |
-| Búsqueda | `?q=1790-0123 45001`, `?q=ANDRADE`, `?q=andradé` | incluye el taller (US4-AC2) |
+| Búsqueda | `?q=1791-2345 67001`, `?q=TALLER A` | incluye el taller (US4-AC2) |
 | Cuentas | `GET /support/workshops/{id}/accounts` | 200 con `name`, `email`, `role`, `status`, `hasOpenTicket`; una fila nueva en `support_access_log` (US4-AC3, US4-AC6) |
 | Inexistente | `GET /support/workshops/{uuid al azar}/accounts` | 404; sin fila en la bitácora (US4-AC7) |
 | Bitácora | `GET /support/access-log` | 200, la consulta anterior primero, `pageSize: 50`, con agente (sin correo), taller, IP y canal (US4-AC8) |

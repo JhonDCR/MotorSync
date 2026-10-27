@@ -392,7 +392,7 @@ Al terminar, el agente busca talleres y ve sus cuentas (solo los campos permitid
 
 ## Phase 9: Base del PR3
 
-- [ ] T059 [P] E2e de BD en `backend/test/db/support-roles-access-log.e2e-spec.ts` (nuevo):
+- [x] T059 [P] E2e de BD en `backend/test/db/support-roles-access-log.e2e-spec.ts` (nuevo):
   - `support_access_log`: RLS `ENABLE` sin `FORCE`; la app sin ningún privilegio; `motorsync_support` con solo `SELECT, INSERT`; como migrator, `UPDATE` y `DELETE` lanzan la excepción append-only (FR-018);
   - `support_list_workshops`, `support_list_workshop_accounts` y `support_list_access_log`: `prosecdef = true`, dueño `motorsync_support`, `search_path` fijo, sin `EXECUTE` para `PUBLIC` y con `EXECUTE` para la app; `support_list_access_log` es `STABLE` (`provolatile = 's'`);
   - compuertas: sin sesión válida o con un taller fijado, las tres lanzan `28000`;
@@ -400,7 +400,7 @@ Al terminar, el agente busca talleres y ve sus cuentas (solo los campos permitid
   - `support_list_access_log` no inserta filas, devuelve exactamente sus 10 columnas (sin correo del agente) en orden `occurred_at DESC` y respeta `LEAST(p_limit, 50)` y los filtros.
 
   — tester
-- [ ] T060 Crear `backend/src/database/migrations/1761000001500-CreateSupportAccessLog.ts` con el DDL de data-model.md **literal** (`action IN ('workshop.accounts_viewed')`, `channel DEFAULT 'support_panel'`, los dos índices, el trigger append-only y las tres funciones), con el `SET ROLE motorsync_support` de la lección también en `down()`, y registrarla en `backend/src/database/data-source.ts`. Deja T059 en verde — implementer-backend
+- [x] T060 Crear `backend/src/database/migrations/1761000001500-CreateSupportAccessLog.ts` con el DDL de data-model.md **literal** (`action IN ('workshop.accounts_viewed')`, `channel DEFAULT 'support_panel'`, los dos índices, el trigger append-only y las tres funciones), con el `SET ROLE motorsync_support` de la lección también en `down()`, y registrarla en `backend/src/database/data-source.ts`. Deja T059 en verde — implementer-backend
 
 ## Phase 10: User Story 4, consultar talleres y sus cuentas (P2) (PR3)
 
@@ -408,7 +408,7 @@ Al terminar, el agente busca talleres y ve sus cuentas (solo los campos permitid
 
 **Independent Test**: quickstart §2 (`access-log`) y §3, tabla "Consulta de talleres"; e2e `backend/test/support-workshops.e2e-spec.ts` y `support-access-log.e2e-spec.ts`.
 
-- [ ] T061 [P] [US4] E2e en `backend/test/support-workshops.e2e-spec.ts`:
+- [x] T061 [P] [US4] E2e en `backend/test/support-workshops.e2e-spec.ts`:
   - **US4-AC1**: `GET /support/workshops` → `pageSize = 50`, `total` y cada elemento con **exactamente** `id, name, ruc, createdAt`; con 51 talleres, la página 1 trae 50 y la 2 trae 1; `page = 0` → 400.
   - **US4-AC2**: `q=1790012345001`, `q=1790-0123 45001` (prefijo de RUC) y `q=andrade`, `q=ANDRADE`, `q=andradé` encuentran el taller A; `q=%` y `q=_` no devuelven todos los talleres (comodines escapados); `q` de 121 caracteres → 400.
   - **US4-AC3 / FR-016**: `GET /support/workshops/{A}/accounts` → `workshop` con `id, name, ruc, createdAt` e `items` con todas las cuentas de A, activas e inactivas, cada una con **exactamente** `name, email, role, status, hasOpenTicket` (`true` para la cuenta con ticket abierto).
@@ -419,16 +419,16 @@ Al terminar, el agente busca talleres y ve sus cuentas (solo los campos permitid
   - **FR-025 / separación**: con el token del admin de A, `GET /support/workshops` y `GET /support/workshops/{B}/accounts` → 403 `FORBIDDEN` sin datos y sin registro en la bitácora.
 
   — tester
-- [ ] T062 [P] [US4] E2e en `backend/test/support-access-log.e2e-spec.ts` (agentes Pedro y Marta; consultas de cuentas de A y B):
+- [x] T062 [P] [US4] E2e en `backend/test/support-access-log.e2e-spec.ts` (agentes Pedro y Marta; consultas de cuentas de A y B):
   - **US4-AC8 / FR-027**: `GET /support/access-log` → de la más reciente a la más antigua, `pageSize = 50`, cada registro con **exactamente** `id, occurredAt, agent{id, name}, workshop{id, name, ruc}, ip, channel` y sin el correo del agente; `workshopId = A` → solo A; `agentId = Marta` → solo Marta; ambos combinados; un uuid inexistente → página vacía; `workshopId` no uuid → 400; con 51 registros, la página 2 trae 1.
   - **US4-AC9**: `countRows('support_access_log')` igual antes y después de varias consultas a la bitácora; `POST`, `PUT`, `PATCH` y `DELETE /support/access-log` y `/support/access-log/{id}` → 404 sin cambios; con el token del admin de A → 403 `FORBIDDEN`.
   - **FR-027 (operaciones)**: `runSupportAccount(['access-log', '--email', <Pedro>, '--since', <fecha>])` lista solo las consultas de Pedro desde esa fecha, con taller e IP.
 
   — tester
-- [ ] T063 [US4] Implementar `backend/src/support/support-workshops.service.ts` y `support-workshops.controller.ts` (`@SupportArea()`; `GET /support/workshops` y `GET /support/workshops/:workshopId/accounts`; `normalizeDocument` para decidir el prefijo de RUC y escape de `%`, `_` y `\` en el nombre; uuid inválido → 404; `P0002` → 404; las filas con cuenta `NULL` no van a `items`), `backend/src/support/dto/list-workshops.dto.ts` ("1–120 caracteres"; `page` "entero ≥ 1; tamaño fijo 50"), `backend/src/support/support-access-log.service.ts` y `support-access-log.controller.ts` (`GET /support/access-log`), `backend/src/support/dto/list-access-log.dto.ts` (`workshopId` y `agentId` "opcionales, uuid"; `page` "entero ≥ 1; tamaño fijo 50"), su registro en `backend/src/support/support.module.ts`, y el comando `access-log [--email …] [--since …]` en `backend/scripts/support-account.ts`. Deja T061, T062 y la parte de T013 sobre los controladores de `SupportModule` en verde — implementer-backend
-- [ ] T064 [P] [US4] Pruebas en `frontend/src/app/core/api/support-api.service.workshops.spec.ts` (nuevo: `listWorkshops(q, page)`, `listWorkshopAccounts(id)` y `listAccessLog({ workshopId, agentId, page })` con rutas y query del contrato) y `frontend/src/app/core/api/mock-api.interceptor.support-workshops.spec.ts` (nuevo): búsqueda por RUC y por nombre sin tildes, 50 por página, cuentas con `hasOpenTicket`, la consulta de cuentas agrega una entrada a la bitácora simulada y la consulta de la bitácora no, filtros combinables, 404 de taller inexistente y 403 con token de taller — tester
-- [ ] T065 [US4] Implementar esos métodos en `frontend/src/app/core/api/support-api.service.ts`, los talleres y la bitácora en `frontend/src/app/core/api/mock-support.store.ts` y las rutas en `mock-api.interceptor.ts` — implementer-frontend
-- [ ] T066 [US4] Pruebas en `frontend/src/app/features/support/workshops-list.page.spec.ts`, `workshop-accounts.page.spec.ts` y `access-log.page.spec.ts`:
+- [x] T063 [US4] Implementar `backend/src/support/support-workshops.service.ts` y `support-workshops.controller.ts` (`@SupportArea()`; `GET /support/workshops` y `GET /support/workshops/:workshopId/accounts`; `normalizeDocument` para decidir el prefijo de RUC y escape de `%`, `_` y `\` en el nombre; uuid inválido → 404; `P0002` → 404; las filas con cuenta `NULL` no van a `items`), `backend/src/support/dto/list-workshops.dto.ts` ("1–120 caracteres"; `page` "entero ≥ 1; tamaño fijo 50"), `backend/src/support/support-access-log.service.ts` y `support-access-log.controller.ts` (`GET /support/access-log`), `backend/src/support/dto/list-access-log.dto.ts` (`workshopId` y `agentId` "opcionales, uuid"; `page` "entero ≥ 1; tamaño fijo 50"), su registro en `backend/src/support/support.module.ts`, y el comando `access-log [--email …] [--since …]` en `backend/scripts/support-account.ts`. Deja T061, T062 y la parte de T013 sobre los controladores de `SupportModule` en verde — implementer-backend
+- [x] T064 [P] [US4] Pruebas en `frontend/src/app/core/api/support-api.service.workshops.spec.ts` (nuevo: `listWorkshops(q, page)`, `listWorkshopAccounts(id)` y `listAccessLog({ workshopId, agentId, page })` con rutas y query del contrato) y `frontend/src/app/core/api/mock-api.interceptor.support-workshops.spec.ts` (nuevo): búsqueda por RUC y por nombre sin tildes, 50 por página, cuentas con `hasOpenTicket`, la consulta de cuentas agrega una entrada a la bitácora simulada y la consulta de la bitácora no, filtros combinables, 404 de taller inexistente y 403 con token de taller — tester
+- [x] T065 [US4] Implementar esos métodos en `frontend/src/app/core/api/support-api.service.ts`, los talleres y la bitácora en `frontend/src/app/core/api/mock-support.store.ts` y las rutas en `mock-api.interceptor.ts` — implementer-frontend
+- [x] T066 [US4] Pruebas en `frontend/src/app/features/support/workshops-list.page.spec.ts`, `workshop-accounts.page.spec.ts` y `access-log.page.spec.ts`:
   - **US4-AC1 / US4-AC2**: lista con nombre comercial, RUC y fecha de alta (hora de Ecuador), búsqueda y paginación de 50.
   - **US4-AC3**: cuentas con nombre, correo, rol, estado y "ticket abierto"; enlace "Ver bitácora de este taller" a `/support/access-log?workshopId=…`.
   - **US4-AC7**: 404 → "no encontrado".
@@ -437,11 +437,11 @@ Al terminar, el agente busca talleres y ve sus cuentas (solo los campos permitid
   - **FR-026**: objetivos táctiles de 44 px; usable en tablet.
 
   — tester
-- [ ] T067 [US4] Implementar `frontend/src/app/features/support/workshops-list.page.*`, `workshop-accounts.page.*` y `access-log.page.*`, las rutas `/support/workshops`, `/support/workshops/:id` y `/support/access-log` con `supportAuthGuard` en `frontend/src/app/app.routes.ts` y los enlaces en `support-shell.component.*` — implementer-frontend
+- [x] T067 [US4] Implementar `frontend/src/app/features/support/workshops-list.page.*`, `workshop-accounts.page.*` y `access-log.page.*`, las rutas `/support/workshops`, `/support/workshops/:id` y `/support/access-log` con `supportAuthGuard` en `frontend/src/app/app.routes.ts` y los enlaces en `support-shell.component.*` — implementer-frontend
 
 ## Cierre PR3
 
-- [ ] T068 Revisar el diff del PR3 contra la spec y la **constitución 1.3.0**. Foco:
+- [x] T068 Revisar el diff del PR3 contra la spec y la **constitución 1.3.0**. Foco:
   - principio I (1.3.0), caso (b): funciones de solo lectura, compuertas, columnas de FR-016 y privilegios por columna; ningún listado de cuentas fuera de un taller o un ticket; búsqueda por nombre con comodines escapados;
   - bitácora append-only escrita en la misma llamada que devuelve las cuentas; la vista de la bitácora no se registra y no expone correos de agentes;
   - ningún dato de negocio ni de auditoría del taller en el panel;
@@ -449,7 +449,7 @@ Al terminar, el agente busca talleres y ve sus cuentas (solo los campos permitid
   - pruebas con ID para US4-AC1 a AC9, FR-016 a FR-018, FR-027 y SC-004.
 
   — reviewer
-- [ ] T069 Verificar el PR3: lo mismo que en T043 (lint, unitarias, e2e, perf en local, builds y CI), más quickstart §2 (`access-log`), §3, tabla "Consulta de talleres", y §5, paso 6, en computadora y tablet (con mock y con backend). Con la 003 completa, recorrer el quickstart entero una vez — leader
+- [x] T069 Verificar el PR3: lo mismo que en T043 (lint, unitarias, e2e, perf en local, builds y CI), más quickstart §2 (`access-log`), §3, tabla "Consulta de talleres", y §5, paso 6, en computadora y tablet (con mock y con backend). Con la 003 completa, recorrer el quickstart entero una vez — leader
 
 ---
 

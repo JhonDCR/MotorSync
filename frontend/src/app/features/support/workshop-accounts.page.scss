@@ -1,0 +1,143 @@
+@use '../../shared/styles/touch';
+
+.workshop-accounts-page {
+  .nav-bar {
+    margin-bottom: 1rem;
+
+    .back-link {
+      @include touch.touch-target;
+      display: inline-flex;
+      align-items: center;
+      color: #1d4ed8;
+      font-weight: 600;
+      text-decoration: none;
+      box-sizing: border-box;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+  }
+}
+
+.workshop-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 1.5rem;
+
+  .workshop-info {
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: 1.5rem;
+      color: #0f172a;
+    }
+
+    .workshop-meta {
+      display: flex;
+      gap: 1.5rem;
+      font-size: 0.9375rem;
+      color: #475569;
+    }
+  }
+
+  .header-actions {
+    .access-log-link {
+      @include touch.touch-target;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      background: #1d4ed8;
+      color: #ffffff;
+      font-weight: 600;
+      font-size: 0.875rem;
+      text-decoration: none;
+      box-sizing: border-box;
+
+      &:hover {
+        background: #1e40af;
+      }
+    }
+  }
+}
+
+.not-found-state {
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  background: #fef2f2;
+  border: 1px solid #ef4444;
+  color: #991b1b;
+
+  h1 {
+    margin: 0 0 0.5rem;
+    font-size: 1.25rem;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.accounts-error {
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: #fef2f2;
+  border: 1px solid #ef4444;
+  color: #991b1b;
+}
+
+.accounts-empty,
+.accounts-loading {
+  padding: 1.25rem;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.accounts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+
+  th,
+  td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+
+  th {
+    background: #f1f5f9;
+    color: #1e293b;
+    font-weight: 600;
+  }
+}
+
+.badge-open-ticket {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.subtle {
+  color: #94a3b8;
+}

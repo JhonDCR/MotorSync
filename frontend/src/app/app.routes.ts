@@ -150,6 +150,22 @@ export function buildRoutes(devMode: boolean): Routes {
           title: 'Detalle de ticket',
           loadComponent: () => import('./features/support/ticket-detail.page').then((m) => m.TicketDetailPage),
         },
+        {
+          path: 'workshops',
+          title: 'Talleres',
+          loadComponent: () => import('./features/support/workshops-list.page').then((m) => m.WorkshopsListPage),
+        },
+        {
+          path: 'workshops/:id',
+          title: 'Cuentas de taller',
+          loadComponent: () =>
+            import('./features/support/workshop-accounts.page').then((m) => m.WorkshopAccountsPage),
+        },
+        {
+          path: 'access-log',
+          title: 'Bitácora de acceso',
+          loadComponent: () => import('./features/support/access-log.page').then((m) => m.AccessLogPage),
+        },
       ],
     },
     ...devRoutes,

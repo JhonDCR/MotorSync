@@ -1,0 +1,86 @@
+<section class="workshops-page" aria-labelledby="workshops-list-title">
+  <div class="page-header">
+    <h1 id="workshops-list-title">Talleres</h1>
+  </div>
+
+  <form class="search-form" (submit)="onSearch($event)">
+    <div class="search-field">
+      <input
+        type="search"
+        class="search-input"
+        data-testid="workshops-search-input"
+        placeholder="Buscar por RUC o nombre comercial…"
+        [value]="query()"
+        (input)="onQueryInput($event)"
+      />
+      <button type="submit" class="search-button" data-testid="workshops-search-button">
+        Buscar
+      </button>
+    </div>
+  </form>
+
+  @if (error(); as errorMessage) {
+    <p class="workshops-error" role="alert" data-testid="workshops-error">{{ errorMessage }}</p>
+  } @else if (loading()) {
+    <p class="workshops-loading" role="status">Cargando talleres…</p>
+  } @else if (workshops().length === 0) {
+    <p class="workshops-empty" data-testid="workshops-empty">No se encontraron talleres.</p>
+  } @else {
+    <div class="table-wrapper">
+      <table class="workshops-table" data-testid="workshops-table">
+        <thead>
+          <tr>
+            <th scope="col">Nombre comercial</th>
+            <th scope="col">RUC</th>
+            <th scope="col">Fecha de alta</th>
+            <th scope="col">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (workshop of workshops(); track workshop.id) {
+            <tr data-testid="workshop-row">
+              <td data-testid="workshop-name">{{ workshop.name }}</td>
+              <td data-testid="workshop-ruc">{{ workshop.ruc ?? '—' }}</td>
+              <td data-testid="workshop-created-at">{{ formatDate(workshop.createdAt) }}</td>
+              <td>
+                <a
+                  class="action-link"
+                  [routerLink]="['/support/workshops', workshop.id]"
+                  data-testid="workshop-accounts-link"
+                >
+                  Ver cuentas
+                </a>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (totalPages() > 1 || total() > pageSize()) {
+      <div class="pagination">
+        <button
+          type="button"
+          class="pagination-btn"
+          data-testid="pagination-prev"
+          [disabled]="page() <= 1"
+          (click)="goToPage(page() - 1)"
+        >
+          Anterior
+        </button>
+        <span class="pagination-info" data-testid="pagination-info">
+          Página {{ page() }} de {{ totalPages() }}
+        </span>
+        <button
+          type="button"
+          class="pagination-btn"
+          data-testid="pagination-next"
+          [disabled]="page() >= totalPages()"
+          (click)="goToPage(page() + 1)"
+        >
+          Siguiente
+        </button>
+      </div>
+    }
+  }
+</section>

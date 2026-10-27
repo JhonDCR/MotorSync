@@ -1,5 +1,31 @@
 <header class="support-header" data-testid="support-header">
-  <a routerLink="/support" class="support-brand">Soporte MotorSync</a>
+  <div class="support-header-brand-nav">
+    <a routerLink="/support" class="support-brand">Soporte MotorSync</a>
+    <nav class="support-nav" aria-label="Navegación de soporte">
+      <a
+        routerLink="/support"
+        class="support-nav-link"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+      >
+        Bandeja
+      </a>
+      <a
+        routerLink="/support/workshops"
+        class="support-nav-link"
+        routerLinkActive="active"
+      >
+        Talleres
+      </a>
+      <a
+        routerLink="/support/access-log"
+        class="support-nav-link"
+        routerLinkActive="active"
+      >
+        Bitácora
+      </a>
+    </nav>
+  </div>
 
   @if (session.agent(); as agent) {
     <div class="support-session-bar">

@@ -119,10 +119,35 @@ export interface AccessLogEntryFixture {
   channel: string;
 }
 
+export interface WorkshopListResponseFixture {
+  items: WorkshopSummaryFixture[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export interface WorkshopAccountsResponseFixture {
+  workshop: WorkshopSummaryFixture;
+  items: WorkshopAccountFixture[];
+}
+
+export interface AccessLogResponseFixture {
+  items: AccessLogEntryFixture[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
 export const SUPPORT_AGENT_ID = '55555555-5555-4555-8555-555555555555';
 export const SUPPORT_SESSION_ID = '66666666-6666-4666-8666-666666666666';
 export const TICKET_ID = '77777777-7777-4777-8777-777777777777';
 export const OTHER_TICKET_ID = '88888888-8888-4888-8888-888888888888';
+export const WORKSHOP_ID = '99999999-9999-4999-8999-999999999999';
+export const OTHER_WORKSHOP_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+export const OTHER_SUPPORT_AGENT_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+export const ACCESS_LOG_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+/** Tamaño fijo de página de US4-AC1 y US4-AC8 (FR-027). */
+export const SUPPORT_PAGE_SIZE = 50;
 
 export const SUPPORT_EMAIL = 'pedro.soporte@motorsync.ec';
 export const SUPPORT_PASSWORD = '  Soporte Seguro 2026 ';
@@ -139,6 +164,11 @@ export const SUPPORT_PASSWORD_URL = '/api/v1/support/auth/password';
 export const SUPPORT_TICKETS_URL = '/api/v1/support/tickets';
 export const SUPPORT_WORKSHOPS_URL = '/api/v1/support/workshops';
 export const SUPPORT_ACCESS_LOG_URL = '/api/v1/support/access-log';
+
+/** GET /api/v1/support/workshops/{workshopId}/accounts, con el id URL-encoded. */
+export function workshopAccountsUrl(workshopId: string): string {
+  return `${SUPPORT_WORKSHOPS_URL}/${encodeURIComponent(workshopId)}/accounts`;
+}
 
 /** Códigos nuevos de Problem.code en el contrato 003. */
 export const SUPPORT_PROBLEM_CODES = ['HELP_RATE_LIMITED', 'TICKET_NOT_OPEN', 'ACCOUNT_INACTIVE'] as const;
@@ -257,4 +287,77 @@ export function ticketDetailFixture(overrides: Partial<TicketDetailFixture> = {}
 
 export function supportProblem(status: number, code: string, extra: Partial<Problem> = {}): Problem {
   return authProblem(status, code, extra);
+}
+
+export function workshopSummaryFixture(
+  overrides: Partial<WorkshopSummaryFixture> = {},
+): WorkshopSummaryFixture {
+  return {
+    id: WORKSHOP_ID,
+    name: 'Taller Andrade',
+    ruc: '1790012345001',
+    createdAt: '2026-10-25T14:00:00.000Z',
+    ...overrides,
+  };
+}
+
+export function workshopAccountFixture(
+  overrides: Partial<WorkshopAccountFixture> = {},
+): WorkshopAccountFixture {
+  return {
+    name: 'Ana Pérez',
+    email: 'ana.perez@taller.ec',
+    role: 'admin',
+    status: 'active',
+    hasOpenTicket: false,
+    ...overrides,
+  };
+}
+
+export function accessLogEntryFixture(
+  overrides: Partial<AccessLogEntryFixture> = {},
+): AccessLogEntryFixture {
+  return {
+    id: ACCESS_LOG_ID,
+    occurredAt: '2026-10-25T14:05:00.000Z',
+    agent: { id: SUPPORT_AGENT_ID, name: 'Pedro Soporte' },
+    workshop: { id: WORKSHOP_ID, name: 'Taller Andrade', ruc: '1790012345001' },
+    ip: null,
+    channel: 'support_panel',
+    ...overrides,
+  };
+}
+
+export function workshopListResponseFixture(
+  overrides: Partial<WorkshopListResponseFixture> = {},
+): WorkshopListResponseFixture {
+  return {
+    items: [workshopSummaryFixture()],
+    page: 1,
+    pageSize: SUPPORT_PAGE_SIZE,
+    total: 1,
+    ...overrides,
+  };
+}
+
+export function workshopAccountsResponseFixture(
+  overrides: Partial<WorkshopAccountsResponseFixture> = {},
+): WorkshopAccountsResponseFixture {
+  return {
+    workshop: workshopSummaryFixture(),
+    items: [workshopAccountFixture()],
+    ...overrides,
+  };
+}
+
+export function accessLogResponseFixture(
+  overrides: Partial<AccessLogResponseFixture> = {},
+): AccessLogResponseFixture {
+  return {
+    items: [accessLogEntryFixture()],
+    page: 1,
+    pageSize: SUPPORT_PAGE_SIZE,
+    total: 1,
+    ...overrides,
+  };
 }

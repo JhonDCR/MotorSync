@@ -1,0 +1,129 @@
+<main class="page">
+  <div aria-live="polite">
+    @switch (state().kind) {
+      @case ('loading') {
+        <p class="status" role="status">Cargando presupuesto…</p>
+      }
+      @case ('error') {
+        <p class="notice-error" role="alert" data-testid="load-error">
+          No se pudo cargar el presupuesto. Revise la conexión e inténtelo de nuevo.
+        </p>
+      }
+    }
+    @if (actionError(); as message) {
+      <p class="notice-error" role="alert" data-testid="budget-error">{{ message }}</p>
+    }
+  </div>
+
+  @if (state(); as current) {
+    @if (current.kind === 'not-found') {
+      <div class="notice-error" role="alert">
+        <h1 data-testid="not-found">Presupuesto no encontrado</h1>
+        <p>Puede que no exista o que pertenezca a otro taller.</p>
+        <a class="action" routerLink="/">Volver a la búsqueda</a>
+      </div>
+    }
+
+    @if (current.kind === 'loaded') {
+      @let budget = current.budget;
+      <h1>Presupuesto n.º {{ budget.number }}</h1>
+
+      <section class="card" aria-labelledby="summary-heading">
+        <h2 id="summary-heading">Resumen</h2>
+        <dl class="facts">
+          <div>
+            <dt>Estado</dt>
+            <dd data-testid="budget-status">{{ budget.status }}</dd>
+          </div>
+          <div>
+            <dt>Fecha</dt>
+            <dd>
+              <time [attr.datetime]="budget.createdAt">{{
+                budget.createdAt | date: 'dd/MM/yyyy HH:mm'
+              }}</time>
+            </dd>
+          </div>
+          @if (budget.createdBy) {
+            <div>
+              <dt>Creado por</dt>
+              <dd>{{ budget.createdBy.name }}</dd>
+            </div>
+          }
+          @if (budget.decidedBy) {
+            <div>
+              <dt>Decidido por</dt>
+              <dd>{{ budget.decidedBy.name }}</dd>
+            </div>
+          }
+        </dl>
+      </section>
+
+      <section class="card" aria-labelledby="lines-heading">
+        <h2 id="lines-heading">Líneas</h2>
+        <ul class="list">
+          @for (line of budget.lines; track line.id) {
+            <li data-testid="budget-line">
+              {{ kindLabels[line.kind] }}: {{ line.description }} – {{ line.quantity }} ×
+              {{ line.unitPrice }} =
+              {{ line.lineTotal }}
+            </li>
+          }
+        </ul>
+        <dl class="facts">
+          <div>
+            <dt>Subtotal</dt>
+            <dd data-testid="budget-subtotal">{{ budget.subtotal }}</dd>
+          </div>
+          <div>
+            <dt>IVA</dt>
+            <dd data-testid="budget-tax">{{ budget.tax }}</dd>
+          </div>
+          <div>
+            <dt>Total</dt>
+            <dd data-testid="budget-total">{{ budget.total }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <div class="toolbar">
+        @if (budget.status === 'borrador') {
+          <a class="action" [routerLink]="['/budgets', budget.id, 'edit']" data-testid="edit-budget"
+            >Editar</a
+          >
+          <button
+            type="button"
+            class="action"
+            data-testid="send-budget"
+            [disabled]="busy()"
+            (click)="run(budget, 'send')"
+          >
+            Enviar
+          </button>
+        }
+        @if (budget.status === 'enviado') {
+          <button
+            type="button"
+            class="action"
+            data-testid="approve-budget"
+            [disabled]="busy()"
+            (click)="run(budget, 'approve')"
+          >
+            Aprobar
+          </button>
+          <button
+            type="button"
+            class="action"
+            data-testid="reject-budget"
+            [disabled]="busy()"
+            (click)="run(budget, 'reject')"
+          >
+            Rechazar
+          </button>
+        }
+        <a class="action" [routerLink]="['/checkins', budget.checkinId, 'budgets']"
+          >Volver a los presupuestos</a
+        >
+      </div>
+    }
+  }
+</main>

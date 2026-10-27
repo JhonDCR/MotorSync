@@ -94,7 +94,12 @@
         }
       </section>
 
-      <a class="action" [routerLink]="['/vehicles', checkin.vehicleId, 'checkins']">Volver a los check-ins</a>
+      <div class="toolbar">
+        <a class="action" [routerLink]="['/checkins', checkin.id, 'budgets']" data-testid="checkin-budgets">
+          Presupuestos
+        </a>
+        <a class="action" [routerLink]="['/vehicles', checkin.vehicleId, 'checkins']">Volver a los check-ins</a>
+      </div>
     }
   }
 </main>

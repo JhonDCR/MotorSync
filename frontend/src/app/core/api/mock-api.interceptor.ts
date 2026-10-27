@@ -9,9 +9,16 @@ import {
 import { inject } from '@angular/core';
 import { mergeMap, Observable, throwError, timer, of } from 'rxjs';
 import { decodeSessionToken } from '../auth/current-session';
-import { MockApiStore, mockActor, mockProblem, type MockActor, type MockResult } from './mock-api.store';
+import {
+  MockApiStore,
+  mockActor,
+  mockProblem,
+  type MockActor,
+  type MockResult,
+} from './mock-api.store';
 import { REQUESTED_WITH_HEADER, REQUESTED_WITH_VALUE } from './auth-api.service';
 import { MockAuthStore } from './mock-auth.store';
+import { MockBudgetStore } from './mock-budget.store';
 import { MockCheckinStore } from './mock-checkin.store';
 import { MockSupportStore } from './mock-support.store';
 import { USE_MOCK_API } from './use-mock-api';
@@ -32,6 +39,10 @@ const VEHICLE_HISTORY = /^\/api\/v1\/vehicles\/([^/]+)\/ownership-history$/;
 const VEHICLE_CHECKINS = /^\/api\/v1\/vehicles\/([^/]+)\/checkins$/;
 const CHECKIN_BY_ID = /^\/api\/v1\/checkins\/([^/]+)$/;
 const CHECKIN_IMAGE = /^\/api\/v1\/checkins\/([^/]+)\/images\/([^/]+)$/;
+const CHECKIN_BUDGETS = /^\/api\/v1\/checkins\/([^/]+)\/budgets$/;
+const VEHICLE_BUDGETS = /^\/api\/v1\/vehicles\/([^/]+)\/budgets$/;
+const BUDGET_BY_ID = /^\/api\/v1\/budgets\/([^/]+)$/;
+const BUDGET_TRANSITION = /^\/api\/v1\/budgets\/([^/]+)\/(send|approve|reject)$/;
 const AUTH_REGISTER_PATH = '/api/v1/auth/register';
 const AUTH_LOGIN_PATH = '/api/v1/auth/login';
 const AUTH_REFRESH_PATH = '/api/v1/auth/refresh';
@@ -87,7 +98,11 @@ function pathOf(url: string): string {
   return withoutOrigin.split(/[?#]/)[0].replace(/\/+$/, '') || '/';
 }
 
-function respond(req: HttpRequest<unknown>, result: MockResult<unknown>, location?: string): Observable<HttpEvent<unknown>> {
+function respond(
+  req: HttpRequest<unknown>,
+  result: MockResult<unknown>,
+  location?: string,
+): Observable<HttpEvent<unknown>> {
   if (!result.ok) {
     return throwError(
       () =>
@@ -104,7 +119,9 @@ function respond(req: HttpRequest<unknown>, result: MockResult<unknown>, locatio
   if (location !== undefined) {
     headers = headers.set('Location', location);
   }
-  return of(new HttpResponse({ body: result.body, headers, status: result.status, url: req.urlWithParams }));
+  return of(
+    new HttpResponse({ body: result.body, headers, status: result.status, url: req.urlWithParams }),
+  );
 }
 
 function route(
@@ -113,6 +130,7 @@ function route(
   auth: MockAuthStore,
   support: MockSupportStore,
   checkins: MockCheckinStore,
+  budgets: MockBudgetStore,
 ): Observable<HttpEvent<unknown>> {
   const path = pathOf(req.url);
 
@@ -163,19 +181,30 @@ function route(
   if (supportTicketDiscard !== null && req.method === 'POST') {
     return respond(
       req,
-      support.discardTicket(bearerToken(req), decodeURIComponent(supportTicketDiscard[1]), req.body),
+      support.discardTicket(
+        bearerToken(req),
+        decodeURIComponent(supportTicketDiscard[1]),
+        req.body,
+      ),
     );
   }
   const supportTicketTempPassword = SUPPORT_TICKET_TEMP_PASSWORD.exec(path);
   if (supportTicketTempPassword !== null && req.method === 'POST') {
     return respond(
       req,
-      support.generateTemporaryPassword(bearerToken(req), decodeURIComponent(supportTicketTempPassword[1]), req.body),
+      support.generateTemporaryPassword(
+        bearerToken(req),
+        decodeURIComponent(supportTicketTempPassword[1]),
+        req.body,
+      ),
     );
   }
   const supportTicketById = SUPPORT_TICKET_BY_ID.exec(path);
   if (supportTicketById !== null && req.method === 'GET') {
-    return respond(req, support.getTicket(bearerToken(req), decodeURIComponent(supportTicketById[1])));
+    return respond(
+      req,
+      support.getTicket(bearerToken(req), decodeURIComponent(supportTicketById[1])),
+    );
   }
   // Support workshops and access log of contract 003 (PR3): read-only, 50 per page.
   if (path === SUPPORT_WORKSHOPS_PATH && req.method === 'GET') {
@@ -191,7 +220,10 @@ function route(
   if (supportWorkshopAccounts !== null && req.method === 'GET') {
     return respond(
       req,
-      support.listWorkshopAccounts(bearerToken(req), decodeURIComponent(supportWorkshopAccounts[1])),
+      support.listWorkshopAccounts(
+        bearerToken(req),
+        decodeURIComponent(supportWorkshopAccounts[1]),
+      ),
     );
   }
   if (path === SUPPORT_ACCESS_LOG_PATH && req.method === 'GET') {
@@ -222,19 +254,31 @@ function route(
   }
   const userRole = USER_ROLE.exec(path);
   if (userRole !== null && req.method === 'PUT') {
-    return respond(req, auth.changeUserRole(bearerToken(req), decodeURIComponent(userRole[1]), req.body));
+    return respond(
+      req,
+      auth.changeUserRole(bearerToken(req), decodeURIComponent(userRole[1]), req.body),
+    );
   }
   const userDeactivate = USER_DEACTIVATE.exec(path);
   if (userDeactivate !== null && req.method === 'POST') {
-    return respond(req, auth.deactivateUser(bearerToken(req), decodeURIComponent(userDeactivate[1])));
+    return respond(
+      req,
+      auth.deactivateUser(bearerToken(req), decodeURIComponent(userDeactivate[1])),
+    );
   }
   const userReactivate = USER_REACTIVATE.exec(path);
   if (userReactivate !== null && req.method === 'POST') {
-    return respond(req, auth.reactivateUser(bearerToken(req), decodeURIComponent(userReactivate[1])));
+    return respond(
+      req,
+      auth.reactivateUser(bearerToken(req), decodeURIComponent(userReactivate[1])),
+    );
   }
   const userPasswordReset = USER_PASSWORD_RESET.exec(path);
   if (userPasswordReset !== null && req.method === 'POST') {
-    return respond(req, auth.resetUserPassword(bearerToken(req), decodeURIComponent(userPasswordReset[1]), req.body));
+    return respond(
+      req,
+      auth.resetUserPassword(bearerToken(req), decodeURIComponent(userPasswordReset[1]), req.body),
+    );
   }
   const userHistory = USER_HISTORY.exec(path);
   if (userHistory !== null && req.method === 'GET') {
@@ -254,7 +298,10 @@ function route(
   // Check-ins of contract 004 (immutable: only GET and POST).
   const vehicleCheckins = VEHICLE_CHECKINS.exec(path);
   if (vehicleCheckins !== null && req.method === 'POST') {
-    return respond(req, checkins.create(decodeURIComponent(vehicleCheckins[1]), req.body, actorOf(req)));
+    return respond(
+      req,
+      checkins.create(decodeURIComponent(vehicleCheckins[1]), req.body, actorOf(req)),
+    );
   }
   if (vehicleCheckins !== null && req.method === 'GET') {
     return respond(req, checkins.list(decodeURIComponent(vehicleCheckins[1])));
@@ -263,9 +310,47 @@ function route(
   if (checkinById !== null && req.method === 'GET') {
     return respond(req, checkins.get(decodeURIComponent(checkinById[1])));
   }
+  // Budgets of contract 005.
+  const checkinBudgets = CHECKIN_BUDGETS.exec(path);
+  if (checkinBudgets !== null && req.method === 'POST') {
+    return respond(
+      req,
+      budgets.create(decodeURIComponent(checkinBudgets[1]), req.body, actorOf(req)),
+    );
+  }
+  if (checkinBudgets !== null && req.method === 'GET') {
+    return respond(req, budgets.listByCheckin(decodeURIComponent(checkinBudgets[1])));
+  }
+  const vehicleBudgets = VEHICLE_BUDGETS.exec(path);
+  if (vehicleBudgets !== null && req.method === 'GET') {
+    return respond(req, budgets.listByVehicle(decodeURIComponent(vehicleBudgets[1])));
+  }
+  const budgetById = BUDGET_BY_ID.exec(path);
+  if (budgetById !== null && req.method === 'GET') {
+    return respond(req, budgets.get(decodeURIComponent(budgetById[1])));
+  }
+  if (budgetById !== null && req.method === 'PUT') {
+    return respond(req, budgets.update(decodeURIComponent(budgetById[1]), req.body));
+  }
+  const budgetTransition = BUDGET_TRANSITION.exec(path);
+  if (budgetTransition !== null && req.method === 'POST') {
+    const action =
+      budgetTransition[2] === 'send'
+        ? 'send'
+        : budgetTransition[2] === 'approve'
+          ? 'approve'
+          : 'reject';
+    return respond(
+      req,
+      budgets.transition(decodeURIComponent(budgetTransition[1]), action, actorOf(req)),
+    );
+  }
   const checkinImage = CHECKIN_IMAGE.exec(path);
   if (checkinImage !== null && req.method === 'GET') {
-    const image = checkins.image(decodeURIComponent(checkinImage[1]), decodeURIComponent(checkinImage[2]));
+    const image = checkins.image(
+      decodeURIComponent(checkinImage[1]),
+      decodeURIComponent(checkinImage[2]),
+    );
     if (!image.ok) {
       return respond(req, image);
     }
@@ -300,11 +385,17 @@ function route(
     return respond(req, store.getVehicle(decodeURIComponent(vehicleById[1])));
   }
   if (vehicleById !== null && req.method === 'PATCH') {
-    return respond(req, store.updateVehicle(decodeURIComponent(vehicleById[1]), req.body, actorOf(req)));
+    return respond(
+      req,
+      store.updateVehicle(decodeURIComponent(vehicleById[1]), req.body, actorOf(req)),
+    );
   }
   const transfers = VEHICLE_TRANSFERS.exec(path);
   if (transfers !== null && req.method === 'POST') {
-    return respond(req, store.transferOwnership(decodeURIComponent(transfers[1]), req.body, actorOf(req)));
+    return respond(
+      req,
+      store.transferOwnership(decodeURIComponent(transfers[1]), req.body, actorOf(req)),
+    );
   }
   const history = VEHICLE_HISTORY.exec(path);
   if (history !== null && req.method === 'GET') {
@@ -321,5 +412,8 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(MockAuthStore);
   const support = inject(MockSupportStore);
   const checkins = inject(MockCheckinStore);
-  return timer(MOCK_LATENCY_MS).pipe(mergeMap(() => route(req, store, auth, support, checkins)));
+  const budgets = inject(MockBudgetStore);
+  return timer(MOCK_LATENCY_MS).pipe(
+    mergeMap(() => route(req, store, auth, support, checkins, budgets)),
+  );
 };

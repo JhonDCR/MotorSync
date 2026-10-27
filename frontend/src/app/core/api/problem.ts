@@ -68,6 +68,7 @@ const PROBLEM_MESSAGES: Record<ProblemCode, string> = {
   ACCOUNT_INACTIVE: 'La cuenta está desactivada; el administrador de su taller debe reactivarla',
   // Contrato 004
   MILEAGE_BELOW_LAST: 'El kilometraje no puede ser menor que el del último check-in',
+  INVALID_BUDGET_STATUS: 'El presupuesto no admite esta acción en su estado actual',
 };
 
 const NOT_FOUND_BY_RESOURCE: Record<NonNullable<ProblemContext['resource']>, string> = {

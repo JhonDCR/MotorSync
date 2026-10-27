@@ -1,0 +1,64 @@
+<main class="page">
+  <h1>Presupuestos {{ scope() === 'checkins' ? 'del check-in' : 'del vehículo' }}</h1>
+
+  <div class="toolbar">
+    @if (scope() === 'checkins') {
+      <a class="action" [routerLink]="['/checkins', ownerId(), 'budgets', 'new']"
+        >Nuevo presupuesto</a
+      >
+      <a class="action" [routerLink]="['/checkins', ownerId()]">Volver al check-in</a>
+    } @else {
+      <a class="action" [routerLink]="['/vehicles', ownerId()]">Volver al vehículo</a>
+    }
+  </div>
+
+  <div aria-live="polite">
+    @switch (state().kind) {
+      @case ('loading') {
+        <p class="status" role="status">Cargando presupuestos…</p>
+      }
+      @case ('error') {
+        <div class="notice-error" role="alert" data-testid="load-error">
+          <p>No se pudieron cargar los presupuestos. Revise la conexión e inténtelo de nuevo.</p>
+          <button type="button" class="action" (click)="retry()">Reintentar</button>
+        </div>
+      }
+    }
+  </div>
+
+  @if (state(); as current) {
+    @if (current.kind === 'loaded') {
+      @if (current.items.length === 0) {
+        <p data-testid="no-budgets">Aún no hay presupuestos.</p>
+      } @else {
+        <ul class="list">
+          @for (item of current.items; track item.id) {
+            <li>
+              <a class="card" [routerLink]="['/budgets', item.id]" data-testid="budget-item">
+                <h2>Presupuesto n.º {{ item.number }}</h2>
+                <dl class="facts">
+                  <div>
+                    <dt>Fecha</dt>
+                    <dd>
+                      <time [attr.datetime]="item.createdAt">{{
+                        item.createdAt | date: 'dd/MM/yyyy HH:mm'
+                      }}</time>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Estado</dt>
+                    <dd>{{ item.status }}</dd>
+                  </div>
+                  <div>
+                    <dt>Total</dt>
+                    <dd>{{ item.total }}</dd>
+                  </div>
+                </dl>
+              </a>
+            </li>
+          }
+        </ul>
+      }
+    }
+  }
+</main>

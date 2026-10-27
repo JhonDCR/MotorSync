@@ -1,0 +1,102 @@
+<main class="page">
+  <h1>Nuevo check-in</h1>
+
+  <form novalidate (submit)="save($event)">
+    <div class="field">
+      <label for="mileage">Kilometraje</label>
+      <input
+        id="mileage"
+        type="number"
+        min="0"
+        step="1"
+        inputmode="numeric"
+        data-testid="mileage"
+        [attr.aria-invalid]="errors().mileage ? true : null"
+        [attr.aria-describedby]="errors().mileage ? 'error-mileage' : null"
+        [value]="mileage()"
+        (input)="mileage.set(value($event))"
+      />
+      @if (errors().mileage; as message) {
+        <p id="error-mileage" class="error" data-testid="error-mileage">{{ message }}</p>
+      }
+      @if (lastMileage(); as last) {
+        <p class="error" role="alert" data-testid="last-mileage">
+          El kilometraje no puede ser menor que el del último check-in: {{ last }} km
+        </p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="fuel-level">Combustible</label>
+      <select
+        id="fuel-level"
+        data-testid="fuel-level"
+        [attr.aria-invalid]="errors().fuelLevel ? true : null"
+        [attr.aria-describedby]="errors().fuelLevel ? 'error-fuel-level' : null"
+        [value]="fuelLevel()"
+        (change)="fuelLevel.set(value($event))"
+      >
+        <option value="">Seleccione…</option>
+        @for (level of fuelLevels; track level) {
+          <option [value]="level">{{ fuelLabels[level] }}</option>
+        }
+      </select>
+      @if (errors().fuelLevel; as message) {
+        <p id="error-fuel-level" class="error" data-testid="error-fuel-level">{{ message }}</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="reason">Motivo de ingreso</label>
+      <textarea
+        id="reason"
+        rows="3"
+        maxlength="1000"
+        data-testid="reason"
+        [attr.aria-invalid]="errors().reason ? true : null"
+        [attr.aria-describedby]="errors().reason ? 'error-reason' : null"
+        [value]="reason()"
+        (input)="reason.set(value($event))"
+      ></textarea>
+      @if (errors().reason; as message) {
+        <p id="error-reason" class="error" data-testid="error-reason">{{ message }}</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="inventory">Inventario (un objeto por línea)</label>
+      <textarea
+        id="inventory"
+        rows="3"
+        data-testid="inventory"
+        [attr.aria-describedby]="errors().inventory ? 'error-inventory' : null"
+        [value]="inventory()"
+        (input)="inventory.set(value($event))"
+      ></textarea>
+      @if (errors().inventory; as message) {
+        <p id="error-inventory" class="error" data-testid="error-inventory">{{ message }}</p>
+      }
+    </div>
+
+    <app-damage-map (damagesChange)="damages.set($event)" />
+
+    <div class="field">
+      <span id="signature-label"><strong>Firma del cliente</strong></span>
+      <app-signature-pad data-testid="signature-pad" aria-labelledby="signature-label" (signed)="onSigned($event)" />
+      @if (errors().signature; as message) {
+        <p class="error" data-testid="error-signature">{{ message }}</p>
+      }
+    </div>
+
+    @if (saveError(); as message) {
+      <p class="notice-error" role="alert" data-testid="save-error">{{ message }}</p>
+    }
+
+    <div class="toolbar">
+      <button type="submit" class="action" data-testid="save" [disabled]="saving()">
+        {{ saving() ? 'Guardando…' : 'Guardar check-in' }}
+      </button>
+      <a class="action" [routerLink]="['/vehicles', vehicleId]">Cancelar</a>
+    </div>
+  </form>
+</main>

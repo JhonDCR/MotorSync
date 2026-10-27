@@ -1,0 +1,100 @@
+<main class="page">
+  <div aria-live="polite">
+    @switch (state().kind) {
+      @case ('loading') {
+        <p class="status" role="status">Cargando check-in…</p>
+      }
+      @case ('error') {
+        <p class="notice-error" role="alert" data-testid="load-error">
+          No se pudo cargar el check-in. Revise la conexión e inténtelo de nuevo.
+        </p>
+      }
+    }
+  </div>
+
+  @if (state(); as current) {
+    @if (current.kind === 'not-found') {
+      <div class="notice-error" role="alert">
+        <h1 data-testid="not-found">Check-in no encontrado</h1>
+        <p>Puede que no exista o que pertenezca a otro taller.</p>
+        <a class="action" routerLink="/">Volver a la búsqueda</a>
+      </div>
+    }
+
+    @if (current.kind === 'loaded') {
+      @let checkin = current.checkin;
+      <h1>Check-in n.º {{ checkin.number }}</h1>
+
+      <section class="card" aria-labelledby="data-heading">
+        <h2 id="data-heading">Recepción</h2>
+        <dl class="facts">
+          <div>
+            <dt>Fecha</dt>
+            <dd>
+              <time [attr.datetime]="checkin.createdAt">{{ checkin.createdAt | date: 'dd/MM/yyyy HH:mm' }}</time>
+            </dd>
+          </div>
+          <div>
+            <dt>Propietario</dt>
+            <dd>{{ checkin.ownerName }}</dd>
+          </div>
+          <div>
+            <dt>Registrado por</dt>
+            <dd>{{ checkin.createdByName }}</dd>
+          </div>
+          <div>
+            <dt>Kilometraje</dt>
+            <dd>{{ formatMileage(checkin.mileage) }} km</dd>
+          </div>
+          <div>
+            <dt>Combustible</dt>
+            <dd>{{ fuelLabels[checkin.fuelLevel] }}</dd>
+          </div>
+          <div>
+            <dt>Motivo</dt>
+            <dd>{{ checkin.reason }}</dd>
+          </div>
+          <div>
+            <dt>Inventario</dt>
+            <dd>{{ checkin.inventory.length > 0 ? checkin.inventory.join(', ') : 'Sin objetos' }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="card" aria-labelledby="damages-heading">
+        <h2 id="damages-heading">Daños ({{ checkin.damageCount }})</h2>
+        @for (group of groups(); track group.view) {
+          <div [attr.data-testid]="'damage-view-' + group.view">
+            <h3>{{ viewLabels[group.view] }}</h3>
+            <ul class="list">
+              @for (damage of group.damages; track damage.id) {
+                <li data-testid="damage-item">
+                  {{ typeLabels[damage.type] }}
+                  @if (damage.note) {
+                    – {{ damage.note }}
+                  }
+                  @if (damage.photoImageId && images()[damage.photoImageId]; as src) {
+                    <img class="thumb" data-testid="damage-photo" [src]="src" alt="Foto del daño" />
+                  }
+                </li>
+              }
+            </ul>
+          </div>
+        } @empty {
+          <p>Sin daños registrados.</p>
+        }
+      </section>
+
+      <section class="card" aria-labelledby="signature-heading">
+        <h2 id="signature-heading">Firma del cliente</h2>
+        @if (images()[checkin.signatureImageId]; as src) {
+          <img class="thumb" data-testid="signature" [src]="src" alt="Firma del cliente" />
+        } @else {
+          <p class="status">Cargando firma…</p>
+        }
+      </section>
+
+      <a class="action" [routerLink]="['/vehicles', checkin.vehicleId, 'checkins']">Volver a los check-ins</a>
+    }
+  }
+</main>

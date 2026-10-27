@@ -443,6 +443,8 @@ export const PROBLEM_CODES = [
   'HELP_RATE_LIMITED',
   'TICKET_NOT_OPEN',
   'ACCOUNT_INACTIVE',
+  // Contrato 004
+  'MILEAGE_BELOW_LAST',
 ] as const;
 
 export type ProblemCode = (typeof PROBLEM_CODES)[number];
@@ -483,4 +485,6 @@ export interface Problem {
   errors?: FieldError[];
   existingId?: string;
   current?: ClientDetail | VehicleDetail;
+  /** Contrato 004 (409, US1-AC3): último kilometraje registrado. */
+  lastMileage?: number;
 }

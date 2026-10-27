@@ -1,0 +1,66 @@
+<main class="page">
+  <h1>Check-ins del vehículo</h1>
+
+  <div class="toolbar">
+    <a class="action" [routerLink]="['/vehicles', vehicleId(), 'checkins', 'new']" data-testid="new-checkin">
+      Nuevo check-in
+    </a>
+    <a class="action" [routerLink]="['/vehicles', vehicleId()]">Volver al vehículo</a>
+  </div>
+
+  <div aria-live="polite">
+    @switch (state().kind) {
+      @case ('loading') {
+        <p class="status" role="status">Cargando check-ins…</p>
+      }
+      @case ('error') {
+        <div class="notice-error" role="alert" data-testid="load-error">
+          <p>No se pudieron cargar los check-ins. Revise la conexión e inténtelo de nuevo.</p>
+          <button type="button" class="action" (click)="retry()">Reintentar</button>
+        </div>
+      }
+    }
+  </div>
+
+  @if (state(); as current) {
+    @if (current.kind === 'loaded') {
+      @if (current.items.length === 0) {
+        <p data-testid="no-checkins">Este vehículo aún no tiene check-ins.</p>
+      } @else {
+        <ul class="list">
+          @for (item of current.items; track item.id) {
+            <li>
+              <a class="card" [routerLink]="['/checkins', item.id]" data-testid="checkin-item">
+                <h2>Check-in n.º {{ item.number }}</h2>
+                <dl class="facts">
+                  <div>
+                    <dt>Fecha</dt>
+                    <dd>
+                      <time [attr.datetime]="item.createdAt">{{ item.createdAt | date: 'dd/MM/yyyy HH:mm' }}</time>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Kilometraje</dt>
+                    <dd>{{ formatMileage(item.mileage) }} km</dd>
+                  </div>
+                  <div>
+                    <dt>Motivo</dt>
+                    <dd>{{ item.reason }}</dd>
+                  </div>
+                  <div>
+                    <dt>Registrado por</dt>
+                    <dd>{{ item.createdByName }}</dd>
+                  </div>
+                  <div>
+                    <dt>Daños</dt>
+                    <dd>{{ item.damageCount }}</dd>
+                  </div>
+                </dl>
+              </a>
+            </li>
+          }
+        </ul>
+      }
+    }
+  }
+</main>

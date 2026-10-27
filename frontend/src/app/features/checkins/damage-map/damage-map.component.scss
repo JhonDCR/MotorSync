@@ -1,0 +1,85 @@
+@use '../../../shared/styles/touch' as touch;
+
+$primary: #0b5394;
+$focus: #f1c232;
+
+.damage-map {
+  margin: 0 0 1rem;
+  padding: 1rem;
+  border: 1px solid #595959;
+  border-radius: 4px;
+}
+
+.views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.view,
+.action {
+  @include touch.touch-target;
+  padding: 0 1rem;
+  font: inherit;
+  color: $primary;
+  background: #ffffff;
+  border: 1px solid $primary;
+  border-radius: 4px;
+}
+
+.view.selected {
+  color: #ffffff;
+  background: $primary;
+}
+
+.view:focus-visible,
+.action:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 3px solid $focus;
+  outline-offset: 2px;
+}
+
+.badge {
+  margin-left: 0.25rem;
+  font-weight: 700;
+}
+
+.add {
+  display: grid;
+  gap: 0.5rem;
+
+  select,
+  input {
+    @include touch.touch-target;
+    font: inherit;
+  }
+}
+
+.list {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+  }
+}
+
+.error {
+  color: #b00020;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

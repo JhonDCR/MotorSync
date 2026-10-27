@@ -14,6 +14,8 @@ export interface ProblemExtra {
   errors?: FieldError[];
   existingId?: string;
   current?: unknown;
+  /** 409 of feature 004 (US1-AC3): highest mileage already recorded for the vehicle. */
+  lastMileage?: number;
 }
 
 /** Body of every error response (contract `Problem` schema), served as application/problem+json. */
@@ -56,6 +58,7 @@ function problem(status: number, code: string, extra: ProblemExtra = {}): Proble
   if (extra.errors !== undefined) body.errors = extra.errors;
   if (extra.existingId !== undefined) body.existingId = extra.existingId;
   if (extra.current !== undefined) body.current = extra.current;
+  if (extra.lastMileage !== undefined) body.lastMileage = extra.lastMileage;
   return body;
 }
 

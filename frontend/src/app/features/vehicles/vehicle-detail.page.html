@@ -42,6 +42,9 @@
         >
           Transferir propietario
         </button>
+        <a class="action" [routerLink]="['/vehicles', vehicle.id, 'checkins']" data-testid="vehicle-checkins">
+          Check-ins
+        </a>
       </div>
 
       <section class="card" aria-labelledby="vehicle-heading">

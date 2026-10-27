@@ -1,8 +1,10 @@
+import { json, type NextFunction, type Request, type Response } from 'express';
 import { ValidationPipe, type INestApplication, type ValidationError } from '@nestjs/common';
 import { ProblemDetailsFilter, ProblemException } from './common/problem-details.filter.js';
 import type { FieldError } from './database/pg-errors.js';
 
 export const API_PREFIX = 'api/v1';
+export const CHECKIN_BODY_LIMIT = '25mb';
 
 const CONSTRAINT_CODES: Record<string, string> = {
   whitelistValidation: 'UNKNOWN_FIELD',
@@ -45,6 +47,14 @@ export function validationExceptionFactory(errors: ValidationError[]): ProblemEx
 /** HTTP wiring shared by main.ts and the e2e tests: prefix, validation and problem+json. */
 export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix(API_PREFIX);
+  // Check-in creation carries base64 photos (up to 21 images of 1 MB): 25 MB only on that route.
+  // Registered before Nest's default 100 kb parser, which then skips the already parsed body.
+  // Wrapped so that the layer is not named `jsonParser`: Nest skips its own parsers when it finds one.
+  const checkinJson = json({ limit: CHECKIN_BODY_LIMIT });
+  app.use(
+    `/${API_PREFIX}/vehicles/:vehicleId/checkins`,
+    (req: Request, res: Response, next: NextFunction) => checkinJson(req, res, next),
+  );
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

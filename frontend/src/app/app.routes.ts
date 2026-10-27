@@ -94,6 +94,28 @@ export function buildRoutes(devMode: boolean): Routes {
       canMatch: [authGuard],
       loadComponent: () => import('./features/vehicles/vehicle-form.page').then((m) => m.VehicleFormPage),
     },
+    // Check-ins (004): vehicles/:id/checkins/new y vehicles/:id/checkins van antes de vehicles/:id.
+    {
+      path: 'vehicles/:id/checkins/new',
+      title: 'Nuevo check-in',
+      canMatch: [authGuard],
+      loadComponent: () =>
+        import('./features/checkins/checkin-form/checkin-form.component').then((m) => m.CheckinFormComponent),
+    },
+    {
+      path: 'vehicles/:id/checkins',
+      title: 'Check-ins del vehículo',
+      canMatch: [authGuard],
+      loadComponent: () =>
+        import('./features/checkins/checkin-list/checkin-list.component').then((m) => m.CheckinListComponent),
+    },
+    {
+      path: 'checkins/:id',
+      title: 'Detalle del check-in',
+      canMatch: [authGuard],
+      loadComponent: () =>
+        import('./features/checkins/checkin-detail/checkin-detail.component').then((m) => m.CheckinDetailComponent),
+    },
     {
       path: 'vehicles/:id',
       title: 'Ficha del vehículo',

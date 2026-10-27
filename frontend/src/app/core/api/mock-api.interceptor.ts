@@ -12,6 +12,7 @@ import { decodeSessionToken } from '../auth/current-session';
 import { MockApiStore, mockActor, mockProblem, type MockActor, type MockResult } from './mock-api.store';
 import { REQUESTED_WITH_HEADER, REQUESTED_WITH_VALUE } from './auth-api.service';
 import { MockAuthStore } from './mock-auth.store';
+import { MockCheckinStore } from './mock-checkin.store';
 import { MockSupportStore } from './mock-support.store';
 import { USE_MOCK_API } from './use-mock-api';
 
@@ -28,6 +29,9 @@ const VEHICLES_PATH = '/api/v1/vehicles';
 const VEHICLE_BY_ID = /^\/api\/v1\/vehicles\/([^/]+)$/;
 const VEHICLE_TRANSFERS = /^\/api\/v1\/vehicles\/([^/]+)\/ownership-transfers$/;
 const VEHICLE_HISTORY = /^\/api\/v1\/vehicles\/([^/]+)\/ownership-history$/;
+const VEHICLE_CHECKINS = /^\/api\/v1\/vehicles\/([^/]+)\/checkins$/;
+const CHECKIN_BY_ID = /^\/api\/v1\/checkins\/([^/]+)$/;
+const CHECKIN_IMAGE = /^\/api\/v1\/checkins\/([^/]+)\/images\/([^/]+)$/;
 const AUTH_REGISTER_PATH = '/api/v1/auth/register';
 const AUTH_LOGIN_PATH = '/api/v1/auth/login';
 const AUTH_REFRESH_PATH = '/api/v1/auth/refresh';
@@ -108,6 +112,7 @@ function route(
   store: MockApiStore,
   auth: MockAuthStore,
   support: MockSupportStore,
+  checkins: MockCheckinStore,
 ): Observable<HttpEvent<unknown>> {
   const path = pathOf(req.url);
 
@@ -246,6 +251,28 @@ function route(
     return respond(req, { ok: false, problem: blocked });
   }
 
+  // Check-ins of contract 004 (immutable: only GET and POST).
+  const vehicleCheckins = VEHICLE_CHECKINS.exec(path);
+  if (vehicleCheckins !== null && req.method === 'POST') {
+    return respond(req, checkins.create(decodeURIComponent(vehicleCheckins[1]), req.body, actorOf(req)));
+  }
+  if (vehicleCheckins !== null && req.method === 'GET') {
+    return respond(req, checkins.list(decodeURIComponent(vehicleCheckins[1])));
+  }
+  const checkinById = CHECKIN_BY_ID.exec(path);
+  if (checkinById !== null && req.method === 'GET') {
+    return respond(req, checkins.get(decodeURIComponent(checkinById[1])));
+  }
+  const checkinImage = CHECKIN_IMAGE.exec(path);
+  if (checkinImage !== null && req.method === 'GET') {
+    const image = checkins.image(decodeURIComponent(checkinImage[1]), decodeURIComponent(checkinImage[2]));
+    if (!image.ok) {
+      return respond(req, image);
+    }
+    const headers = new HttpHeaders({ 'Content-Type': image.body.type });
+    return of(new HttpResponse({ body: image.body, headers, status: 200, url: req.urlWithParams }));
+  }
+
   if (path === CLIENTS_PATH && req.method === 'POST') {
     const result = store.createClient(req.body);
     return respond(req, result, result.ok ? `${CLIENTS_PATH}/${result.body.id}` : undefined);
@@ -293,5 +320,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   const store = inject(MockApiStore);
   const auth = inject(MockAuthStore);
   const support = inject(MockSupportStore);
-  return timer(MOCK_LATENCY_MS).pipe(mergeMap(() => route(req, store, auth, support)));
+  const checkins = inject(MockCheckinStore);
+  return timer(MOCK_LATENCY_MS).pipe(mergeMap(() => route(req, store, auth, support, checkins)));
 };

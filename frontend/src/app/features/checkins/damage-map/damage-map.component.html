@@ -1,0 +1,79 @@
+<fieldset class="damage-map">
+  <legend>Daños visibles</legend>
+  <div class="views" role="group" aria-label="Vista del vehículo">
+    @for (v of views; track v) {
+      <button
+        type="button"
+        class="view"
+        [class.selected]="view() === v"
+        [attr.aria-pressed]="view() === v"
+        [attr.data-testid]="'view-' + v"
+        (click)="view.set(v)"
+      >
+        {{ viewLabels[v] }}
+        @if (countFor(v) > 0) {
+          <span class="badge">({{ countFor(v) }})</span>
+        }
+      </button>
+    }
+  </div>
+
+  <div class="add">
+    <label for="damage-type">Tipo de daño en la vista {{ viewLabels[view()] }}</label>
+    <select id="damage-type" [value]="type()" (change)="onType($event)">
+      @for (t of types; track t) {
+        <option [value]="t">{{ typeLabels[t] }}</option>
+      }
+    </select>
+
+    <label for="damage-note">Nota (opcional)</label>
+    <input id="damage-note" type="text" maxlength="500" [value]="note()" (input)="onNote($event)" />
+
+    <label for="damage-photo">Foto (opcional)</label>
+    <input
+      #photoInput
+      id="damage-photo"
+      type="file"
+      accept="image/*"
+      capture="environment"
+      (change)="onPhoto(photoInput)"
+    />
+    @if (processing()) {
+      <p class="status" role="status">Comprimiendo foto…</p>
+    }
+    @if (photoError()) {
+      <p class="error" role="alert">No se pudo procesar la foto. Intente con otra.</p>
+    }
+
+    <button
+      type="button"
+      class="action"
+      data-testid="add-damage"
+      [disabled]="processing() || damages().length >= maxDamages"
+      (click)="add(photoInput)"
+    >
+      Agregar daño
+    </button>
+  </div>
+
+  @if (damages().length > 0) {
+    <ul class="list">
+      @for (d of damages(); track $index) {
+        <li>
+          <span>
+            {{ viewLabels[d.view] }}: {{ typeLabels[d.type] }}
+            @if (d.note) {
+              – {{ d.note }}
+            }
+            @if (d.photo) {
+              (con foto)
+            }
+          </span>
+          <button type="button" class="action" (click)="remove($index)">
+            Quitar<span class="sr-only"> daño {{ $index + 1 }}</span>
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</fieldset>

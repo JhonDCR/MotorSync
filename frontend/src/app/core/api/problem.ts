@@ -66,6 +66,8 @@ const PROBLEM_MESSAGES: Record<ProblemCode, string> = {
   HELP_RATE_LIMITED: 'Demasiadas solicitudes. Intente de nuevo más tarde',
   TICKET_NOT_OPEN: 'Solo se puede generar una contraseña temporal sobre un ticket abierto',
   ACCOUNT_INACTIVE: 'La cuenta está desactivada; el administrador de su taller debe reactivarla',
+  // Contrato 004
+  MILEAGE_BELOW_LAST: 'El kilometraje no puede ser menor que el del último check-in',
 };
 
 const NOT_FOUND_BY_RESOURCE: Record<NonNullable<ProblemContext['resource']>, string> = {

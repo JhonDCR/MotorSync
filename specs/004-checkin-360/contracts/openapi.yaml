@@ -1,0 +1,135 @@
+openapi: 3.1.0
+info:
+  title: MotorSync - Check-in 360 (004)
+  version: 0.4.0
+  description: |
+    Rutas de taller; exigen sesión de la 002 (roles `asesor` o `admin`). Tenant y autor salen de la sesión.
+    Recursos de otro taller o inexistentes responden 404 (US1-AC5, US2-AC2). Errores en Problem Details (001).
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /vehicles/{vehicleId}/checkins:
+    parameters:
+      - { name: vehicleId, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      summary: Crear check-in (US1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckinCreate' }
+      responses:
+        '201': { description: Creado, content: { application/json: { schema: { $ref: '#/components/schemas/CheckinDetail' } } } }
+        '400': { $ref: '#/components/responses/Problem' }
+        '401': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409': { description: 'Kilometraje menor al último (US1-AC3); `lastMileage` en el cuerpo', content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } } }
+        '413': { $ref: '#/components/responses/Problem' }
+    get:
+      summary: Listar check-ins del vehículo, más reciente primero (US2-AC1)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/CheckinSummary' } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /checkins/{checkinId}:
+    get:
+      summary: Detalle (US2-AC1)
+      parameters:
+        - { name: checkinId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/CheckinDetail' } } } }
+        '404': { $ref: '#/components/responses/Problem' }
+  /checkins/{checkinId}/images/{imageId}:
+    get:
+      summary: Foto de daño o firma (binario)
+      parameters:
+        - { name: checkinId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: imageId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Imagen
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+        '404': { $ref: '#/components/responses/Problem' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  responses:
+    Problem:
+      description: Error
+      content: { application/problem+json: { schema: { $ref: '#/components/schemas/Problem' } } }
+  schemas:
+    Problem:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        errors: { type: object, additionalProperties: { type: string } }
+        lastMileage: { type: integer }
+    ImageUpload:
+      type: object
+      required: [mime, base64]
+      properties:
+        mime: { type: string, enum: [image/jpeg, image/png] }
+        base64: { type: string, description: 'Máx. 1 MB decodificado; se verifica por magic bytes' }
+    DamageInput:
+      type: object
+      required: [view, type]
+      properties:
+        view: { $ref: '#/components/schemas/View' }
+        type: { $ref: '#/components/schemas/DamageType' }
+        note: { type: string, maxLength: 500 }
+        photo: { $ref: '#/components/schemas/ImageUpload' }
+    CheckinCreate:
+      type: object
+      required: [mileage, fuelLevel, reason, signature]
+      additionalProperties: false
+      properties:
+        mileage: { type: integer, minimum: 0 }
+        fuelLevel: { $ref: '#/components/schemas/FuelLevel' }
+        reason: { type: string, minLength: 1, maxLength: 1000 }
+        inventory: { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 100 } }
+        damages: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/DamageInput' } }
+        signature: { $ref: '#/components/schemas/ImageUpload' }
+    CheckinSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: integer }
+        createdAt: { type: string, format: date-time }
+        mileage: { type: integer }
+        reason: { type: string }
+        createdByName: { type: string }
+        damageCount: { type: integer }
+    CheckinDetail:
+      allOf:
+        - $ref: '#/components/schemas/CheckinSummary'
+        - type: object
+          properties:
+            vehicleId: { type: string, format: uuid }
+            ownerClientId: { type: string, format: uuid }
+            ownerName: { type: string }
+            fuelLevel: { $ref: '#/components/schemas/FuelLevel' }
+            inventory: { type: array, items: { type: string } }
+            signatureImageId: { type: string, format: uuid }
+            damages:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  view: { $ref: '#/components/schemas/View' }
+                  type: { $ref: '#/components/schemas/DamageType' }
+                  note: { type: [string, 'null'] }
+                  photoImageId: { type: [string, 'null'], format: uuid }
+    FuelLevel: { type: string, enum: [vacio, '1/4', '1/2', '3/4', lleno] }
+    View: { type: string, enum: [frente, atras, izquierda, derecha, arriba] }
+    DamageType: { type: string, enum: [rayon, golpe, abolladura, rotura, faltante, otro] }

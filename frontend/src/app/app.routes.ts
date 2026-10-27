@@ -109,6 +109,42 @@ export function buildRoutes(devMode: boolean): Routes {
       loadComponent: () =>
         import('./features/checkins/checkin-list/checkin-list.component').then((m) => m.CheckinListComponent),
     },
+    // Presupuestos (005): van antes de checkins/:id y vehicles/:id.
+    {
+      path: 'checkins/:id/budgets/new',
+      title: 'Nuevo presupuesto',
+      canMatch: [authGuard],
+      loadComponent: () =>
+        import('./features/budgets/budget-form/budget-form.component').then((m) => m.BudgetFormComponent),
+    },
+    {
+      path: 'checkins/:id/budgets',
+      title: 'Presupuestos del check-in',
+      canMatch: [authGuard],
+      loadComponent: () =>
+        import('./features/budgets/budget-list/budget-list.component').then((m) => m.BudgetListComponent),
+    },
+    {
+      path: 'vehicles/:id/budgets',
+      title: 'Presupuestos del vehículo',
+      canMatch: [authGuard],
+      loadComponent: () =>
+        import('./features/budgets/budget-list/budget-list.component').then((m) => m.BudgetListComponent),
+    },
+    {
+      path: 'budgets/:id/edit',
+      title: 'Editar presupuesto',
+      canMatch: [authGuard],
+      loadComponent: () =>
+        import('./features/budgets/budget-form/budget-form.component').then((m) => m.BudgetFormComponent),
+    },
+    {
+      path: 'budgets/:id',
+      title: 'Detalle del presupuesto',
+      canMatch: [authGuard],
+      loadComponent: () =>
+        import('./features/budgets/budget-detail/budget-detail.component').then((m) => m.BudgetDetailComponent),
+    },
     {
       path: 'checkins/:id',
       title: 'Detalle del check-in',

@@ -1,6 +1,6 @@
 <a href="#main-content" class="skip-link">Saltar al contenido principal</a>
 
-@if (!isSupportZone()) {
+@if (!isSupportZone() && !isAuthZone()) {
   <header class="app-header">
     <div class="header-inner">
       <div class="brand-group">
@@ -15,8 +15,8 @@
         </a>
       </div>
 
-      <!-- FR-026: with a temporary password pending, the workshop navigation is hidden. -->
-      @if (!session.mustChangePassword()) {
+      <!-- FR-026: with a temporary password pending or in auth flows, the workshop navigation is hidden. -->
+      @if (showNavigation()) {
         <nav class="main-nav" aria-label="Principal">
           <ul>
             <li>

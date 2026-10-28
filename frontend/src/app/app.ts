@@ -13,6 +13,17 @@ function isSupportUrl(url: string): boolean {
   return url === '/support' || url.startsWith('/support/') || url.startsWith('/support?');
 }
 
+function isAuthUrl(url: string): boolean {
+  return (
+    url === '/login' ||
+    url.startsWith('/login?') ||
+    url === '/register' ||
+    url.startsWith('/register?') ||
+    url === '/forgot-password' ||
+    url.startsWith('/forgot-password?')
+  );
+}
+
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
@@ -28,6 +39,11 @@ export class App {
 
   private readonly currentUrl = signal(this.router.url);
   protected readonly isSupportZone = computed(() => isSupportUrl(this.currentUrl()));
+  protected readonly isAuthZone = computed(() => isAuthUrl(this.currentUrl()));
+
+  protected readonly showNavigation = computed(() => {
+    return !this.session.mustChangePassword() && !this.isAuthZone();
+  });
 
   protected readonly roleLabel = computed(() => {
     const role = this.session.user()?.role;

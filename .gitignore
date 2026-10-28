@@ -3,6 +3,7 @@ node_modules/
 dist/
 build/
 .angular/
+.vitest/
 coverage/
 *.tsbuildinfo
 

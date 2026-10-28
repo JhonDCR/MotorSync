@@ -19,9 +19,14 @@
 //         // GET   /api/v1/vehicles/{vehicleId}/ownership-history  ({ items: OwnershipChange[] }, sin reordenar)
 //   Cuerpos tal cual, id con encodeURIComponent, errores Problem como arriba (409 VERSION_CONFLICT con current,
 //   422 SAME_OWNER, 404 CLIENT_NOT_FOUND, 400 REASON_REQUIRED).
+//
+// T004 (007, US1, US2), método nuevo para el implementer (T005):
+//     getHistory(vehicleId: string): Observable<VehicleClinicalHistory>
+//         // GET   /api/v1/vehicles/{vehicleId}/history
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import type { Observable } from 'rxjs';
 import type {
   OwnershipHistoryResponse,
   OwnershipTransferRequest,
@@ -32,6 +37,57 @@ import type {
   VehicleUpdate,
 } from './api.models';
 import { VehiclesApiService } from './vehicles-api.service';
+
+export interface VehicleHeader {
+  id: string;
+  plate: string;
+  brand: string;
+  model: string;
+  year: number;
+  color: string;
+  bodyType: string;
+  vin: string | null;
+  initialMileage: number;
+}
+
+export interface VehicleOwner {
+  id: string;
+  displayName: string;
+  documentType: 'cedula' | 'ruc' | 'passport';
+  documentNumber: string;
+  phone?: string | null;
+}
+
+export interface VehicleMetrics {
+  currentMileage: number;
+  mileageDelta: number;
+  totalCheckins: number;
+  totalWorkOrders: number;
+  totalDeliveredWorkOrders: number;
+  totalInvested: string;
+  lastVisitAt: string | null;
+}
+
+export interface TimelineEvent {
+  id: string;
+  kind: 'checkin' | 'budget' | 'work_order' | 'ownership_transfer';
+  occurredAt: string;
+  summary: string;
+  data: Record<string, unknown>;
+}
+
+export interface VehicleClinicalHistory {
+  vehicle: VehicleHeader;
+  owner: VehicleOwner;
+  metrics: VehicleMetrics;
+  timeline: TimelineEvent[];
+}
+
+declare module './vehicles-api.service' {
+  interface VehiclesApiService {
+    getHistory(vehicleId: string): Observable<VehicleClinicalHistory>;
+  }
+}
 
 const VEHICLE_ID = 'b2222222-2222-4222-8222-222222222222';
 const EXISTING_ID = 'c3333333-3333-4333-8333-333333333333';
@@ -519,6 +575,114 @@ describe('VehiclesApiService: edición, transferencia e historial (T076)', () =>
         .flush(body, { status: 404, statusText: 'Not Found', headers: PROBLEM_HEADERS });
 
       expect(received).toEqual(body);
+    });
+  });
+
+  describe('getHistory (T004, US1, US2)', () => {
+    const CLINICAL_HISTORY: VehicleClinicalHistory = {
+      vehicle: {
+        id: VEHICLE_ID,
+        plate: 'PBA1234',
+        brand: 'Toyota',
+        model: 'Hilux',
+        year: 2022,
+        color: 'Blanco',
+        bodyType: 'pickup',
+        vin: null,
+        initialMileage: 45000,
+      },
+      owner: {
+        id: OWNER_ID,
+        displayName: 'Ana Pérez',
+        documentType: 'cedula',
+        documentNumber: '1710034065',
+        phone: '0991234567',
+      },
+      metrics: {
+        currentMileage: 52000,
+        mileageDelta: 7000,
+        totalCheckins: 3,
+        totalWorkOrders: 2,
+        totalDeliveredWorkOrders: 2,
+        totalInvested: '450.00',
+        lastVisitAt: '2026-10-21T18:00:00.000Z',
+      },
+      timeline: [
+        {
+          id: 'e1111111-1111-4111-8111-111111111111',
+          kind: 'work_order',
+          occurredAt: '2026-10-21T18:00:00.000Z',
+          summary: 'Orden de trabajo #2 entregada',
+          data: { number: 2, status: 'entregada' },
+        },
+        {
+          id: 'e2222222-2222-4222-8222-222222222222',
+          kind: 'budget',
+          occurredAt: '2026-10-21T16:00:00.000Z',
+          summary: 'Presupuesto #2 aprobado',
+          data: { number: 2, status: 'aprobado', total: '250.00' },
+        },
+        {
+          id: 'e3333333-3333-4333-8333-333333333333',
+          kind: 'checkin',
+          occurredAt: '2026-10-21T15:00:00.000Z',
+          summary: 'Check-in de recepción con 52.000 km',
+          data: { mileage: 52000, fuelLevel: '1/2' },
+        },
+        {
+          id: 'e4444444-4444-4444-8444-444444444444',
+          kind: 'ownership_transfer',
+          occurredAt: '2026-09-15T14:00:00.000Z',
+          summary: 'Transferencia de propietario',
+          data: {
+            previousOwner: { displayName: 'Carlos Ruiz', documentNumber: '0912345675' },
+            newOwner: { displayName: 'Ana Pérez', documentNumber: '1710034065' },
+          },
+        },
+      ],
+    };
+
+    it('[US1-AC1] solicita GET /api/v1/vehicles/:vehicleId/history y retorna VehicleClinicalHistory', () => {
+      let result: VehicleClinicalHistory | undefined;
+      service.getHistory(VEHICLE_ID).subscribe((response: VehicleClinicalHistory) => (result = response));
+
+      const req = httpMock.expectOne(`/api/v1/vehicles/${VEHICLE_ID}/history`);
+      expect(req.request.method).toBe('GET');
+      req.flush(CLINICAL_HISTORY);
+
+      expect(result).toEqual(CLINICAL_HISTORY);
+    });
+
+    it('[US1-AC1] codifica el vehicleId en la URL', () => {
+      const weirdId = 'vehículo/especial?1';
+      service.getHistory(weirdId).subscribe();
+
+      const req = httpMock.expectOne(`/api/v1/vehicles/${encodeURIComponent(weirdId)}/history`);
+      expect(req.request.method).toBe('GET');
+      req.flush(CLINICAL_HISTORY);
+    });
+
+    it('[US1-AC4] maneja error 404 (vehículo inexistente o ajeno) propagando Problem tipado', () => {
+      const body = problem(404, 'NOT_FOUND');
+      let received: unknown;
+      service.getHistory(VEHICLE_ID).subscribe({ error: (err: unknown) => (received = err) });
+
+      httpMock
+        .expectOne(`/api/v1/vehicles/${VEHICLE_ID}/history`)
+        .flush(body, { status: 404, statusText: 'Not Found', headers: PROBLEM_HEADERS });
+
+      expect(received).toEqual(body);
+    });
+
+    it('[edge case conexión inestable] un fallo de red con status 0 se propaga como HttpErrorResponse', () => {
+      let received: unknown;
+      service.getHistory(VEHICLE_ID).subscribe({ error: (err: unknown) => (received = err) });
+
+      httpMock
+        .expectOne(`/api/v1/vehicles/${VEHICLE_ID}/history`)
+        .error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+
+      expect(received).toBeInstanceOf(HttpErrorResponse);
     });
   });
 });

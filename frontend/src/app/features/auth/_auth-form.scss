@@ -1,5 +1,7 @@
 @use '../../shared/styles/touch' as touch;
 
+$touch-target: 44px;
+
 :host {
   display: block;
   min-height: 100%;
@@ -7,14 +9,73 @@
   background-color: var(--color-bg);
 }
 
+.auth-layout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 5rem);
+  padding: var(--space-xl) var(--space-md);
+  box-sizing: border-box;
+}
+
 .auth-page {
   box-sizing: border-box;
+  width: 100%;
   max-width: 28rem;
-  margin: var(--space-xl) auto;
+  margin: 0 auto;
   padding: var(--space-xl);
-  background-color: var(--color-bg);
+  background-color: #ffffff;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+
+  &.auth-page--wide {
+    max-width: 34rem;
+  }
+}
+
+.auth-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--color-primary);
+  background-color: var(--color-primary-light);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+
+  .auth-brand-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  .auth-brand-title {
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+}
+
+.auth-header {
+  margin-bottom: var(--space-xl);
+
+  h1 {
+    margin: 0 0 var(--space-xs);
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--color-text);
+    line-height: 1.25;
+  }
+
+  .intro {
+    margin: 0;
+    font-size: var(--font-size-base);
+    color: var(--color-text-muted);
+    line-height: 1.5;
+  }
 }
 
 h1 {
@@ -45,7 +106,7 @@ h1 {
     @include touch.touch-target;
     box-sizing: border-box;
     width: 100%;
-    min-height: 44px;
+    min-height: $touch-target;
     padding: 0 var(--space-md);
     font-family: var(--font-sans);
     font-size: var(--font-size-md);
@@ -84,20 +145,29 @@ h1 {
   margin: 0 0 var(--space-lg);
   padding: var(--space-md) var(--space-lg);
   font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: 1.4;
   color: var(--color-error);
   background-color: var(--color-error-light);
   border: 1px solid var(--color-error);
   border-radius: var(--radius-sm);
 }
 
-.session-reason {
+.session-reason,
+.must-change {
   margin: 0 0 var(--space-lg);
   padding: var(--space-md) var(--space-lg);
   font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: 1.4;
   color: var(--color-text);
   background-color: var(--color-primary-light);
   border: 1px solid var(--color-primary);
   border-radius: var(--radius-sm);
+}
+
+.auth-form {
+  margin-bottom: 0;
 }
 
 .primary {
@@ -132,13 +202,35 @@ h1 {
   }
 }
 
+.auth-footer {
+  margin-top: var(--space-xl);
+}
+
+.auth-divider {
+  height: 1px;
+  margin: var(--space-md) 0;
+  background-color: var(--color-border-light);
+}
+
 .alternate {
-  margin: var(--space-lg) 0 0;
+  margin: var(--space-md) 0 0;
   text-align: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+
+  &.alternate-secondary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+  }
 }
 
 .alternate a {
   @include touch.touch-target;
+  min-height: $touch-target;
+  min-width: $touch-target;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -146,6 +238,7 @@ h1 {
   font-size: var(--font-size-base);
   font-weight: 600;
   text-decoration: underline;
+  text-underline-offset: 3px;
   transition: color var(--transition-fast);
 
   &:hover {
@@ -159,7 +252,11 @@ h1 {
 }
 
 @media (min-width: 48rem) {
+  .auth-layout {
+    padding: var(--space-2xl) var(--space-lg);
+  }
+
   .auth-page {
-    margin: var(--space-2xl) auto;
+    padding: var(--space-2xl);
   }
 }

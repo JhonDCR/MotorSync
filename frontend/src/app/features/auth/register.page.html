@@ -1,107 +1,126 @@
-<section class="auth-page" aria-labelledby="register-title">
-  <h1 id="register-title">Registrar taller</h1>
-  <p class="intro">Cree la cuenta de su taller y la del primer administrador.</p>
-
-  @if (formError(); as message) {
-    <p class="form-error" role="alert" data-testid="form-error">{{ message }}</p>
-  }
-
-  @let fieldErrors = errors();
-  <form novalidate (submit)="submit($event)">
-    <div class="field">
-      <label for="register-workshop-name">Nombre comercial del taller</label>
-      <input
-        id="register-workshop-name"
-        type="text"
-        autocomplete="organization"
-        data-testid="workshop-name"
-        [attr.aria-invalid]="fieldErrors.workshopName ? 'true' : null"
-        [attr.aria-describedby]="fieldErrors.workshopName ? 'register-workshop-name-error' : null"
-        (input)="update('workshopName', $event)"
-      />
-      @if (fieldErrors.workshopName) {
-        <p class="field-error" id="register-workshop-name-error" data-testid="error-workshopName">
-          {{ fieldErrors.workshopName }}
-        </p>
-      }
+<div class="auth-layout">
+  <section class="auth-page auth-page--wide" aria-labelledby="register-title">
+    <div class="auth-brand-badge" aria-hidden="true">
+      <svg class="auth-brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+      </svg>
+      <span class="auth-brand-title">MotorSync</span>
     </div>
 
-    <div class="field">
-      <label for="register-ruc">RUC del taller</label>
-      <input
-        id="register-ruc"
-        type="text"
-        inputmode="numeric"
-        autocomplete="off"
-        data-testid="ruc"
-        [attr.aria-invalid]="fieldErrors.ruc ? 'true' : null"
-        [attr.aria-describedby]="fieldErrors.ruc ? 'register-ruc-hint register-ruc-error' : 'register-ruc-hint'"
-        (input)="update('ruc', $event)"
-      />
-      <p class="hint" id="register-ruc-hint">13 dígitos terminados en 001.</p>
-      @if (fieldErrors.ruc) {
-        <p class="field-error" id="register-ruc-error" data-testid="error-ruc">{{ fieldErrors.ruc }}</p>
-      }
+    <div class="auth-header">
+      <h1 id="register-title">Registrar taller</h1>
+      <p class="intro">Cree la cuenta de su taller y la del primer administrador.</p>
     </div>
 
-    <div class="field">
-      <label for="register-name">Su nombre</label>
-      <input
-        id="register-name"
-        type="text"
-        autocomplete="name"
-        data-testid="name"
-        [attr.aria-invalid]="fieldErrors.name ? 'true' : null"
-        [attr.aria-describedby]="fieldErrors.name ? 'register-name-error' : null"
-        (input)="update('name', $event)"
-      />
-      @if (fieldErrors.name) {
-        <p class="field-error" id="register-name-error" data-testid="error-name">{{ fieldErrors.name }}</p>
-      }
+    @if (formError(); as message) {
+      <p class="form-error" role="alert" data-testid="form-error">{{ message }}</p>
+    }
+
+    @let fieldErrors = errors();
+    <form novalidate (submit)="submit($event)" class="auth-form">
+      <div class="field">
+        <label for="register-workshop-name">Nombre comercial del taller</label>
+        <input
+          id="register-workshop-name"
+          type="text"
+          autocomplete="organization"
+          data-testid="workshop-name"
+          placeholder="Ej. Taller Mecánico Los Andes"
+          [attr.aria-invalid]="fieldErrors.workshopName ? 'true' : null"
+          [attr.aria-describedby]="fieldErrors.workshopName ? 'register-workshop-name-error' : null"
+          (input)="update('workshopName', $event)"
+        />
+        @if (fieldErrors.workshopName) {
+          <p class="field-error" id="register-workshop-name-error" data-testid="error-workshopName">
+            {{ fieldErrors.workshopName }}
+          </p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="register-ruc">RUC del taller</label>
+        <input
+          id="register-ruc"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          data-testid="ruc"
+          placeholder="1790012345001"
+          [attr.aria-invalid]="fieldErrors.ruc ? 'true' : null"
+          [attr.aria-describedby]="fieldErrors.ruc ? 'register-ruc-hint register-ruc-error' : 'register-ruc-hint'"
+          (input)="update('ruc', $event)"
+        />
+        <p class="hint" id="register-ruc-hint">13 dígitos terminados en 001.</p>
+        @if (fieldErrors.ruc) {
+          <p class="field-error" id="register-ruc-error" data-testid="error-ruc">{{ fieldErrors.ruc }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="register-name">Su nombre</label>
+        <input
+          id="register-name"
+          type="text"
+          autocomplete="name"
+          data-testid="name"
+          placeholder="Ej. Carlos Mendoza"
+          [attr.aria-invalid]="fieldErrors.name ? 'true' : null"
+          [attr.aria-describedby]="fieldErrors.name ? 'register-name-error' : null"
+          (input)="update('name', $event)"
+        />
+        @if (fieldErrors.name) {
+          <p class="field-error" id="register-name-error" data-testid="error-name">{{ fieldErrors.name }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="register-email">Correo electrónico</label>
+        <input
+          id="register-email"
+          type="email"
+          inputmode="email"
+          autocomplete="email"
+          autocapitalize="off"
+          spellcheck="false"
+          data-testid="email"
+          placeholder="admin@taller.ec"
+          [attr.aria-invalid]="fieldErrors.email ? 'true' : null"
+          [attr.aria-describedby]="fieldErrors.email ? 'register-email-error' : null"
+          (input)="update('email', $event)"
+        />
+        @if (fieldErrors.email) {
+          <p class="field-error" id="register-email-error" data-testid="error-email">{{ fieldErrors.email }}</p>
+        }
+      </div>
+
+      <div class="field">
+        <label for="register-password">Contraseña</label>
+        <input
+          id="register-password"
+          type="password"
+          autocomplete="new-password"
+          data-testid="password"
+          placeholder="Mínimo 8 caracteres"
+          [attr.aria-invalid]="fieldErrors.password ? 'true' : null"
+          [attr.aria-describedby]="
+            fieldErrors.password ? 'register-password-hint register-password-error' : 'register-password-hint'
+          "
+          (input)="update('password', $event)"
+        />
+        <p class="hint" id="register-password-hint">Al menos {{ passwordMinLength }} caracteres.</p>
+        @if (fieldErrors.password) {
+          <p class="field-error" id="register-password-error" data-testid="error-password">{{ fieldErrors.password }}</p>
+        }
+      </div>
+
+      <button type="submit" class="primary" data-testid="submit" [disabled]="submitting()">
+        {{ submitting() ? 'Registrando…' : 'Registrar' }}
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      <div class="auth-divider" role="separator" aria-hidden="true"></div>
+      <p class="alternate alternate-secondary">¿Ya tiene una cuenta? <a routerLink="/login">Iniciar sesión</a></p>
     </div>
-
-    <div class="field">
-      <label for="register-email">Correo electrónico</label>
-      <input
-        id="register-email"
-        type="email"
-        inputmode="email"
-        autocomplete="email"
-        autocapitalize="off"
-        spellcheck="false"
-        data-testid="email"
-        [attr.aria-invalid]="fieldErrors.email ? 'true' : null"
-        [attr.aria-describedby]="fieldErrors.email ? 'register-email-error' : null"
-        (input)="update('email', $event)"
-      />
-      @if (fieldErrors.email) {
-        <p class="field-error" id="register-email-error" data-testid="error-email">{{ fieldErrors.email }}</p>
-      }
-    </div>
-
-    <div class="field">
-      <label for="register-password">Contraseña</label>
-      <input
-        id="register-password"
-        type="password"
-        autocomplete="new-password"
-        data-testid="password"
-        [attr.aria-invalid]="fieldErrors.password ? 'true' : null"
-        [attr.aria-describedby]="
-          fieldErrors.password ? 'register-password-hint register-password-error' : 'register-password-hint'
-        "
-        (input)="update('password', $event)"
-      />
-      <p class="hint" id="register-password-hint">Al menos {{ passwordMinLength }} caracteres.</p>
-      @if (fieldErrors.password) {
-        <p class="field-error" id="register-password-error" data-testid="error-password">{{ fieldErrors.password }}</p>
-      }
-    </div>
-
-    <button type="submit" class="primary" data-testid="submit" [disabled]="submitting()">
-      {{ submitting() ? 'Registrando…' : 'Registrar' }}
-    </button>
-  </form>
-
-  <p class="alternate">¿Ya tiene una cuenta? <a routerLink="/login">Iniciar sesión</a></p>
-</section>
+  </section>
+</div>

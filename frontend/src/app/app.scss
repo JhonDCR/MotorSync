@@ -7,23 +7,61 @@
   background-color: var(--color-bg);
 }
 
+.skip-link {
+  position: absolute;
+  top: -9999px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  padding: var(--space-sm) var(--space-lg);
+  font-weight: 700;
+  color: var(--color-primary);
+  background: #ffffff;
+  border: 2px solid var(--color-focus);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+
+  &:focus {
+    top: var(--space-sm);
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
 .app-header {
   position: sticky;
   top: 0;
   z-index: 100;
+  color: #ffffff;
+  background-color: var(--color-primary);
+  border-bottom: 2px solid var(--color-primary-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+.header-inner {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
   padding: var(--space-sm) var(--space-lg);
-  color: #ffffff;
-  background-color: var(--color-primary);
-  border-bottom: 2px solid var(--color-primary-hover);
 }
 
 .brand-group {
   display: flex;
   align-items: center;
+}
+
+.brand-link {
+  display: inline-flex;
+  align-items: center;
   gap: var(--space-sm);
+  color: #ffffff;
+  text-decoration: none;
+
+  &:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
 }
 
 .brand-logo {
@@ -33,12 +71,26 @@
   stroke: var(--color-focus);
 }
 
+.brand-text {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+
 .brand {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: #ffffff;
+}
+
+.brand-tagline {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .main-nav {
@@ -207,11 +259,12 @@ main {
 }
 
 @media (min-width: 48rem) {
-  .app-header {
+  .header-inner {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
     padding: var(--space-sm) var(--space-xl);
+    gap: var(--space-lg);
   }
 
   .session-bar {

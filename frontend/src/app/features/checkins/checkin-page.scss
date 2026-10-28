@@ -1,49 +1,54 @@
 @use '../../shared/styles/touch' as touch;
 
-// Shared styles of the check-in pages. Mobile-first: one column from 360 px.
-$text: #1a1a1a;
-$muted: #4a4a4a;
-$border: #595959;
-$primary: #0b5394;
-$error: #b00020;
-$focus: #f1c232;
-
 :host {
   display: block;
-  color: $text;
-  background: #ffffff;
+  min-height: 100%;
+  color: var(--color-text);
+  background-color: var(--color-bg);
 }
 
 .page {
   box-sizing: border-box;
-  max-width: 40rem;
+  max-width: 48rem;
   margin: 0 auto;
-  padding: 1rem;
+  padding: var(--space-lg);
 }
 
 h1 {
-  margin: 0 0 1rem;
-  font-size: 1.5rem;
+  margin: 0 0 var(--space-lg);
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-text);
 }
 
 h2 {
-  margin: 0 0 0.75rem;
-  font-size: 1.125rem;
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 .status {
-  margin: 0 0 1rem;
-  color: $muted;
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-base);
+  color: var(--color-text-muted);
 }
 
 .card {
   display: block;
-  margin-bottom: 1rem;
-  padding: 1rem;
-  color: inherit;
+  margin-bottom: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  color: var(--color-text);
   text-decoration: none;
-  border: 1px solid $border;
-  border-radius: 4px;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+
+  &:hover {
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+  }
 }
 
 a.card:focus-visible,
@@ -51,17 +56,21 @@ a.card:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid $focus;
+  outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
 
 .field {
-  display: grid;
-  gap: 0.25rem;
-  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-lg);
 
-  label {
+  label,
+  span#signature-label {
+    font-size: var(--font-size-base);
     font-weight: 600;
+    color: var(--color-text);
   }
 
   input,
@@ -70,64 +79,128 @@ textarea:focus-visible {
     @include touch.touch-target;
     box-sizing: border-box;
     width: 100%;
-    font: inherit;
-    border: 1px solid $border;
-    border-radius: 4px;
+    padding: var(--space-xs) var(--space-md);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-md);
+    color: var(--color-text);
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    transition: border-color var(--transition-fast);
+
+    &:focus-visible {
+      border-color: var(--color-primary);
+      outline: 3px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    &[aria-invalid='true'] {
+      border: 2px solid var(--color-error);
+    }
+  }
+
+  textarea {
+    min-height: 5rem;
+    line-height: 1.5;
+    resize: vertical;
   }
 }
 
 .error {
-  margin: 0;
-  color: $error;
+  margin: var(--space-xs) 0 0;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-error);
 }
 
 .notice-error {
-  padding: 0.75rem;
-  color: $error;
-  border: 1px solid $error;
-  border-radius: 4px;
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--font-size-base);
+  color: var(--color-error);
+  background-color: var(--color-error-light);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-sm);
 }
 
 .action {
   @include touch.touch-target;
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-sizing: border-box;
-  padding: 0 1rem;
-  font: inherit;
+  min-height: 48px;
+  padding: 0 var(--space-xl);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  font-weight: 600;
   color: #ffffff;
   text-decoration: none;
-  background: $primary;
-  border: 1px solid $primary;
-  border-radius: 4px;
+  background-color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+
+  &:hover {
+    background-color: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+  }
+
+  &:disabled {
+    cursor: progress;
+    opacity: 0.7;
+  }
+
+  &[routerLink] {
+    color: var(--color-primary);
+    background-color: var(--color-bg);
+    border-color: var(--color-primary);
+
+    &:hover {
+      background-color: var(--color-primary-light);
+    }
+  }
 }
 
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+  margin-bottom: var(--space-xl);
 }
 
 .facts {
   margin: 0;
 
   div + div {
-    margin-top: 0.5rem;
+    margin-top: var(--space-sm);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--color-surface);
   }
 
   dt {
+    font-size: var(--font-size-sm);
     font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
   }
 
   dd {
-    margin: 0;
+    margin: var(--space-xs) 0 0;
+    font-size: var(--font-size-md);
+    color: var(--color-text);
     overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
   }
 }
 
 .list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -136,6 +209,13 @@ textarea:focus-visible {
 .thumb {
   display: block;
   max-width: 100%;
-  margin-top: 0.5rem;
-  border: 1px solid $border;
+  margin-top: var(--space-sm);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+}
+
+@media (min-width: 48rem) {
+  .page {
+    padding: var(--space-2xl) var(--space-lg);
+  }
 }

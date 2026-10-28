@@ -1,78 +1,196 @@
 @use '../../../shared/styles/touch' as touch;
 
-$primary: #0b5394;
-$focus: #f1c232;
-
 .damage-map {
-  margin: 0 0 1rem;
-  padding: 1rem;
-  border: 1px solid #595959;
-  border-radius: 4px;
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-lg);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+
+  legend {
+    padding: 0 var(--space-xs);
+    font-size: var(--font-size-md);
+    font-weight: 700;
+    color: var(--color-text);
+  }
 }
 
 .views {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+  margin-bottom: var(--space-lg);
 }
 
-.view,
-.action {
+.view {
   @include touch.touch-target;
-  padding: 0 1rem;
-  font: inherit;
-  color: $primary;
-  background: #ffffff;
-  border: 1px solid $primary;
-  border-radius: 4px;
-}
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-md);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 
-.view.selected {
-  color: #ffffff;
-  background: $primary;
-}
+  &:hover {
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+  }
 
-.view:focus-visible,
-.action:focus-visible,
-select:focus-visible,
-input:focus-visible {
-  outline: 3px solid $focus;
-  outline-offset: 2px;
+  &.selected {
+    color: #ffffff;
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+
+    .badge {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.25);
+    }
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
 }
 
 .badge {
-  margin-left: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-xs);
+  padding: 1px 6px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
+  border-radius: var(--radius-pill);
 }
 
 .add {
-  display: grid;
-  gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+
+  label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+  }
 
   select,
-  input {
+  input[type='text'],
+  input[type='file'] {
     @include touch.touch-target;
-    font: inherit;
+    box-sizing: border-box;
+    width: 100%;
+    padding: var(--space-xs) var(--space-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    color: var(--color-text);
+    background-color: #ffffff;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+
+    &:focus-visible {
+      border-color: var(--color-primary);
+      outline: 3px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+  }
+
+  .action {
+    @include touch.touch-target;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    margin-top: var(--space-xs);
+    padding: 0 var(--space-lg);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--color-primary);
+    background-color: #ffffff;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+
+    &:hover {
+      background-color: var(--color-primary-light);
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    &:focus-visible {
+      outline: 3px solid var(--color-focus);
+      outline-offset: 2px;
+    }
   }
 }
 
 .list {
-  margin: 1rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: var(--space-md) 0 0;
   padding: 0;
   list-style: none;
 
   li {
     display: flex;
-    gap: 0.5rem;
     align-items: center;
     justify-content: space-between;
-    padding: 0.25rem 0;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    background-color: #ffffff;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-sm);
+
+    .action {
+      @include touch.touch-target;
+      padding: 0 var(--space-md);
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      color: var(--color-error);
+      background: transparent;
+      border: 1px solid var(--color-error);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+
+      &:hover {
+        background-color: var(--color-error-light);
+      }
+    }
   }
 }
 
+.status {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
 .error {
-  color: #b00020;
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-error);
 }
 
 .sr-only {

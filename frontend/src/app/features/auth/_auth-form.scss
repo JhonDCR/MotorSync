@@ -1,133 +1,165 @@
 @use '../../shared/styles/touch' as touch;
 
-// Shared styles of the public auth pages (register and login). Mobile-first (FR-025): one column from 360 px;
-// wider screens only gain margins. Colors meet WCAG AA contrast on white.
-$text: #1a1a1a;
-$muted: #4a4a4a;
-$border: #595959;
-$primary: #0b5394;
-$error: #b00020;
-$focus: #f1c232;
-
 :host {
   display: block;
-  color: $text;
-  background: #ffffff;
+  min-height: 100%;
+  color: var(--color-text);
+  background-color: var(--color-bg);
 }
 
 .auth-page {
   box-sizing: border-box;
   max-width: 28rem;
-  margin: 0 auto;
-  padding: 1rem;
+  margin: var(--space-xl) auto;
+  padding: var(--space-xl);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
 }
 
 h1 {
-  font-size: 1.5rem;
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-text);
 }
 
 .intro {
-  margin: 0 0 1rem;
-  color: $muted;
+  margin: 0 0 var(--space-lg);
+  font-size: var(--font-size-base);
+  color: var(--color-text-muted);
 }
 
 .field {
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-lg);
 
   label {
     display: block;
-    margin-bottom: 0.25rem;
+    margin-bottom: var(--space-xs);
+    font-size: var(--font-size-base);
     font-weight: 600;
+    color: var(--color-text);
   }
 
   input {
     @include touch.touch-target;
     box-sizing: border-box;
     width: 100%;
-    padding: 0 0.75rem;
-    font-size: 1rem;
-    color: $text;
-    border: 1px solid $border;
-    border-radius: 4px;
-  }
+    min-height: 44px;
+    padding: 0 var(--space-md);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-md);
+    color: var(--color-text);
+    background-color: #ffffff;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    transition: border-color var(--transition-fast);
 
-  input[aria-invalid='true'] {
-    border: 2px solid $error;
+    &:focus-visible {
+      border-color: var(--color-primary);
+      outline: 3px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    &[aria-invalid='true'] {
+      border: 2px solid var(--color-error);
+    }
   }
 }
 
 .hint {
-  margin: 0.25rem 0 0;
-  font-size: 0.875rem;
-  color: $muted;
+  margin: var(--space-xs) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
 }
 
 .field-error {
-  margin: 0.25rem 0 0;
-  color: $error;
+  margin: var(--space-xs) 0 0;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-error);
 }
 
 .form-error {
-  margin: 0 0 1rem;
-  padding: 0.75rem;
-  color: $error;
-  background: #fdecee;
-  border: 1px solid $error;
-  border-radius: 4px;
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--font-size-sm);
+  color: var(--color-error);
+  background-color: var(--color-error-light);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-sm);
 }
 
 .session-reason {
-  margin: 0 0 1rem;
-  padding: 0.75rem;
-  color: $text;
-  background: #e8f0fe;
-  border: 1px solid $primary;
-  border-radius: 4px;
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  background-color: var(--color-primary-light);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
 }
 
 .primary {
   @include touch.touch-target;
   box-sizing: border-box;
   width: 100%;
-  padding: 0 1rem;
-  font-size: 1rem;
+  min-height: 48px;
+  padding: 0 var(--space-xl);
+  font-family: inherit;
+  font-size: var(--font-size-base);
   font-weight: 600;
   color: #ffffff;
-  background: $primary;
-  border: 0;
-  border-radius: 4px;
+  background-color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-}
+  transition: background-color var(--transition-fast);
 
-.primary:disabled {
-  cursor: progress;
-  opacity: 0.8;
-}
+  &:hover {
+    background-color: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+  }
 
-.alternate {
-  margin: 1.5rem 0 0;
-  text-align: center;
+  &:disabled {
+    cursor: progress;
+    opacity: 0.7;
+  }
 
-  a {
-    @include touch.touch-target;
-    display: inline-flex;
-    align-items: center;
-    padding: 0 0.5rem;
-    color: $primary;
-    font-weight: 600;
+  &:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
   }
 }
 
-input:focus-visible,
-button:focus-visible,
-a:focus-visible {
-  outline: 3px solid $focus;
-  outline-offset: 2px;
+.alternate {
+  margin: var(--space-lg) 0 0;
+  text-align: center;
+}
+
+.alternate a {
+  @include touch.touch-target;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  text-decoration: underline;
+  transition: color var(--transition-fast);
+
+  &:hover {
+    color: var(--color-primary-hover);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
 }
 
 @media (min-width: 48rem) {
   .auth-page {
-    padding: 2rem;
+    margin: var(--space-2xl) auto;
   }
 }

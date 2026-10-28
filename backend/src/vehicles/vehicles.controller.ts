@@ -12,10 +12,13 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { API_PREFIX } from '../app.setup.js';
+import { Roles } from '../auth/roles.decorator.js';
 import { CreateVehicleDto } from './dto/create-vehicle.dto.js';
 import { OwnershipTransferDto } from './dto/ownership-transfer.dto.js';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto.js';
+import type { VehicleClinicalHistoryDto } from './dto/vehicle-history.dto.js';
 import { OwnershipService, type OwnershipHistoryResponse } from './ownership.service.js';
+import { VehicleHistoryService } from './vehicle-history.service.js';
 import {
   VehiclesService,
   type VehicleDetail,
@@ -27,6 +30,7 @@ export class VehiclesController {
   constructor(
     @Inject(VehiclesService) private readonly vehicles: VehiclesService,
     @Inject(OwnershipService) private readonly ownership: OwnershipService,
+    @Inject(VehicleHistoryService) private readonly historyService: VehicleHistoryService,
   ) {}
 
   /** POST /api/v1/vehicles (US3): 201 with Location /api/v1/vehicles/{id}. */
@@ -67,6 +71,15 @@ export class VehiclesController {
   @Get(':vehicleId/ownership-history')
   history(@Param('vehicleId') vehicleId: string): Promise<OwnershipHistoryResponse> {
     return this.ownership.history(vehicleId);
+  }
+
+  /** GET /api/v1/vehicles/{vehicleId}/history (007, US1, US2). Consolidated clinical history and metrics. */
+  @Get(':vehicleId/history')
+  @Roles('asesor', 'admin')
+  clinicalHistory(
+    @Param('vehicleId') vehicleId: string,
+  ): Promise<VehicleClinicalHistoryDto> {
+    return this.historyService.getClinicalHistory(vehicleId);
   }
 
   /** GET /api/v1/vehicles/{vehicleId}: 404 NOT_FOUND for missing, foreign or malformed ids. */

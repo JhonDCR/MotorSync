@@ -4,6 +4,7 @@ import type { Observable } from 'rxjs';
 import type {
   OwnershipHistoryResponse,
   OwnershipTransferRequest,
+  VehicleClinicalHistory,
   VehicleCreate,
   VehicleDetail,
   VehicleSearchResponse,
@@ -46,6 +47,10 @@ export class VehiclesApiService {
   /** Items come newest first from the API; they are not reordered. */
   getOwnershipHistory(vehicleId: string): Observable<OwnershipHistoryResponse> {
     return this.http.get<OwnershipHistoryResponse>(`${vehicleUrl(vehicleId)}/ownership-history`).pipe(toProblem);
+  }
+
+  getHistory(vehicleId: string): Observable<VehicleClinicalHistory> {
+    return this.http.get<VehicleClinicalHistory>(`${vehicleUrl(vehicleId)}/history`).pipe(toProblem);
   }
 
   search(q: string): Observable<VehicleSearchResponse> {

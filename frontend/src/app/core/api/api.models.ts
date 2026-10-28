@@ -152,6 +152,55 @@ export interface OwnershipHistoryResponse {
   items: OwnershipChange[];
 }
 
+// --- Historial clínico por placa (contrato 007) ---
+
+export interface VehicleHeader {
+  id: string;
+  plate: string;
+  brand: string;
+  model: string;
+  year: number;
+  color: string;
+  bodyType: string;
+  vin: string | null;
+  initialMileage: number;
+}
+
+export interface VehicleOwner {
+  id: string;
+  displayName: string;
+  documentType: DocumentType;
+  documentNumber: string;
+  phone?: string | null;
+}
+
+export interface VehicleMetrics {
+  currentMileage: number;
+  mileageDelta: number;
+  totalCheckins: number;
+  totalWorkOrders: number;
+  totalDeliveredWorkOrders: number;
+  totalInvested: string;
+  lastVisitAt: string | null;
+}
+
+export type TimelineEventKind = 'checkin' | 'budget' | 'work_order' | 'ownership_transfer';
+
+export interface TimelineEvent {
+  id: string;
+  kind: TimelineEventKind;
+  occurredAt: string;
+  summary: string;
+  data: Record<string, unknown>;
+}
+
+export interface VehicleClinicalHistory {
+  vehicle: VehicleHeader;
+  owner: VehicleOwner;
+  metrics: VehicleMetrics;
+  timeline: TimelineEvent[];
+}
+
 // --- Autenticación (contrato 002) ---
 
 export type UserStatus = 'active' | 'inactive';

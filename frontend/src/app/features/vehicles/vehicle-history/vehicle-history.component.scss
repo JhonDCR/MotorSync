@@ -1,0 +1,244 @@
+@use '../../../shared/styles/touch' as touch;
+
+$text: #1a1a1a;
+$muted: #4a4a4a;
+$border: #595959;
+$border-light: #d0d0d0;
+$primary: #0b5394;
+$error: #b00020;
+$focus: #f1c232;
+
+:host {
+  display: block;
+  color: $text;
+  background: #fff;
+}
+
+.vehicle-history {
+  box-sizing: border-box;
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+h1 { font-size: 1.5rem; margin: 0 0 0.5rem; }
+h2 { font-size: 1.125rem; margin: 0 0 0.75rem; }
+.status { margin: 0 0 1rem; color: $muted; }
+
+.plate {
+  display: block;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: $primary;
+}
+
+.subtitle {
+  display: block;
+  font-size: 1rem;
+  font-weight: 400;
+  color: $muted;
+}
+
+.owner-info {
+  margin: 0.5rem 0 1rem;
+  .owner-doc { margin-left: 0.35rem; color: $muted; }
+}
+
+.toolbar, .event-actions, .filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.toolbar {
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.action, .filter-btn, .event-link {
+  @include touch.touch-target;
+}
+
+.action {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  font-size: 1rem;
+  color: $primary;
+  text-decoration: none;
+  background: #fff;
+  border: 1px solid $primary;
+  border-radius: 4px;
+  cursor: pointer;
+
+  &.action-print {
+    color: #fff;
+    background: $primary;
+  }
+}
+
+.notice {
+  margin: 0 0 1rem;
+  padding: 1rem;
+  border-radius: 4px;
+}
+
+.notice-error {
+  color: $error;
+  background: #fdecee;
+  border: 1px solid $error;
+}
+
+.card {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border: 1px solid $border-light;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+}
+
+.metric-box {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem;
+  background: #f8f9fa;
+  border: 1px solid $border-light;
+  border-radius: 4px;
+}
+
+.metric-label {
+  font-size: 0.8125rem;
+  color: $muted;
+}
+
+.metric-value {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.filters-section { margin-bottom: 1.5rem; }
+
+.filter-btn {
+  padding: 0 0.875rem;
+  font-size: 0.875rem;
+  background: #fff;
+  border: 1px solid $border-light;
+  border-radius: 20px;
+  cursor: pointer;
+
+  &.active {
+    background: $primary;
+    color: #fff;
+    border-color: $primary;
+  }
+}
+
+.timeline-section { margin-bottom: 1.5rem; }
+.timeline-list { margin: 0; padding: 0; list-style: none; }
+
+.timeline-event {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: #fff;
+  border: 1px solid $border-light;
+  border-left: 4px solid $border;
+  border-radius: 4px;
+}
+
+.event-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 4px;
+}
+
+[data-kind='checkin'] {
+  &.timeline-event { border-left-color: #0b5394; }
+  &.badge { background: #e8f4fd; color: #0b5394; }
+}
+[data-kind='budget'] {
+  &.timeline-event { border-left-color: #b45309; }
+  &.badge { background: #fef3e6; color: #b45309; }
+}
+[data-kind='work_order'] {
+  &.timeline-event { border-left-color: #1e7e34; }
+  &.badge { background: #e6f7ec; color: #1e7e34; }
+}
+[data-kind='ownership_transfer'] {
+  &.timeline-event { border-left-color: #6b21a8; }
+  &.badge { background: #f3e8fd; color: #6b21a8; }
+}
+
+.event-date {
+  font-size: 0.8125rem;
+  color: $muted;
+}
+
+.event-summary {
+  margin: 0 0 0.5rem;
+  font-size: 0.9375rem;
+}
+
+.event-link {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: $primary;
+  text-decoration: underline;
+}
+
+.empty-state {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: $muted;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+:focus-visible {
+  outline: 3px solid $focus;
+  outline-offset: 2px;
+}
+
+@media (min-width: 48rem) {
+  .vehicle-history { padding: 2rem; }
+  .metrics-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media print {
+  .no-print, .toolbar, .filters-section, .event-actions, button, a {
+    display: none !important;
+  }
+  :host { background: #fff !important; color: #000 !important; }
+  .vehicle-history { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+  .plate { color: #000 !important; }
+  .card, .timeline-event {
+    break-inside: avoid;
+    border: 1px solid #999 !important;
+    margin-bottom: 0.75rem !important;
+    padding: 0.75rem !important;
+  }
+  .metric-box { background: none !important; border: 1px solid #ccc !important; }
+  .badge { border: 1px solid #666 !important; background: none !important; color: #000 !important; }
+}

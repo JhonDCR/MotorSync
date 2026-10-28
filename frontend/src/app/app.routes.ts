@@ -167,6 +167,16 @@ export function buildRoutes(devMode: boolean): Routes {
       loadComponent: () =>
         import('./features/checkins/checkin-detail/checkin-detail.component').then((m) => m.CheckinDetailComponent),
     },
+    // Historial clínico por placa (007): va antes de vehicles/:id.
+    {
+      path: 'vehicles/:id/history',
+      title: 'Historial clínico',
+      canMatch: [authGuard],
+      loadComponent: () =>
+        import('./features/vehicles/vehicle-history/vehicle-history.component').then(
+          (m) => m.VehicleHistoryComponent,
+        ),
+    },
     {
       path: 'vehicles/:id',
       title: 'Ficha del vehículo',

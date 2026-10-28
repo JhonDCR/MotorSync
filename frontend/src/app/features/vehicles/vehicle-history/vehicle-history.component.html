@@ -1,0 +1,194 @@
+<main class="vehicle-history">
+  <div aria-live="polite">
+    @switch (state().kind) {
+      @case ('loading') {
+        <p class="status" role="status">Cargando historial clínico…</p>
+      }
+      @case ('error') {
+        <div class="notice notice-error" role="alert" data-testid="load-error">
+          <p>No se pudo cargar el historial clínico. Revise la conexión e inténtelo de nuevo.</p>
+          <button type="button" class="action" data-testid="retry" (click)="retry()">Reintentar</button>
+        </div>
+      }
+    }
+  </div>
+
+  @if (state(); as current) {
+    @if (current.kind === 'not-found') {
+      <div class="notice notice-error" role="alert">
+        <h1 data-testid="not-found">{{ current.message }}</h1>
+        <p>Puede que no exista o que pertenezca a otro taller.</p>
+        <a class="action" routerLink="/" data-testid="back-to-search">Volver a la búsqueda</a>
+      </div>
+    }
+
+    @if (current.kind === 'loaded') {
+      @let history = current.history;
+
+      <header class="header">
+        <h1>
+          <span class="plate" data-testid="history-plate">{{ history.vehicle.plate }}</span>
+          <span class="subtitle">
+            {{ history.vehicle.brand }} {{ history.vehicle.model }} ({{ history.vehicle.year }}) &bull; {{ history.vehicle.color }}
+          </span>
+        </h1>
+
+        <p class="owner-info">
+          Propietario:
+          <strong data-testid="history-owner">{{ history.owner.displayName }}</strong>
+          <span class="owner-doc">({{ history.owner.documentNumber }})</span>
+        </p>
+
+        <div class="toolbar no-print">
+          <button
+            type="button"
+            class="action action-print"
+            data-testid="print-history"
+            (click)="print()"
+          >
+            Imprimir historial
+          </button>
+          <a class="action" [routerLink]="['/vehicles', history.vehicle.id]">
+            Ficha del vehículo
+          </a>
+          <a class="action" routerLink="/" data-testid="back-to-search-nav">
+            Buscar vehículo
+          </a>
+        </div>
+      </header>
+
+      <section class="card metrics-card" aria-labelledby="metrics-heading" data-testid="history-metrics">
+        <h2 id="metrics-heading">Resumen clínico y métricas</h2>
+        <dl class="metrics-grid">
+          <div class="metric-box">
+            <dt class="metric-label">Odómetro actual</dt>
+            <dd class="metric-value" data-testid="metric-current-mileage">
+              {{ formatMileage(history.metrics.currentMileage) }} km
+            </dd>
+          </div>
+          <div class="metric-box">
+            <dt class="metric-label">Variación acumulada</dt>
+            <dd class="metric-value" data-testid="metric-mileage-delta">
+              +{{ formatMileage(history.metrics.mileageDelta) }} km
+            </dd>
+          </div>
+          <div class="metric-box">
+            <dt class="metric-label">Check-ins</dt>
+            <dd class="metric-value" data-testid="metric-total-checkins">
+              {{ history.metrics.totalCheckins }}
+            </dd>
+          </div>
+          <div class="metric-box">
+            <dt class="metric-label">Órdenes totales</dt>
+            <dd class="metric-value" data-testid="metric-total-work-orders">
+              {{ history.metrics.totalWorkOrders }}
+            </dd>
+          </div>
+          <div class="metric-box">
+            <dt class="metric-label">Órdenes entregadas</dt>
+            <dd class="metric-value" data-testid="metric-delivered-work-orders">
+              {{ history.metrics.totalDeliveredWorkOrders }}
+            </dd>
+          </div>
+          <div class="metric-box">
+            <dt class="metric-label">Inversión total</dt>
+            <dd class="metric-value" data-testid="metric-total-invested">
+              ${{ history.metrics.totalInvested }}
+            </dd>
+          </div>
+          <div class="metric-box">
+            <dt class="metric-label">Última intervención</dt>
+            <dd class="metric-value" data-testid="metric-last-visit">
+              {{ history.metrics.lastVisitAt ? (history.metrics.lastVisitAt | date: 'dd/MM/yyyy') : 'Sin visitas' }}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="filters-section no-print" aria-label="Filtros de eventos">
+        <div class="filter-bar" role="toolbar" aria-label="Filtrar eventos por tipo">
+          <button
+            type="button"
+            class="filter-btn"
+            [class.active]="activeFilter() === 'all'"
+            data-testid="filter-all"
+            (click)="setFilter('all')"
+          >
+            Todos
+          </button>
+          <button
+            type="button"
+            class="filter-btn"
+            [class.active]="activeFilter() === 'checkin'"
+            data-testid="filter-checkin"
+            (click)="setFilter('checkin')"
+          >
+            Check-ins
+          </button>
+          <button
+            type="button"
+            class="filter-btn"
+            [class.active]="activeFilter() === 'budget'"
+            data-testid="filter-budget"
+            (click)="setFilter('budget')"
+          >
+            Presupuestos
+          </button>
+          <button
+            type="button"
+            class="filter-btn"
+            [class.active]="activeFilter() === 'work_order'"
+            data-testid="filter-work_order"
+            (click)="setFilter('work_order')"
+          >
+            Órdenes de trabajo
+          </button>
+          <button
+            type="button"
+            class="filter-btn"
+            [class.active]="activeFilter() === 'ownership_transfer'"
+            data-testid="filter-ownership_transfer"
+            (click)="setFilter('ownership_transfer')"
+          >
+            Transferencias
+          </button>
+        </div>
+      </section>
+
+      <section class="timeline-section" aria-labelledby="timeline-heading">
+        <h2 id="timeline-heading">Línea de tiempo consolidada</h2>
+
+        <ol class="timeline-list" data-testid="timeline-list">
+          @for (event of filteredTimeline(); track event.id) {
+            <li class="timeline-event" [attr.data-kind]="event.kind" data-testid="timeline-event">
+              <div class="event-header">
+                <span class="badge" [attr.data-kind]="event.kind" data-testid="event-kind">
+                  {{ kindLabels[event.kind] }}
+                </span>
+                <time class="event-date" [attr.datetime]="event.occurredAt" data-testid="event-date">
+                  {{ event.occurredAt | date: 'dd/MM/yyyy HH:mm' }}
+                </time>
+              </div>
+
+              <p class="event-summary" data-testid="event-summary">
+                {{ event.summary }}
+              </p>
+
+              @if (getLink(event); as link) {
+                <div class="event-actions no-print">
+                  <a [routerLink]="link.path" class="event-link" data-testid="event-link">
+                    {{ link.label }}
+                  </a>
+                </div>
+              }
+            </li>
+          }
+        </ol>
+
+        @if (filteredTimeline().length === 0) {
+          <p class="empty-state">No hay eventos para mostrar con el filtro seleccionado.</p>
+        }
+      </section>
+    }
+  }
+</main>

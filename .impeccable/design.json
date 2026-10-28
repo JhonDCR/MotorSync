@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-28T16:21:20-05:00",
+  "title": "Design System: MotorSync",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Precision Cobalt Navy",
+        "canonical": "#0b5394",
+        "tonalRamp": ["#041a2e", "#072e52", "#0b5394", "#156bb9", "#3b88d1", "#72ace3", "#b4d4f4", "#eef3f9"]
+      },
+      "focus": {
+        "role": "secondary",
+        "displayName": "Bay Safety Amber",
+        "canonical": "#f1c232",
+        "tonalRamp": ["#4a3900", "#735902", "#a68007", "#d1a313", "#f1c232", "#f5d367", "#fae6a3", "#fdf6df"]
+      },
+      "error": {
+        "role": "error",
+        "displayName": "Critical Crimson",
+        "canonical": "#b00020",
+        "tonalRamp": ["#3b000a", "#630012", "#8c0019", "#b00020", "#d62846", "#eb677f", "#f5abb9", "#fdecee"]
+      },
+      "neutral-text": {
+        "role": "neutral",
+        "displayName": "Deep Carbon Text",
+        "canonical": "#1a1a1a",
+        "tonalRamp": ["#000000", "#1a1a1a", "#333333", "#4a4a4a", "#666666", "#888888", "#cccccc", "#ffffff"]
+      },
+      "neutral-surface": {
+        "role": "neutral",
+        "displayName": "Diagnostic Tint Gray",
+        "canonical": "#f8f9fa",
+        "tonalRamp": ["#111213", "#232527", "#484b50", "#71767e", "#a2a8b3", "#d0d5dd", "#e9ecef", "#f8f9fa"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display / Plate",
+        "purpose": "Placas vehiculares ecuatorianas normalizadas en mayúsculas y números destacados."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Encabezados principales de pantalla y títulos de flujo."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Títulos de tarjetas, modales y eventos de línea de tiempo."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Texto operativo estándar, valores de tabla y formularios."
+      },
+      "label": {
+        "displayName": "Label / Micro",
+        "purpose": "Badges de estado, marcas de tiempo y etiquetas descriptivas."
+      }
+    },
+    "shadows": [
+      {
+        "name": "flat-rest",
+        "value": "none",
+        "purpose": "Filosofía Flat & Bordered: bordes sólidos de 1px a 2px sin sombras difusas para visibilidad bajo luz de bahía."
+      }
+    ],
+    "motion": [
+      {
+        "name": "fast-touch",
+        "value": "150ms ease-in-out",
+        "purpose": "Retroalimentación táctil inmediata en botones y enlaces sin demoras visuales."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "360px"
+      },
+      {
+        "name": "tablet",
+        "value": "768px"
+      },
+      {
+        "name": "desktop",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Botón principal de confirmación y guardado de acciones.",
+      "html": "<button class=\"ds-btn-primary\">GUARDAR CHECK-IN</button>",
+      "css": ".ds-btn-primary { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; padding: 0 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 600; color: #ffffff; background-color: #0b5394; border: 0; border-radius: 4px; cursor: pointer; transition: background-color 150ms ease-in-out; } .ds-btn-primary:hover { background-color: #083e6f; } .ds-btn-primary:focus-visible { outline: 3px solid #f1c232; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Botón secundario para acciones alternativas o de cancelación.",
+      "html": "<button class=\"ds-btn-secondary\">CANCELAR</button>",
+      "css": ".ds-btn-secondary { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; padding: 0 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 600; color: #0b5394; background-color: #ffffff; border: 1px solid #0b5394; border-radius: 4px; cursor: pointer; transition: background-color 150ms ease-in-out; } .ds-btn-secondary:hover { background-color: #eef3f9; } .ds-btn-secondary:focus-visible { outline: 3px solid #f1c232; outline-offset: 2px; }"
+    },
+    {
+      "name": "Bay Search Plate Input",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "Campo de búsqueda táctil de placas en bahía con texto en mayúsculas.",
+      "html": "<div class=\"ds-search-group\"><label class=\"ds-search-label\">PLACA DEL VEHÍCULO</label><input class=\"ds-search-input\" type=\"text\" placeholder=\"PBA-1234\" value=\"PBA1234\"></div>",
+      "css": ".ds-search-group { display: flex; flex-direction: column; gap: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; } .ds-search-label { font-size: 14px; font-weight: 600; color: #1a1a1a; } .ds-search-input { box-sizing: border-box; width: 100%; min-height: 56px; padding: 0 12px; font-size: 24px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #1a1a1a; background: #ffffff; border: 2px solid #595959; border-radius: 4px; } .ds-search-input:focus-visible { outline: 3px solid #f1c232; outline-offset: 2px; border-color: #0b5394; }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-filter",
+      "description": "Filtro tipo píldora para seleccionar categorías en historiales o tableros.",
+      "html": "<button class=\"ds-chip-filter ds-chip-active\">TODOS (14)</button>",
+      "css": ".ds-chip-filter { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; font-weight: 600; color: #1a1a1a; background: #ffffff; border: 1px solid #d0d0d0; border-radius: 20px; cursor: pointer; } .ds-chip-active { background: #0b5394; color: #ffffff; border-color: #0b5394; } .ds-chip-filter:focus-visible { outline: 3px solid #f1c232; outline-offset: 2px; }"
+    },
+    {
+      "name": "Status Badge Check-in",
+      "kind": "chip",
+      "refersTo": "badge-status",
+      "description": "Distintivo indicador de evento de recepción técnica.",
+      "html": "<span class=\"ds-badge ds-badge-checkin\">CHECK-IN</span>",
+      "css": ".ds-badge { box-sizing: border-box; display: inline-block; padding: 3px 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 12px; font-weight: 600; border-radius: 4px; text-transform: uppercase; } .ds-badge-checkin { background-color: #e8f4fd; color: #0b5394; }"
+    },
+    {
+      "name": "Diagnostic Metric Box",
+      "kind": "card",
+      "refersTo": "card-container",
+      "description": "Contenedor de métrica técnica con cifras tabulares.",
+      "html": "<div class=\"ds-metric-box\"><span class=\"ds-metric-label\">KILOMETRAJE</span><span class=\"ds-metric-value\">85,420 km</span></div>",
+      "css": ".ds-metric-box { box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; padding: 12px; background-color: #f8f9fa; border: 1px solid #d0d0d0; border-radius: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; } .ds-metric-label { font-size: 13px; font-weight: 600; color: #4a4a4a; } .ds-metric-value { font-size: 18px; font-weight: 700; color: #1a1a1a; font-variant-numeric: tabular-nums; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Precision Workshop",
+    "overview": "MotorSync adopta la estética de un taller automotriz de alta ingeniería: limpio, estructurado, directo y funcionalmente robusto. No es un portal administrativo estático ni un ERP genérico; es una herramienta de campo concebida para asesores de servicio y mecánicos que operan en movimiento sobre tablets en la bahía de recepción e inspección. Cada píxel responde a la necesidad de certeza legal, rapidez diagnóstica y ergonomía táctil bajo condiciones ambientales reales.",
+    "keyCharacteristics": [
+      "Ergonomía táctil no negociable (objetivos mínimos de 44 × 44 px en bahía).",
+      "Contraste cromático estricto (cumplimiento integral WCAG 2.1 AA sobre fondos claros).",
+      "Profundidad plana y estructurada (ausencia de sombras difusas; jerarquía lograda mediante bordes sólidos y fondos tonales).",
+      "Tipografía de lectura inmediata con números tabulares para VIN, kilometraje y valores económicos.",
+      "Indicadores semánticos unívocos por tipo de evento técnico (check-in, presupuesto, orden de trabajo, transferencia)."
+    ],
+    "rules": [
+      {
+        "name": "The Focus Exclusivity Rule",
+        "body": "El color ámbar (#f1c232) está reservado estrictamente para el foco accesible del teclado y toque; nunca se utiliza como fondo de botón ni como color decorativo.",
+        "section": "colors"
+      },
+      {
+        "name": "The Semantic State Rule",
+        "body": "Cada estado de la orden o del historial técnico emplea un único par cromático que jamás se intercambia entre módulos.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Data Rule",
+        "body": "Todo kilometraje, número de VIN, código de repuesto, valor monetario o desglose de presupuesto debe aplicar font-variant-numeric: tabular-nums para conservar alineación vertical perfecta.",
+        "section": "typography"
+      },
+      {
+        "name": "The Plate Prominence Rule",
+        "body": "Las placas vehiculares siempre se representan normalizadas en mayúsculas sostenidas, con espacio entre letras (letter-spacing: 0.05em) y peso 700, simulando la placa física metálica.",
+        "section": "typography"
+      },
+      {
+        "name": "The No-Fuzzy-Shadow Rule",
+        "body": "Ningún componente en reposo utiliza box-shadow difuso. La separación espacial se resuelve mediante bordes sólidos y fondos contrastados.",
+        "section": "elevation"
+      },
+      {
+        "name": "The State Elevation Rule",
+        "body": "El único cambio de profundidad permitido ocurre en hover táctil o enfoque, alterando el fondo tonal (#f3f6fa) y activando el contorno de foco sólido (outline: 3px solid #f1c232).",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do garantizar que todo elemento interactivo o clicable cumpla como mínimo 44 × 44 px de área de toque.",
+      "Do presentar siempre placas ecuatorianas en mayúsculas, negrita y con espacio tipográfico (0.05em).",
+      "Do emplear números tabulares (tabular-nums) para kilometrajes, cotizaciones y códigos técnicos.",
+      "Do utilizar el contorno ámbar #f1c232 como indicador universal de foco visible.",
+      "Do mantener el fondo blanco o tonal claro con bordes sólidos de alto contraste para visibilidad en bahía."
+    ],
+    "donts": [
+      "Don't aplicar degradados decorativos de color ni efectos de sombras difusas o 'glassmorphism'.",
+      "Don't utilizar textos en tonos de gris claro que violen el ratio de contraste mínimo 4.5:1 (WCAG AA).",
+      "Don't crear botones compactos de escritorio (< 44px) en pantallas operativas de bahía.",
+      "Don't alterar los códigos cromáticos semánticos establecidos para check-ins, presupuestos y órdenes de trabajo.",
+      "Don't introducir animaciones lentas o transiciones cosméticas que retarden la captura de información en recepción."
+    ]
+  }
+}

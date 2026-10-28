@@ -23,6 +23,13 @@ import { MockCheckinStore } from './mock-checkin.store';
 import { MockWorkOrderStore } from './mock-work-order.store';
 import { MockSupportStore } from './mock-support.store';
 import { USE_MOCK_API } from './use-mock-api';
+import type {
+  TimelineEvent,
+  VehicleClinicalHistory,
+  VehicleHeader,
+  VehicleMetrics,
+  VehicleOwner,
+} from './api.models';
 
 // API simulada en memoria (research R8). Solo actúa con USE_MOCK_API en true y en rutas /api/.
 // Respeta contracts/openapi.yaml: éxitos con el status del contrato y errores como HttpErrorResponse
@@ -37,6 +44,7 @@ const VEHICLES_PATH = '/api/v1/vehicles';
 const VEHICLE_BY_ID = /^\/api\/v1\/vehicles\/([^/]+)$/;
 const VEHICLE_TRANSFERS = /^\/api\/v1\/vehicles\/([^/]+)\/ownership-transfers$/;
 const VEHICLE_HISTORY = /^\/api\/v1\/vehicles\/([^/]+)\/ownership-history$/;
+const VEHICLE_CLINICAL_HISTORY = /^\/api\/v1\/vehicles\/([^/]+)\/history$/;
 const VEHICLE_CHECKINS = /^\/api\/v1\/vehicles\/([^/]+)\/checkins$/;
 const CHECKIN_BY_ID = /^\/api\/v1\/checkins\/([^/]+)$/;
 const CHECKIN_IMAGE = /^\/api\/v1\/checkins\/([^/]+)\/images\/([^/]+)$/;
@@ -442,7 +450,186 @@ function route(
   if (history !== null && req.method === 'GET') {
     return respond(req, store.getOwnershipHistory(decodeURIComponent(history[1])));
   }
+  const clinicalHistory = VEHICLE_CLINICAL_HISTORY.exec(path);
+  if (clinicalHistory !== null && req.method === 'GET') {
+    return respond(
+      req,
+      buildMockClinicalHistory(
+        decodeURIComponent(clinicalHistory[1]),
+        store,
+        checkins,
+        budgets,
+        workOrders,
+      ),
+    );
+  }
   return respond(req, { ok: false, problem: mockProblem(404, 'NOT_FOUND') });
+}
+
+function buildMockClinicalHistory(
+  vehicleId: string,
+  store: MockApiStore,
+  checkins: MockCheckinStore,
+  budgets: MockBudgetStore,
+  workOrders: MockWorkOrderStore,
+): MockResult<VehicleClinicalHistory> {
+  const vehicleResult = store.getVehicle(vehicleId);
+  if (!vehicleResult.ok) {
+    return vehicleResult;
+  }
+  const vehicleDetail = vehicleResult.body;
+  const vehicle: VehicleHeader = {
+    id: vehicleDetail.id,
+    plate: vehicleDetail.plate,
+    brand: vehicleDetail.brand,
+    model: vehicleDetail.model,
+    year: vehicleDetail.year,
+    color: vehicleDetail.color,
+    bodyType: vehicleDetail.bodyType,
+    vin: vehicleDetail.vin,
+    initialMileage: vehicleDetail.initialMileage,
+  };
+  const owner: VehicleOwner = {
+    id: vehicleDetail.owner.id,
+    displayName: vehicleDetail.owner.displayName,
+    documentType: vehicleDetail.owner.documentType,
+    documentNumber: vehicleDetail.owner.documentNumber,
+    phone: vehicleDetail.owner.phone,
+  };
+
+  const checkinListResult = checkins.list(vehicleDetail.id);
+  const checkinSummaries = checkinListResult.ok ? checkinListResult.body : [];
+
+  const budgetListResult = budgets.listByVehicle(vehicleDetail.id);
+  const budgetSummaries = budgetListResult.ok ? budgetListResult.body : [];
+
+  const workOrderListResult = workOrders.listByVehicle(vehicleDetail.id);
+  const workOrderSummaries = workOrderListResult.ok ? workOrderListResult.body : [];
+
+  const ownershipHistoryResult = store.getOwnershipHistory(vehicleDetail.id);
+  const ownershipChanges = ownershipHistoryResult.ok ? ownershipHistoryResult.body.items : [];
+
+  const maxCheckinMileage =
+    checkinSummaries.length > 0 ? Math.max(...checkinSummaries.map((c) => c.mileage)) : 0;
+  const currentMileage = Math.max(vehicle.initialMileage, maxCheckinMileage);
+  const mileageDelta = currentMileage - vehicle.initialMileage;
+
+  const deliveredOrders = workOrderSummaries.filter((wo) => wo.status === 'entregada');
+
+  let totalInvestedCents = 0;
+  for (const wo of deliveredOrders) {
+    const woDetailResult = workOrders.get(wo.id);
+    if (woDetailResult.ok) {
+      const budgetResult = budgets.get(woDetailResult.body.budgetId);
+      if (budgetResult.ok) {
+        const parsed = Math.round(parseFloat(budgetResult.body.total) * 100);
+        if (!isNaN(parsed)) {
+          totalInvestedCents += parsed;
+        }
+      }
+    }
+  }
+  const totalInvested = (totalInvestedCents / 100).toFixed(2);
+
+  const visitDates: number[] = [
+    ...checkinSummaries.map((c) => new Date(c.createdAt).getTime()),
+    ...workOrderSummaries.map((wo) => new Date(wo.createdAt).getTime()),
+  ];
+  const lastVisitAt =
+    visitDates.length > 0 ? new Date(Math.max(...visitDates)).toISOString() : null;
+
+  const metrics: VehicleMetrics = {
+    currentMileage,
+    mileageDelta,
+    totalCheckins: checkinSummaries.length,
+    totalWorkOrders: workOrderSummaries.length,
+    totalDeliveredWorkOrders: deliveredOrders.length,
+    totalInvested,
+    lastVisitAt,
+  };
+
+  const timeline: TimelineEvent[] = [];
+
+  for (const c of checkinSummaries) {
+    const detailResult = checkins.get(c.id);
+    const detail = detailResult.ok ? detailResult.body : null;
+    timeline.push({
+      id: c.id,
+      kind: 'checkin',
+      occurredAt: c.createdAt,
+      summary: `Check-in de recepción con ${c.mileage.toLocaleString('es-EC')} km`,
+      data: {
+        id: c.id,
+        mileage: c.mileage,
+        fuelLevel: detail?.fuelLevel ?? '1/2',
+        damageCount: c.damageCount,
+        authorName: c.createdByName,
+      },
+    });
+  }
+
+  for (const b of budgetSummaries) {
+    timeline.push({
+      id: b.id,
+      kind: 'budget',
+      occurredAt: b.createdAt,
+      summary: `Presupuesto #${b.number} ${b.status} ($${b.total})`,
+      data: {
+        id: b.id,
+        number: b.number,
+        status: b.status,
+        total: b.total,
+        checkinId: b.checkinId,
+      },
+    });
+  }
+
+  for (const wo of workOrderSummaries) {
+    timeline.push({
+      id: wo.id,
+      kind: 'work_order',
+      occurredAt: wo.createdAt,
+      summary: `Orden de trabajo #${wo.number} (${wo.status})`,
+      data: {
+        id: wo.id,
+        number: wo.number,
+        status: wo.status,
+      },
+    });
+  }
+
+  for (const oc of ownershipChanges) {
+    timeline.push({
+      id: oc.id,
+      kind: 'ownership_transfer',
+      occurredAt: oc.occurredAt,
+      summary: `Transferencia de propietario de ${oc.previousOwner.displayName} a ${oc.newOwner.displayName}`,
+      data: {
+        id: oc.id,
+        previousOwner: oc.previousOwner,
+        newOwner: oc.newOwner,
+        reason: oc.reason,
+        actorName: oc.actorName,
+      },
+    });
+  }
+
+  timeline.sort((a, b) => {
+    const diff = new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime();
+    if (diff !== 0) return diff;
+    return b.id.localeCompare(a.id);
+  });
+
+  return {
+    ok: true,
+    status: 200,
+    body: {
+      vehicle,
+      owner,
+      metrics,
+      timeline,
+    },
+  };
 }
 
 export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {

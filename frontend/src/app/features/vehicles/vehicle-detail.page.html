@@ -30,6 +30,9 @@
       </h1>
 
       <div class="toolbar">
+        <a class="action" [routerLink]="['/vehicles', vehicle.id, 'history']" data-testid="vehicle-history">
+          Historial clínico
+        </a>
         <a class="action" [routerLink]="['/vehicles', vehicle.id, 'edit']" data-testid="edit-vehicle">
           Editar<span class="sr-only"> vehículo</span>
         </a>

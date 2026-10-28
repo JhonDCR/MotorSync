@@ -1,0 +1,142 @@
+openapi: 3.1.0
+info:
+  title: MotorSync - Historial clínico por placa (007)
+  version: 0.7.0
+  description: |
+    Rutas de taller para consulta consolidada del historial clínico de un vehículo.
+    Requiere sesión activa con rol `asesor` o `admin`.
+    Aislamiento multi-tenant estricto vía RLS: un vehículo inexistente o de otro taller retorna 404 (US1-AC4).
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /vehicles/{vehicleId}/history:
+    parameters:
+      - name: vehicleId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Obtener historial clínico consolidado y métricas del vehículo (US1, US2)
+      operationId: getVehicleClinicalHistory
+      responses:
+        '200':
+          description: Historial clínico consolidado con métricas y timeline de eventos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VehicleClinicalHistory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Vehículo no encontrado o pertenece a otro taller
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorized:
+      description: Sesión requerida
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: Rol no autorizado
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string }
+
+    VehicleClinicalHistory:
+      type: object
+      required: [vehicle, owner, metrics, timeline]
+      properties:
+        vehicle:
+          $ref: '#/components/schemas/VehicleHeader'
+        owner:
+          $ref: '#/components/schemas/VehicleOwner'
+        metrics:
+          $ref: '#/components/schemas/VehicleMetrics'
+        timeline:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineEvent'
+
+    VehicleHeader:
+      type: object
+      required: [id, plate, brand, model, year, color, bodyType, initialMileage]
+      properties:
+        id: { type: string, format: uuid }
+        plate: { type: string, example: 'ABC1234' }
+        brand: { type: string, example: 'Toyota' }
+        model: { type: string, example: 'Corolla' }
+        year: { type: integer, example: 2020 }
+        color: { type: string, example: 'Blanco' }
+        bodyType: { type: string, enum: [sedan, suv, pickup, hatchback, van, motorcycle] }
+        vin: { type: string, nullable: true }
+        initialMileage: { type: integer, example: 45000 }
+
+    VehicleOwner:
+      type: object
+      required: [id, displayName, documentType, documentNumber]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string, example: 'Juan Pérez' }
+        documentType: { type: string, enum: [cedula, ruc, passport] }
+        documentNumber: { type: string, example: '1710000001' }
+        phone: { type: string, nullable: true, example: '0991234567' }
+
+    VehicleMetrics:
+      type: object
+      required: [currentMileage, mileageDelta, totalCheckins, totalWorkOrders, totalDeliveredWorkOrders, totalInvested, lastVisitAt]
+      properties:
+        currentMileage: { type: integer, example: 52000 }
+        mileageDelta: { type: integer, example: 7000 }
+        totalCheckins: { type: integer, example: 3 }
+        totalWorkOrders: { type: integer, example: 2 }
+        totalDeliveredWorkOrders: { type: integer, example: 2 }
+        totalInvested: { type: string, example: '450.00' }
+        lastVisitAt: { type: string, format: date-time, nullable: true }
+
+    TimelineEvent:
+      type: object
+      required: [id, kind, occurredAt, summary, data]
+      properties:
+        id: { type: string, format: uuid }
+        kind:
+          type: string
+          enum: [checkin, budget, work_order, ownership_transfer]
+        occurredAt:
+          type: string
+          format: date-time
+        summary:
+          type: string
+          example: 'Check-in de recepción con 52.000 km'
+        data:
+          type: object
+          description: Payload específico del evento según su `kind`

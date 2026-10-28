@@ -1,82 +1,142 @@
-<div class="auth-layout">
-  <section class="auth-page" aria-labelledby="login-title">
-    <div class="auth-brand-badge" aria-hidden="true">
-      <svg class="auth-brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-      </svg>
-      <span class="auth-brand-title">MotorSync</span>
-    </div>
-
-    <div class="auth-header">
-      <h1 id="login-title">Iniciar sesión</h1>
-      <p class="intro">Entre con el correo y la contraseña de su cuenta.</p>
-    </div>
-
-    @if (reason(); as message) {
-      <p class="session-reason" role="status" data-testid="session-reason">{{ message }}</p>
-    }
-
-    @if (formError(); as message) {
-      <p class="form-error" role="alert" data-testid="form-error">{{ message }}</p>
-    }
-
-    @let fieldErrors = errors();
-    <form novalidate (submit)="submit($event)" class="auth-form">
-      <div class="field">
-        <label for="login-email">Correo electrónico</label>
-        <input
-          id="login-email"
-          type="email"
-          inputmode="email"
-          autocomplete="username"
-          autocapitalize="off"
-          spellcheck="false"
-          data-testid="email"
-          placeholder="ejemplo@taller.ec"
-          [attr.aria-invalid]="fieldErrors.email ? 'true' : null"
-          [attr.aria-describedby]="fieldErrors.email ? 'login-email-error' : null"
-          (input)="update('email', $event)"
-        />
-        @if (fieldErrors.email) {
-          <p class="field-error" id="login-email-error" data-testid="error-email">{{ fieldErrors.email }}</p>
-        }
+<div class="auth-split-layout">
+  <!-- Hero / Brand Showcase Panel (Desktop / Tablet) -->
+  <aside class="auth-hero-panel" aria-label="MotorSync presentación">
+    <div class="hero-content">
+      <div class="hero-brand">
+        <svg class="hero-brand-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+        </svg>
+        <span class="hero-brand-name">MotorSync</span>
       </div>
 
-      <div class="field">
-        <label for="login-password">Contraseña</label>
-        <input
-          id="login-password"
-          type="password"
-          autocomplete="current-password"
-          data-testid="password"
-          placeholder="••••••••"
-          [attr.aria-invalid]="fieldErrors.password ? 'true' : null"
-          [attr.aria-describedby]="fieldErrors.password ? 'login-password-error' : null"
-          (input)="update('password', $event)"
-        />
-        @if (fieldErrors.password) {
-          <p class="field-error" id="login-password-error" data-testid="error-password">{{ fieldErrors.password }}</p>
-        }
+      <div class="hero-tagline-group">
+        <h2 class="hero-slogan">El sistema operativo para el taller automotriz moderno</h2>
+        <p class="hero-description">
+          Gestión integral de bahía en tiempo real, búsqueda de vehículos por placa, inspección pericial 360° con evidencia fotográfica inmutable y presupuestos transparentes.
+        </p>
       </div>
 
-      <button type="submit" class="primary" data-testid="submit" [disabled]="submitting()">
-        {{ submitting() ? 'Entrando…' : 'Iniciar sesión' }}
-      </button>
-    </form>
+      <ul class="hero-features">
+        <li class="feature-item">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          <div class="feature-text">
+            <strong class="feature-title">Check-in 360° con firma pericial</strong>
+            <span class="feature-sub">Registro de daños, pertenencias y kilometraje con evidencia inalterable.</span>
+          </div>
+        </li>
+        <li class="feature-item">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <div class="feature-text">
+            <strong class="feature-title">Terminal de placa ultrarrápido</strong>
+            <span class="feature-sub">Acceso inmediato a la hoja de vida clínica vehicular en menos de 200 ms.</span>
+          </div>
+        </li>
+        <li class="feature-item">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <rect x="2" y="5" width="20" height="14" rx="2"/>
+            <line x1="2" y1="10" x2="22" y2="10"/>
+          </svg>
+          <div class="feature-text">
+            <strong class="feature-title">Presupuestos y Órdenes de Trabajo</strong>
+            <span class="feature-sub">Aprobación digital en un toque y control operativo por bahía.</span>
+          </div>
+        </li>
+      </ul>
 
-    <div class="auth-footer">
-      <p class="alternate">
-        <a routerLink="/forgot-password" [queryParams]="emailQuery()" data-testid="forgot-password-link">
-          ¿Olvidaste tu contraseña?
-        </a>
-      </p>
-
-      <div class="auth-divider" role="separator" aria-hidden="true"></div>
-
-      <p class="alternate alternate-secondary">
-        ¿Su taller aún no usa MotorSync?
-        <a routerLink="/register">Registrar taller</a>
-      </p>
+      <div class="hero-footer-note">
+        <span class="pulse-dot" aria-hidden="true"></span>
+        <span>Plataforma activa para talleres automotrices en Ecuador</span>
+      </div>
     </div>
-  </section>
+  </aside>
+
+  <!-- Main Login Panel -->
+  <main class="auth-main-panel">
+    <section class="auth-page" aria-labelledby="login-title">
+      <div class="auth-brand-badge" aria-hidden="true">
+        <svg class="auth-brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+        </svg>
+        <span class="auth-brand-title">MotorSync</span>
+      </div>
+
+      <div class="auth-header">
+        <h1 id="login-title">Iniciar sesión</h1>
+        <p class="intro">Entre con el correo y la contraseña de su cuenta.</p>
+        <p class="auth-slogan-mobile">El sistema operativo para el taller automotriz moderno</p>
+      </div>
+
+      @if (reason(); as message) {
+        <p class="session-reason" role="status" data-testid="session-reason">{{ message }}</p>
+      }
+
+      @if (formError(); as message) {
+        <p class="form-error" role="alert" data-testid="form-error">{{ message }}</p>
+      }
+
+      @let fieldErrors = errors();
+      <form novalidate (submit)="submit($event)" class="auth-form">
+        <div class="field">
+          <label for="login-email">Correo electrónico</label>
+          <input
+            id="login-email"
+            type="email"
+            inputmode="email"
+            autocomplete="username"
+            autocapitalize="off"
+            spellcheck="false"
+            data-testid="email"
+            placeholder="ejemplo@taller.ec"
+            [attr.aria-invalid]="fieldErrors.email ? 'true' : null"
+            [attr.aria-describedby]="fieldErrors.email ? 'login-email-error' : null"
+            (input)="update('email', $event)"
+          />
+          @if (fieldErrors.email) {
+            <p class="field-error" id="login-email-error" data-testid="error-email">{{ fieldErrors.email }}</p>
+          }
+        </div>
+
+        <div class="field">
+          <label for="login-password">Contraseña</label>
+          <input
+            id="login-password"
+            type="password"
+            autocomplete="current-password"
+            data-testid="password"
+            placeholder="••••••••"
+            [attr.aria-invalid]="fieldErrors.password ? 'true' : null"
+            [attr.aria-describedby]="fieldErrors.password ? 'login-password-error' : null"
+            (input)="update('password', $event)"
+          />
+          @if (fieldErrors.password) {
+            <p class="field-error" id="login-password-error" data-testid="error-password">{{ fieldErrors.password }}</p>
+          }
+        </div>
+
+        <button type="submit" class="primary" data-testid="submit" [disabled]="submitting()">
+          {{ submitting() ? 'Entrando…' : 'Iniciar sesión' }}
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <p class="alternate">
+          <a routerLink="/forgot-password" [queryParams]="emailQuery()" data-testid="forgot-password-link">
+            ¿Olvidaste tu contraseña?
+          </a>
+        </p>
+
+        <div class="auth-divider" role="separator" aria-hidden="true"></div>
+
+        <p class="alternate alternate-secondary">
+          <span>¿Su taller aún no usa MotorSync?</span>
+          <a routerLink="/register">Registrar taller</a>
+        </p>
+      </div>
+    </section>
+  </main>
 </div>

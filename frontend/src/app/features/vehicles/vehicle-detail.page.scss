@@ -1,117 +1,112 @@
 @use '../../shared/styles/touch' as touch;
 
-// Mobile-first (FR-025): one column from 360 px; wider screens only gain margins.
-$text: #1a1a1a;
-$muted: #4a4a4a;
-$border: #595959;
-$primary: #0b5394;
-$error: #b00020;
-$focus: #f1c232;
-
 :host {
   display: block;
-  color: $text;
-  background: #ffffff;
+  min-height: 100%;
+  color: var(--color-text);
+  background-color: var(--color-bg);
 }
 
 .vehicle-detail {
   box-sizing: border-box;
-  max-width: 40rem;
+  max-width: 48rem;
   margin: 0 auto;
-  padding: 1rem;
+  padding: var(--space-lg);
 }
 
 h1 {
-  font-size: 1.5rem;
-  margin: 0 0 1rem;
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-text);
+
+  .plate {
+    display: inline-block;
+    padding: 2px 12px;
+    font-size: var(--font-size-plate);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+    background-color: var(--color-status-checkin-bg);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+  }
+}
+
+.subtitle {
+  display: block;
+  margin-top: var(--space-xs);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  color: var(--color-text-muted);
 }
 
 h2 {
-  font-size: 1.125rem;
-  margin: 0 0 0.75rem;
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 .status {
-  margin: 0 0 1rem;
-  color: $muted;
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-base);
+  color: var(--color-text-muted);
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin: 0 0 var(--space-lg);
 }
 
 .card {
-  margin-bottom: 1rem;
-  padding: 1rem;
-  border: 1px solid $border;
-  border-radius: 4px;
+  margin-bottom: var(--space-lg);
+  padding: var(--space-lg);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
 }
 
 .facts {
   margin: 0;
 
   div + div {
-    margin-top: 0.75rem;
+    margin-top: var(--space-sm);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--color-surface);
   }
 
   dt {
+    font-size: var(--font-size-sm);
     font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
   }
 
   dd {
-    margin: 0;
+    margin: var(--space-xs) 0 0;
+    font-size: var(--font-size-md);
+    color: var(--color-text);
     overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
   }
 }
 
-.vehicle-list {
-  margin: 0 0 1rem;
-  padding: 0;
-  list-style: none;
-
-  li + li {
-    margin-top: 0.5rem;
-  }
-}
-
-.vehicle {
+.owner-link {
   @include touch.touch-target;
-  box-sizing: border-box;
-  display: flex;
-  flex-wrap: wrap;
+  display: inline-flex;
   align-items: center;
-  gap: 0.25rem 0.75rem;
-  padding: 0.5rem 0.75rem;
-  color: $text;
-  text-decoration: none;
-  border: 1px solid $border;
-  border-radius: 4px;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: underline;
 
   &:hover {
-    background: #f3f6fa;
+    color: var(--color-primary-hover);
   }
-}
-
-.plate {
-  font-weight: 700;
-  color: $primary;
-  letter-spacing: 0.05em;
-}
-
-.notice {
-  margin: 0 0 1rem;
-  padding: 0.75rem;
-  border-radius: 4px;
-
-  p {
-    margin: 0 0 0.75rem;
-  }
-
-  h1 {
-    margin-bottom: 0.5rem;
-  }
-}
-
-.notice-error {
-  color: $error;
-  background: #fdecee;
-  border: 1px solid $error;
 }
 
 .action {
@@ -120,64 +115,56 @@ h2 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 1rem;
-  font-size: 1rem;
-  color: $primary;
+  min-height: 44px;
+  padding: 0 var(--space-lg);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-primary);
   text-decoration: none;
-  background: #ffffff;
-  border: 1px solid $primary;
-  border-radius: 4px;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+
+  &:hover {
+    background-color: var(--color-primary-light);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
 }
 
 .stamp {
   margin: 0;
-  font-size: 0.875rem;
-  color: $muted;
-}
-
-h1 .plate {
-  display: block;
-  font-size: 1.75rem;
-}
-
-.subtitle {
-  display: block;
-  font-size: 1.125rem;
-  font-weight: 400;
-  color: $muted;
-}
-
-.owner-link {
-  @include touch.touch-target;
-  display: inline-flex;
-  align-items: center;
-  color: $primary;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
 }
 
 .stamp + .action {
-  margin-top: 1rem;
+  margin-top: var(--space-md);
 }
 
-button:focus-visible,
-a:focus-visible {
-  outline: 3px solid $focus;
-  outline-offset: 2px;
-}
+.notice {
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-sm);
 
-@media (min-width: 48rem) {
-  .vehicle-detail {
-    padding: 2rem;
+  p {
+    margin: 0 0 var(--space-sm);
+  }
+
+  h1 {
+    margin-bottom: var(--space-xs);
   }
 }
 
-// US4: actions, ownership history and visually hidden text.
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin: 0 0 1rem;
+.notice-error {
+  color: var(--color-error);
+  background-color: var(--color-error-light);
+  border: 1px solid var(--color-error);
 }
 
 .ownership-list {
@@ -187,8 +174,8 @@ a:focus-visible {
 }
 
 .ownership-change {
-  padding: 0.75rem 0;
-  border-top: 1px solid #d0d0d0;
+  padding: var(--space-md) 0;
+  border-top: 1px solid var(--color-border-light);
 
   &:first-child {
     padding-top: 0;
@@ -196,18 +183,22 @@ a:focus-visible {
   }
 
   .facts div + div {
-    margin-top: 0.5rem;
+    margin-top: var(--space-xs);
+    border-top: none;
   }
 }
 
 .ownership-date {
-  margin: 0 0 0.5rem;
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-base);
   font-weight: 600;
+  color: var(--color-text);
 }
 
 .document {
-  margin-left: 0.5rem;
-  color: $muted;
+  margin-left: var(--space-xs);
+  color: var(--color-text-muted);
+  font-weight: 400;
 }
 
 .sr-only {
@@ -217,4 +208,16 @@ a:focus-visible {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+@media (min-width: 48rem) {
+  .vehicle-detail {
+    padding: var(--space-2xl) var(--space-lg);
+  }
 }

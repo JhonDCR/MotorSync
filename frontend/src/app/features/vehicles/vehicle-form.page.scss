@@ -185,9 +185,9 @@ select {
 }
 
 .notice-warning {
-  color: #4d3200;
-  background-color: #fff4ce;
-  border: 1px solid #8a5a00;
+  color: var(--color-warning-text);
+  background-color: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
 }
 
 .action,

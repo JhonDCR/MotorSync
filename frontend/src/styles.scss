@@ -1,5 +1,7 @@
 /* MotorSync Design System — "The Precision Workshop" */
 
+@use './styles/auth-hero';
+
 :root {
   /* Colors */
   --color-primary: #0b5394;
@@ -14,6 +16,11 @@
   --color-surface: #f8f9fa;
   --color-border: #595959;
   --color-border-light: #d0d0d0;
+
+  /* Warning — advisory, never error (DESIGN.md: Umber / Parchment / Advisory Ochre) */
+  --color-warning-text: #4d3200;
+  --color-warning-bg: #fff4ce;
+  --color-warning-border: #8a6d00;
 
   /* Semantic status colors */
   --color-status-checkin: #0b5394;

@@ -1,0 +1,233 @@
+// Split-screen de login: el panel de marca y el layout de dos columnas solo se
+// renderizan en esa pantalla. Vive en la hoja global para que Angular no lo
+// inline en las seis páginas de autenticación, donde nunca aparece.
+//
+// Los formularios y la tarjeta siguen en su componente (_auth-form.scss).
+// Los nombres genéricos (.feature-*, .hero-brand, .pulse-dot) se anidan bajo
+// .auth-hero-panel: existen en otras pantallas de la app.
+
+.auth-split-layout {
+  position: relative;
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background-color: var(--color-bg);
+}
+
+.auth-hero-panel {
+  display: none;
+}
+
+// The photo also sits behind the form on small screens, heavily darkened,
+// so the glass panel has something to frost.
+.auth-main-panel {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-xl) var(--space-md);
+  box-sizing: border-box;
+  background:
+    radial-gradient(80% 50% at 50% 0%, rgb(255 143 0 / 22%), transparent 70%),
+    linear-gradient(180deg, rgb(13 15 18 / 82%), rgb(13 15 18 / 96%)),
+    url('/images/workshop-hero.jpg') center / cover no-repeat,
+    var(--color-bg);
+}
+
+.auth-page .auth-slogan-mobile {
+  display: block;
+  margin: var(--space-md) 0 0;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+@keyframes auth-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(52 211 153 / 55%);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgb(52 211 153 / 0%);
+  }
+}
+
+@media (min-width: 60rem) {
+  .auth-main-panel {
+    padding: var(--space-2xl);
+    background:
+      radial-gradient(60% 50% at 30% 20%, rgb(255 143 0 / 10%), transparent 70%),
+      radial-gradient(50% 40% at 100% 100%, rgb(67 45 191 / 22%), transparent 70%),
+      var(--color-bg);
+  }
+
+  .auth-hero-panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 52%;
+    max-width: 720px;
+    min-height: 100vh;
+    padding: 3rem;
+    box-sizing: border-box;
+    color: #ffffff;
+    background-color: #0d0f12;
+    background-image:
+      linear-gradient(200deg, rgb(255 143 0 / 55%) 0%, rgb(120 40 8 / 45%) 28%, rgb(13 15 18 / 88%) 62%, #0d0f12 100%),
+      url('/images/workshop-hero.jpg');
+    background-size: cover;
+    background-position: center;
+    overflow: hidden;
+
+    // Hairline seam with an orange glow towards the form.
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 1px;
+      background: linear-gradient(180deg, transparent, rgb(255 143 0 / 70%), transparent);
+      box-shadow: 0 0 24px 2px rgb(255 143 0 / 35%);
+    }
+
+    // Fine technical grid.
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgb(255 255 255 / 4%) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(255 255 255 / 4%) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: linear-gradient(180deg, #000 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      flex: 1;
+      justify-content: space-between;
+      gap: var(--space-2xl);
+    }
+
+    .hero-brand {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+
+      .hero-brand-logo {
+        width: 48px;
+        height: 48px;
+        flex-shrink: 0;
+        object-fit: contain;
+        filter: drop-shadow(0 4px 14px rgb(67 45 191 / 50%));
+      }
+
+      .hero-brand-name {
+        font-family: var(--font-display);
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        color: #ffffff;
+      }
+    }
+
+    .hero-tagline-group {
+      margin: auto 0;
+
+      .hero-slogan {
+        max-width: 16ch;
+        margin: 0 0 var(--space-lg);
+        font-family: var(--font-display);
+        font-size: clamp(2.25rem, 3.4vw, 3.25rem);
+        font-weight: 700;
+        line-height: 1.05;
+        letter-spacing: -0.03em;
+        color: #ffffff;
+        text-shadow: 0 2px 24px rgb(0 0 0 / 50%);
+      }
+
+      .hero-description {
+        margin: 0;
+        max-width: 50ch;
+        font-size: var(--font-size-md);
+        line-height: 1.6;
+        color: rgb(255 255 255 / 82%);
+      }
+    }
+
+    .hero-features {
+      display: grid;
+      gap: var(--space-sm);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+
+      .feature-item {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-md);
+        padding: var(--space-md) var(--space-lg);
+        background: rgb(13 15 18 / 55%);
+        border: 1px solid rgb(255 255 255 / 9%);
+        border-radius: var(--radius-md);
+        backdrop-filter: blur(10px);
+
+        .feature-icon {
+          width: 36px;
+          height: 36px;
+          padding: 8px;
+          flex-shrink: 0;
+          color: var(--color-primary);
+          background: rgb(255 143 0 / 14%);
+          border-radius: var(--radius-sm);
+        }
+
+        .feature-title {
+          display: block;
+          font-size: var(--font-size-base);
+          font-weight: 600;
+          color: #ffffff;
+        }
+
+        .feature-sub {
+          display: block;
+          margin-top: 2px;
+          font-size: var(--font-size-sm);
+          line-height: 1.45;
+          color: rgb(255 255 255 / 72%);
+        }
+      }
+    }
+
+    .hero-footer-note {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: var(--font-size-sm);
+      color: rgb(255 255 255 / 72%);
+
+      .pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: var(--color-success);
+        animation: auth-pulse 2.4s ease-in-out infinite;
+      }
+    }
+  }
+
+  .auth-page .auth-slogan-mobile {
+    display: none;
+  }
+}

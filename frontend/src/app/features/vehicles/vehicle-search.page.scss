@@ -1,158 +1,259 @@
 @use '../../shared/styles/touch' as touch;
 
-// Mobile-first bay screen (FR-025, FR-026): one column from 360 px, large search field, 44 px targets.
-$text: #1a1a1a;
-$muted: #4a4a4a;
-$border: #595959;
-$primary: #0b5394;
-$error: #b00020;
-$focus: #f1c232;
-
 :host {
   display: block;
-  color: $text;
-  background: #ffffff;
+  min-height: 100%;
+  color: var(--color-text);
+  background:
+    radial-gradient(60rem 22rem at 50% -6rem, rgb(255 143 0 / 10%), transparent 70%),
+    radial-gradient(40rem 18rem at 100% 0%, rgb(67 45 191 / 18%), transparent 70%),
+    var(--color-bg);
 }
 
 .vehicle-search {
-  box-sizing: border-box;
-  max-width: 40rem;
+  max-width: 52rem;
   margin: 0 auto;
-  padding: 1rem;
+  padding: var(--space-xl) var(--space-lg);
+}
+
+.hero {
+  margin-bottom: var(--space-xl);
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-accent);
 }
 
 h2 {
-  font-size: 1.5rem;
-  margin: 0 0 1rem;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(var(--font-size-3xl), 5vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--color-text);
 }
 
 .search {
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-xl);
+  padding: var(--space-xl);
 
   label {
     display: block;
-    margin-bottom: 0.25rem;
+    margin-bottom: var(--space-sm);
+    font-size: var(--font-size-sm);
     font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
   }
 
   input {
     @include touch.touch-target;
-    box-sizing: border-box;
     width: 100%;
-    min-height: 3.5rem;
-    padding: 0 0.75rem;
-    font-size: 1.5rem;
-    letter-spacing: 0.05em;
+    min-height: 4.5rem;
+    padding: 0 var(--space-xl);
+    font-family: var(--font-display);
+    font-size: clamp(var(--font-size-2xl), 4vw, 2.25rem);
+    font-weight: 700;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: $text;
-    border: 2px solid $border;
-    border-radius: 4px;
+    color: var(--color-text);
+    background-color: var(--color-bg);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-base);
+
+    &::placeholder {
+      color: var(--color-text-muted);
+      font-weight: 400;
+      letter-spacing: normal;
+      text-transform: none;
+    }
+
+    &:focus-visible {
+      border-color: var(--color-primary);
+      outline: 3px solid var(--color-focus);
+      outline-offset: 2px;
+      box-shadow: var(--glow-primary);
+    }
   }
 }
 
 .hint {
-  margin: 0.25rem 0 0;
-  font-size: 0.875rem;
-  color: $muted;
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: 1.4;
 }
 
 .status {
-  margin: 0 0 1rem;
-  color: $muted;
+  margin: 0 0 var(--space-md);
+  color: var(--color-text-muted);
 }
 
 .notice {
-  margin: 0 0 1rem;
-  padding: 0.75rem;
-  border-radius: 4px;
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  line-height: 1.4;
+  border-radius: var(--radius-md);
 }
 
 .notice-info {
-  color: $text;
-  background: #eef3f9;
-  border: 1px solid $primary;
+  color: var(--color-text);
+  background-color: var(--color-surface-2);
+  border: 1px solid var(--color-border-light);
 }
 
 .notice-error {
-  color: $error;
-  background: #fdecee;
-  border: 1px solid $error;
+  color: var(--color-error);
+  background-color: var(--color-error-light);
+  border: 1px solid var(--color-error);
 }
 
 .result-list {
-  margin: 0 0 1rem;
+  display: grid;
+  gap: var(--space-md);
+  margin: 0 0 var(--space-lg);
   padding: 0;
   list-style: none;
-
-  li + li {
-    margin-top: 0.5rem;
-  }
 }
 
 .result {
   @include touch.touch-target;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.25rem;
-  padding: 0.75rem;
-  color: $text;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-sm) var(--space-lg);
+  padding: var(--space-lg) var(--space-xl);
+  color: var(--color-text);
   text-decoration: none;
-  border: 1px solid $border;
-  border-radius: 4px;
 
   &:hover {
-    background: #f3f6fa;
+    border-color: rgb(255 143 0 / 45%);
+
+    .result-arrow {
+      color: var(--color-primary);
+      transform: translateX(3px);
+    }
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
   }
 }
 
+/* License plate */
 .result-plate {
-  font-size: 1.25rem;
+  grid-row: span 2;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-xs) var(--space-md);
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
   font-weight: 700;
-  letter-spacing: 0.05em;
-  color: $primary;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #111;
+  background: linear-gradient(180deg, #fafafa, #dfe3e8);
+  border: 2px solid #111;
+  border-top-width: 6px;
+  border-top-color: var(--color-primary);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 18%);
+}
+
+.result-vehicle {
+  font-size: var(--font-size-md);
+  font-weight: 600;
 }
 
 .result-mileage {
-  color: $muted;
+  grid-column: 2;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
+.result-arrow {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  font-size: var(--font-size-xl);
+  color: var(--color-text-muted);
+  transition: transform var(--transition-base), color var(--transition-fast);
+}
+
 .result-owner {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem 0.75rem;
-  color: $muted;
+  gap: var(--space-xs) var(--space-md);
+  padding-top: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  border-top: 1px solid var(--color-border-light);
 }
 
 .result-owner-name {
   font-weight: 600;
-  color: $text;
+  color: var(--color-text);
 }
 
 .action {
   @include touch.touch-target;
-  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 1rem;
-  font-size: 1rem;
-  color: #ffffff;
+  min-height: 48px;
+  padding: 0 var(--space-xl);
+  font-weight: 600;
+  color: var(--color-on-primary);
   text-decoration: none;
-  background: $primary;
-  border-radius: 4px;
+  background-color: var(--color-primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glow-primary);
+  transition: background-color var(--transition-fast);
+
+  &:hover {
+    background-color: var(--color-primary-hover);
+  }
+
+  &:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
 }
 
-input:focus-visible,
-a:focus-visible {
-  outline: 3px solid $focus;
-  outline-offset: 2px;
+@media (max-width: 30rem) {
+  .result {
+    grid-template-columns: 1fr auto;
+    padding: var(--space-lg);
+  }
+
+  .result-plate {
+    grid-row: auto;
+    width: fit-content;
+  }
+
+  .result-mileage {
+    grid-column: 1;
+  }
+
+  .result-arrow {
+    grid-column: 2;
+    grid-row: 1;
+  }
 }
 
 @media (min-width: 48rem) {
   .vehicle-search {
-    padding: 2rem;
+    padding: var(--space-3xl) var(--space-lg);
   }
 }

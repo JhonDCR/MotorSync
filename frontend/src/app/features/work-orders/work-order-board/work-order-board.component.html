@@ -1,6 +1,7 @@
 <main class="page">
   <h1>Órdenes de trabajo</h1>
 
+  <div class="filter">
   <label for="status-filter">Estado</label>
   <select id="status-filter" data-testid="status-filter" (change)="onFilter($event)">
     <option value="">Todos</option>
@@ -8,6 +9,7 @@
       <option [value]="status">{{ status }}</option>
     }
   </select>
+  </div>
 
   <div aria-live="polite">
     @switch (state().kind) {
@@ -24,18 +26,35 @@
 
   @if (state(); as current) {
     @if (current.kind === 'loaded') {
-      <ul class="list">
-        @for (order of current.orders; track order.id) {
-          <li data-testid="wo-row">
-            <a [routerLink]="['/work-orders', order.id]"
-              >OT n.º {{ order.number }} – {{ order.plate }} – {{ order.assignee.name }} –
-              {{ order.status }}</a
-            >
-          </li>
-        } @empty {
+      @if (current.orders.length === 0) {
+        <ul class="list">
           <li data-testid="board-empty">No hay órdenes de trabajo.</li>
-        }
-      </ul>
+        </ul>
+      } @else {
+        <div class="board">
+          @for (status of statuses; track status) {
+            <section class="column" [attr.data-status]="status" [attr.aria-labelledby]="'col-' + status">
+              <h2 class="column-title" [id]="'col-' + status">
+                <span class="ms-pill" [attr.data-status]="status">{{ status }}</span>
+              </h2>
+              <ul class="list">
+                @for (order of current.orders; track order.id) {
+                  @if (order.status === status) {
+                    <li data-testid="wo-row" [attr.data-status]="order.status">
+                      <a [routerLink]="['/work-orders', order.id]">
+                        <span class="wo-number">OT n.º {{ order.number }}</span>
+                        <span class="plate">{{ order.plate }}</span>
+                        <span class="wo-assignee">{{ order.assignee.name }}</span>
+                        <span class="sr-only">{{ order.status }}</span>
+                      </a>
+                    </li>
+                  }
+                }
+              </ul>
+            </section>
+          }
+        </div>
+      }
     }
   }
 </main>

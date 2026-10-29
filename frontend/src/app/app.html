@@ -1,66 +1,142 @@
-@if (!isSupportZone()) {
-  <header class="app-header">
-    <h1 class="brand">MotorSync</h1>
-    <!-- FR-026: with a temporary password pending, the workshop navigation is hidden. -->
-    @if (!session.mustChangePassword()) {
-      <nav class="main-nav" aria-label="Principal">
-        <ul>
-          <li>
-            <a
-              routerLink="/"
-              routerLinkActive="active"
-              [routerLinkActiveOptions]="{ exact: true }"
-              ariaCurrentWhenActive="page"
-              >Vehículos</a
-            >
-          </li>
-          <li>
-            <a
-              routerLink="/clients"
-              routerLinkActive="active"
-              [routerLinkActiveOptions]="{ exact: true }"
-              ariaCurrentWhenActive="page"
-              >Clientes</a
-            >
-          </li>
-          <li>
-            <a routerLink="/clients/new" routerLinkActive="active" ariaCurrentWhenActive="page">Registrar cliente</a>
-          </li>
-          @if (session.user()) {
-            <li>
-              <a routerLink="/work-orders" routerLinkActive="active" ariaCurrentWhenActive="page">Órdenes de trabajo</a>
-            </li>
-          }
-          @if (session.user()?.role === 'admin') {
-            <li>
-              <a routerLink="/users" routerLinkActive="active" ariaCurrentWhenActive="page">Usuarios</a>
-            </li>
-          }
-        </ul>
-      </nav>
+<a href="#main-content" class="skip-link">Saltar al contenido principal</a>
+
+@let withShell = !isSupportZone() && !isAuthZone();
+<div class="app-layout" [class.app-layout--shell]="withShell" [class.nav-open]="navOpen()">
+@if (withShell) {
+  <div class="topbar">
+    <button
+      type="button"
+      class="nav-toggle"
+      aria-controls="app-sidebar"
+      [attr.aria-expanded]="navOpen()"
+      [attr.aria-label]="navOpen() ? 'Cerrar menú' : 'Abrir menú'"
+      (click)="toggleNav()"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" />
+      </svg>
+    </button>
+    <img class="topbar-logo" src="images/logo.png" alt="" width="28" height="28" />
+    <span class="topbar-title">MotorSync</span>
+    @if (session.workshop(); as workshop) {
+      <span class="topbar-workshop"><span class="live-dot" aria-hidden="true"></span>{{ workshop.name }}</span>
     }
-    @if (session.user(); as user) {
-      <div class="session-bar">
-        <p class="session-info">
-          <span class="session-user" data-testid="session-user">{{ user.name }}</span>
-          <span class="session-role" data-testid="session-role">{{ roleLabel() }}</span>
-          <span class="session-workshop" data-testid="session-workshop">{{ session.workshop()?.name }}</span>
-        </p>
-        <button
-          type="button"
-          class="logout"
-          data-testid="logout"
-          [disabled]="loggingOut()"
-          [attr.aria-busy]="loggingOut() ? 'true' : null"
-          (click)="logout()"
-        >
-          Cerrar sesión
-        </button>
+  </div>
+  <div class="nav-scrim" aria-hidden="true" (click)="closeNav()"></div>
+  <header class="app-header" id="app-sidebar">
+    <div class="header-inner">
+      <div class="brand-group">
+        <a routerLink="/" class="brand-link" aria-label="MotorSync Inicio">
+          <img class="brand-logo" src="images/logo.png" alt="" width="40" height="40" />
+          <div class="brand-text">
+            <h1 class="brand">MotorSync</h1>
+            <span class="brand-tagline">Bahía & Taller</span>
+          </div>
+        </a>
       </div>
-    }
+
+      <!-- FR-026: with a temporary password pending or in auth flows, the workshop navigation is hidden. -->
+      @if (showNavigation()) {
+        <nav class="main-nav" aria-label="Principal">
+          <ul>
+            <li>
+              <a
+                routerLink="/"
+                routerLinkActive="active"
+                [routerLinkActiveOptions]="{ exact: true }"
+                ariaCurrentWhenActive="page"
+              >
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
+                  <circle cx="7" cy="17" r="2" />
+                  <path d="M9 17h6" />
+                  <circle cx="17" cy="17" r="2" />
+                </svg>
+                Vehículos
+              </a>
+            </li>
+            <li>
+              <a
+                routerLink="/clients"
+                routerLinkActive="active"
+                [routerLinkActiveOptions]="{ exact: true }"
+                ariaCurrentWhenActive="page"
+              >
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                Clientes
+              </a>
+            </li>
+            <li>
+              <a routerLink="/clients/new" routerLinkActive="active" ariaCurrentWhenActive="page">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <line x1="19" y1="8" x2="19" y2="14" />
+                  <line x1="22" y1="11" x2="16" y2="11" />
+                </svg>
+                Registrar cliente
+              </a>
+            </li>
+            @if (session.user()) {
+              <li>
+                <a routerLink="/work-orders" routerLinkActive="active" ariaCurrentWhenActive="page">
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                    <path d="m9 14 2 2 4-4" />
+                  </svg>
+                  Órdenes de trabajo
+                </a>
+              </li>
+            }
+            @if (session.user()?.role === 'admin') {
+              <li>
+                <a routerLink="/users" routerLinkActive="active" ariaCurrentWhenActive="page">
+                  <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                  Usuarios
+                </a>
+              </li>
+            }
+          </ul>
+        </nav>
+      }
+
+      @if (session.user(); as user) {
+        <div class="session-bar">
+          <div class="session-info">
+            <span class="session-user" data-testid="session-user">{{ user.name }}</span>
+            <span class="session-role" data-testid="session-role">{{ roleLabel() }}</span>
+            <span class="session-workshop" data-testid="session-workshop">{{ session.workshop()?.name }}</span>
+          </div>
+          <button
+            type="button"
+            class="logout"
+            data-testid="logout"
+            [disabled]="loggingOut()"
+            [attr.aria-busy]="loggingOut() ? 'true' : null"
+            (click)="logout()"
+          >
+            <svg class="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Cerrar sesión
+          </button>
+        </div>
+      }
+    </div>
   </header>
 }
 
-<main>
+<main id="main-content" class="app-main">
   <router-outlet />
 </main>
+</div>

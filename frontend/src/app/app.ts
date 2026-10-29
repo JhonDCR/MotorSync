@@ -13,6 +13,17 @@ function isSupportUrl(url: string): boolean {
   return url === '/support' || url.startsWith('/support/') || url.startsWith('/support?');
 }
 
+function isAuthUrl(url: string): boolean {
+  return (
+    url === '/login' ||
+    url.startsWith('/login?') ||
+    url === '/register' ||
+    url.startsWith('/register?') ||
+    url === '/forgot-password' ||
+    url.startsWith('/forgot-password?')
+  );
+}
+
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
@@ -28,12 +39,19 @@ export class App {
 
   private readonly currentUrl = signal(this.router.url);
   protected readonly isSupportZone = computed(() => isSupportUrl(this.currentUrl()));
+  protected readonly isAuthZone = computed(() => isAuthUrl(this.currentUrl()));
+
+  protected readonly showNavigation = computed(() => {
+    return !this.session.mustChangePassword() && !this.isAuthZone();
+  });
 
   protected readonly roleLabel = computed(() => {
     const role = this.session.user()?.role;
     return role === undefined ? '' : ROLE_LABELS[role];
   });
   protected readonly loggingOut = signal(false);
+  /** Mobile drawer state (< 1024px); purely presentational. */
+  protected readonly navOpen = signal(false);
 
   constructor() {
     this.router.events
@@ -43,7 +61,16 @@ export class App {
       )
       .subscribe((event) => {
         this.currentUrl.set(event.urlAfterRedirects || event.url);
+        this.navOpen.set(false);
       });
+  }
+
+  protected toggleNav(): void {
+    this.navOpen.update((open) => !open);
+  }
+
+  protected closeNav(): void {
+    this.navOpen.set(false);
   }
 
   /**

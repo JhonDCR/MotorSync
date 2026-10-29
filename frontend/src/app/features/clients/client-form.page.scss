@@ -1,161 +1,218 @@
 @use '../../shared/styles/touch' as touch;
 
-// Mobile-first (FR-025): one column from 360 px; wider screens only gain margins.
-$text: #1a1a1a;
-$border: #595959;
-$primary: #0b5394;
-$error: #b00020;
-$focus: #f1c232;
-
 :host {
   display: block;
-  color: $text;
-  background: #ffffff;
+  min-height: 100%;
+  color: var(--color-text);
+  background-color: var(--color-bg);
 }
 
 .client-form {
   box-sizing: border-box;
-  max-width: 40rem;
+  max-width: 44rem;
   margin: 0 auto;
-  padding: 1rem;
+  padding: var(--space-lg);
 }
 
 h1 {
-  font-size: 1.5rem;
-  margin: 0 0 1rem;
+  margin: 0 0 var(--space-lg);
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-text);
 }
 
 fieldset {
-  border: 0;
-  margin: 0 0 1rem;
+  margin: 0 0 var(--space-lg);
   padding: 0;
+  border: 0;
 }
 
 legend,
 .field label {
   display: block;
-  margin-bottom: 0.25rem;
+  margin-bottom: var(--space-xs);
+  font-size: var(--font-size-base);
   font-weight: 600;
+  color: var(--color-text);
 }
 
 .options {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-xs);
 }
 
 .option {
   @include touch.touch-target;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0 0.75rem;
-  border: 1px solid $border;
-  border-radius: 4px;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md);
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+
+  &:hover {
+    background-color: var(--color-surface);
+  }
 
   input {
     width: 1.25rem;
     height: 1.25rem;
     margin: 0;
+    accent-color: var(--color-primary);
   }
 }
 
 .field {
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-lg);
 
-  input {
+  input,
+  textarea {
     @include touch.touch-target;
     box-sizing: border-box;
     width: 100%;
-    padding: 0 0.75rem;
-    font-size: 1rem;
-    color: $text;
-    border: 1px solid $border;
-    border-radius: 4px;
+    padding: var(--space-xs) var(--space-md);
+    font-family: var(--font-sans);
+    font-size: var(--font-size-md);
+    color: var(--color-text);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    transition: border-color var(--transition-fast);
+
+    &:focus-visible {
+      border-color: var(--color-primary);
+      outline: 3px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    &[aria-invalid='true'] {
+      border: 2px solid var(--color-error);
+    }
   }
 
-  input[aria-invalid='true'] {
-    border: 2px solid $error;
+  textarea {
+    min-height: 6rem;
+    line-height: 1.5;
+    resize: vertical;
   }
 }
 
 .required,
 .optional {
   font-weight: 400;
+  color: var(--color-text-muted);
 }
 
 .field-error {
-  margin: 0.25rem 0 0;
-  color: $error;
+  margin: var(--space-xs) 0 0;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-error);
 }
 
 .warning {
-  margin: 0.5rem 0 0;
-  padding: 0.5rem 0.75rem;
-  color: #4d3200;
-  background: #fff4ce;
-  border-left: 4px solid #8a5a00;
+  margin: var(--space-xs) 0 0;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-warning-text);
+  background-color: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-sm);
 }
 
 .notice {
-  margin: 0 0 1rem;
-  padding: 0.75rem;
-  border-radius: 4px;
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-sm);
 
   p {
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--space-xs);
   }
 }
 
 .notice-error {
-  color: $error;
-  background: #fdecee;
-  border: 1px solid $error;
+  color: var(--color-error);
+  background-color: var(--color-error-light);
+  border: 1px solid var(--color-error);
+}
+
+.notice-warning {
+  color: var(--color-warning-text);
+  background-color: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
 }
 
 .action,
 .primary {
   @include touch.touch-target;
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 1rem;
-  font-size: 1rem;
-  border-radius: 4px;
+  min-height: 48px;
+  padding: 0 var(--space-xl);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
 a.action,
 button.action {
-  color: $primary;
-  background: #ffffff;
-  border: 1px solid $primary;
+  color: var(--color-primary);
+  text-decoration: none;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-primary);
+
+  &:hover {
+    background-color: var(--color-primary-light);
+  }
 }
 
 .primary {
   width: 100%;
-  color: #ffffff;
-  background: $primary;
-  border: 0;
+  color: var(--color-on-primary);
+  background-color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+
+  &:hover {
+    background-color: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+  }
 }
 
 .actions {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-sm);
+  margin-top: var(--space-xl);
 }
 
 button:disabled {
   cursor: progress;
-  opacity: 0.8;
+  opacity: 0.7;
 }
 
 input:focus-visible,
+textarea:focus-visible,
 button:focus-visible,
 a:focus-visible {
-  outline: 3px solid $focus;
+  outline: 3px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+.status,
+.hint {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
 }
 
 .sr-only {
@@ -169,7 +226,7 @@ a:focus-visible {
 
 @media (min-width: 48rem) {
   .client-form {
-    padding: 2rem;
+    padding: var(--space-2xl) var(--space-lg);
   }
 
   .actions {
@@ -181,38 +238,4 @@ a:focus-visible {
     width: auto;
     min-width: 10rem;
   }
-}
-
-// Edit mode (US4).
-.status,
-.hint {
-  margin: 0 0 0.5rem;
-  color: #4a4a4a;
-}
-
-.field textarea {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 6rem;
-  padding: 0.5rem 0.75rem;
-  font: inherit;
-  color: $text;
-  border: 1px solid $border;
-  border-radius: 4px;
-  resize: vertical;
-}
-
-.field textarea[aria-invalid='true'] {
-  border: 2px solid $error;
-}
-
-textarea:focus-visible {
-  outline: 3px solid $focus;
-  outline-offset: 2px;
-}
-
-.notice-warning {
-  color: #4d3200;
-  background: #fff4ce;
-  border: 1px solid #8a5a00;
 }

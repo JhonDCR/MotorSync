@@ -1,78 +1,194 @@
 @use '../../../shared/styles/touch' as touch;
 
-$primary: #0b5394;
-$focus: #f1c232;
-
 .damage-map {
-  margin: 0 0 1rem;
-  padding: 1rem;
-  border: 1px solid #595959;
-  border-radius: 4px;
+  margin: 0 0 var(--space-lg);
+  padding: var(--space-xl);
+  background:
+    radial-gradient(28rem 14rem at 50% 0%, rgb(255 143 0 / 9%), transparent 70%),
+    repeating-linear-gradient(0deg, rgb(255 255 255 / 2.5%) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 2.5%) 0 1px, transparent 1px 24px),
+    var(--color-bg);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+
+  legend {
+    padding: 0 var(--space-sm);
+    font-family: var(--font-display);
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-text);
+  }
 }
 
-.views {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.view,
-.action {
-  @include touch.touch-target;
-  padding: 0 1rem;
-  font: inherit;
-  color: $primary;
-  background: #ffffff;
-  border: 1px solid $primary;
-  border-radius: 4px;
-}
-
-.view.selected {
-  color: #ffffff;
-  background: $primary;
-}
-
-.view:focus-visible,
-.action:focus-visible,
-select:focus-visible,
-input:focus-visible {
-  outline: 3px solid $focus;
+:focus-visible {
+  outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
 
+.views {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0 var(--space-lg);
+}
+
+.view {
+  @include touch.touch-target;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: 0 var(--space-md);
+  font-family: var(--font-display);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  background-color: var(--color-surface-2);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+
+  &:hover {
+    background-color: var(--color-surface-3);
+    border-color: var(--color-border);
+  }
+
+  &.selected {
+    color: var(--color-on-primary);
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    box-shadow: var(--glow-primary);
+
+    .badge {
+      color: var(--color-primary);
+      background: var(--color-on-primary);
+    }
+  }
+}
+
 .badge {
-  margin-left: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-radius: var(--radius-pill);
 }
 
 .add {
-  display: grid;
-  gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  background: var(--gradient-card), var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+
+  label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--color-text);
+  }
 
   select,
-  input {
+  input[type='text'],
+  input[type='file'] {
     @include touch.touch-target;
-    font: inherit;
+    width: 100%;
+    padding: var(--space-xs) var(--space-md);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    color: var(--color-text);
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+
+    &:focus-visible {
+      border-color: var(--color-primary);
+    }
+  }
+
+  .action {
+    @include touch.touch-target;
+    align-self: flex-start;
+    min-height: 44px;
+    margin-top: var(--space-xs);
+    padding: 0 var(--space-xl);
+    font-family: inherit;
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    color: var(--color-on-primary);
+    background-color: var(--color-primary);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+
+    &:hover {
+      background-color: var(--color-primary-hover);
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
   }
 }
 
 .list {
-  margin: 1rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: var(--space-lg) 0 0;
   padding: 0;
   list-style: none;
 
   li {
     display: flex;
-    gap: 0.5rem;
     align-items: center;
     justify-content: space-between;
-    padding: 0.25rem 0;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-lg);
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+    background-color: var(--color-primary-light);
+    border: 1px solid rgb(255 143 0 / 35%);
+    border-radius: var(--radius-sm);
+
+    .action {
+      @include touch.touch-target;
+      padding: 0 var(--space-md);
+      font-family: inherit;
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      color: var(--color-error);
+      background: transparent;
+      border: 1px solid var(--color-error);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+
+      &:hover {
+        background-color: var(--color-error-light);
+      }
+    }
   }
 }
 
+.status {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
 .error {
-  color: #b00020;
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-error);
 }
 
 .sr-only {

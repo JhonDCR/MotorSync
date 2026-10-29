@@ -1,130 +1,383 @@
 @use './shared/styles/touch' as touch;
 
-// Mobile-first shell (FR-025): same palette as the client pages, AA contrast.
-$text: #1a1a1a;
-$primary: #0b5394;
-$on-primary: #ffffff;
-$focus: #f1c232;
+$sidebar-width: 264px;
+$desktop: 64rem; // 1024px
 
 :host {
   display: block;
-  color: $text;
-  background: #ffffff;
+  min-height: 100vh;
+  color: var(--color-text);
+  background-color: var(--color-bg);
 }
 
+.skip-link {
+  position: absolute;
+  top: -9999px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  padding: var(--space-sm) var(--space-lg);
+  font-weight: 700;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+
+  &:focus {
+    top: var(--space-sm);
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
+/* ---------- Layout ---------- */
+
+.app-layout {
+  min-height: 100vh;
+}
+
+/* ---------- Topbar (mobile/tablet) ---------- */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: 56px;
+  padding: var(--space-xs) var(--space-lg);
+  background: rgb(13 15 18 / 82%);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.nav-toggle {
+  @include touch.touch-target;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--color-text);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+
+  svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  &:hover {
+    background: var(--color-surface-3);
+    border-color: var(--color-border);
+  }
+}
+
+.topbar-title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topbar-workshop {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-left: auto;
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.live-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-success);
+  box-shadow: var(--glow-live);
+}
+
+.nav-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: rgb(0 0 0 / 60%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-base);
+}
+
+/* ---------- Sidebar ---------- */
+
 .app-header {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 100;
+  width: min($sidebar-width, 86vw);
+  overflow-y: auto;
+  color: var(--color-text);
+  background:
+    radial-gradient(120% 40% at 0% 0%, rgb(255 143 0 / 10%), transparent 60%),
+    var(--color-surface);
+  border-right: 1px solid var(--color-border-light);
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition: transform var(--transition-base), visibility var(--transition-base);
+}
+
+.nav-open {
+  .app-header {
+    transform: none;
+    visibility: visible;
+  }
+
+  .nav-scrim {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.header-inner {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  color: $on-primary;
-  background: $primary;
+  gap: var(--space-xl);
+  min-height: 100%;
+  padding: var(--space-xl) var(--space-lg);
+}
+
+.brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: var(--touch-target);
+  color: var(--color-text);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+}
+
+.brand-logo {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgb(67 45 191 / 45%));
+}
+
+.topbar-logo {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
 }
 
 .brand {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
 }
 
-.main-nav ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.brand-tagline {
+  margin-top: 2px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.main-nav {
+  flex: 1;
+
+  ul {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
 }
 
 .main-nav a {
   @include touch.touch-target;
-  box-sizing: border-box;
-  display: inline-flex;
+  position: relative;
+  display: flex;
   align-items: center;
-  padding: 0 0.75rem;
-  color: $on-primary;
-  font-weight: 600;
-  text-decoration: underline;
-  border: 1px solid $on-primary;
-  border-radius: 4px;
+  gap: var(--space-md);
+  padding: 0 var(--space-md);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
 
-  &.active {
-    color: $primary;
-    background: $on-primary;
-    text-decoration: none;
+  .nav-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
   }
 
-  &:focus-visible {
-    outline: 3px solid $focus;
-    outline-offset: 2px;
+  &:hover {
+    color: var(--color-text);
+    background: var(--color-surface-2);
+  }
+
+  &.active {
+    font-weight: 600;
+    color: var(--color-text);
+    background: linear-gradient(90deg, rgb(255 143 0 / 18%), rgb(255 143 0 / 4%));
+    border-color: rgb(255 143 0 / 28%);
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 10px;
+      bottom: 10px;
+      left: -1px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--color-primary);
+      box-shadow: var(--glow-primary);
+    }
+
+    .nav-icon {
+      color: var(--color-primary);
+    }
   }
 }
 
-// US3-AC3 (FR-025): user, role and workshop, and "Cerrar sesión" one tap away, also at 360 px.
 .session-bar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
 }
 
 .session-info {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem 0.5rem;
-  margin: 0;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
+  font-size: var(--font-size-sm);
 }
 
 .session-user {
+  overflow: hidden;
   font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.session-role,
-.session-workshop {
-  font-size: 0.875rem;
-  overflow-wrap: anywhere;
+  color: var(--color-text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .session-role {
-  padding: 0 0.375rem;
-  border: 1px solid $on-primary;
-  border-radius: 4px;
+  align-self: flex-start;
+  margin: 2px 0;
+  padding: 1px var(--space-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  background: rgb(139 124 246 / 12%);
+  border-radius: var(--radius-pill);
+}
+
+.session-workshop {
+  overflow: hidden;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .logout {
   @include touch.touch-target;
-  box-sizing: border-box;
-  padding: 0 0.75rem;
-  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 0 var(--space-md);
+  font-size: var(--font-size-sm);
   font-weight: 600;
-  color: $primary;
-  background: $on-primary;
-  border: 1px solid $on-primary;
-  border-radius: 4px;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
+
+  .logout-icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    color: var(--color-error);
+    background: var(--color-error-light);
+    border-color: var(--color-error);
+  }
 
   &:disabled {
     cursor: progress;
-    opacity: 0.85;
-  }
-
-  &:focus-visible {
-    outline: 3px solid $focus;
-    outline-offset: 2px;
+    opacity: 0.7;
   }
 }
 
-@media (min-width: 48rem) {
-  .session-bar {
-    justify-content: flex-end;
+main {
+  display: block;
+  min-height: calc(100vh - 56px);
+  background-color: var(--color-bg);
+}
+
+/* ---------- Desktop: fixed sidebar ---------- */
+
+@media (min-width: $desktop) {
+  .topbar,
+  .nav-scrim {
+    display: none;
   }
 
   .app-header {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    width: $sidebar-width;
+    transform: none;
+    visibility: visible;
+    transition: none;
+  }
+
+  .app-layout--shell main {
+    min-height: 100vh;
+    margin-left: $sidebar-width;
+    background:
+      radial-gradient(60% 40% at 100% 0%, rgb(67 45 191 / 14%), transparent 70%),
+      var(--color-bg);
   }
 }

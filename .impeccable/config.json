@@ -1,0 +1,25 @@
+{
+  "buildPath": "code",
+  "hook": {
+    "enabled": true,
+    "limits": {
+      "maxFindings": 5,
+      "maxChars": 8000
+    }
+  },
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "frontend/src/app/features/budgets/budget-page.scss"
+        ],
+        "createdAt": "2026-10-29T19:55:58.911Z",
+        "reason": "Claude: licence-plate chip imitates the coloured top band of Ecuadorian plates; 4px radius, domain-appropriate"
+      }
+    ]
+  }
+}

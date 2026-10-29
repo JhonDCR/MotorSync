@@ -1,0 +1,408 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-28T22:00:00Z",
+  "title": "Design System: MotorSync",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Precision Cobalt Navy",
+        "canonical": "#0b5394",
+        "tonalRamp": ["#041a2e", "#062f52", "#0b5394", "#156bb9", "#3b88d1", "#72ace3", "#b4d4f4", "#eef3f9"]
+      },
+      "primary-hover": {
+        "role": "primary",
+        "displayName": "Deep Cobalt Pressed",
+        "canonical": "#083e6f",
+        "tonalRamp": ["#02101d", "#04263f", "#083e6f", "#0f5796", "#1f76bd", "#529bd6", "#a3c9ea", "#e6f0fa"]
+      },
+      "primary-deep": {
+        "role": "primary",
+        "displayName": "Legacy Pressed Cobalt",
+        "canonical": "#073763",
+        "tonalRamp": ["#020e19", "#042038", "#073763", "#0d528e", "#1d74b5", "#559cd3", "#a6caea", "#e8f1f9"]
+      },
+      "primary-light": {
+        "role": "primary",
+        "displayName": "Cobalt Mist Tint",
+        "canonical": "#eef3f9",
+        "tonalRamp": ["#0a1622", "#16283a", "#2a3f52", "#4a5f70", "#7b8f9e", "#b2c2ce", "#dbe5ec", "#eef3f9"]
+      },
+      "primary-wash": {
+        "role": "primary",
+        "displayName": "Cobalt Wash",
+        "canonical": "#e8f4fd",
+        "tonalRamp": ["#051a29", "#0a2c45", "#124a6d", "#2a6f96", "#5a9cbf", "#96c8e2", "#cfe9f8", "#e8f4fd"]
+      },
+      "focus": {
+        "role": "secondary",
+        "displayName": "Bay Safety Amber",
+        "canonical": "#f1c232",
+        "tonalRamp": ["#4a3900", "#735902", "#a68007", "#d1a313", "#f1c232", "#f5d367", "#fae6a3", "#fdf6df"]
+      },
+      "warning-bg": {
+        "role": "secondary",
+        "displayName": "Parchment Warning",
+        "canonical": "#fff4ce",
+        "tonalRamp": ["#3b2c00", "#5c4600", "#8a6a00", "#b89300", "#e0bc2e", "#f2d774", "#fbeab1", "#fff4ce"]
+      },
+      "warning-border": {
+        "role": "secondary",
+        "displayName": "Advisory Ochre",
+        "canonical": "#8a6d00",
+        "tonalRamp": ["#3d2e00", "#5f4a00", "#8a6d00", "#ab8606", "#d1a313", "#e2bd4c", "#f0d98f", "#fbf0c9"]
+      },
+      "warning-text": {
+        "role": "secondary",
+        "displayName": "Umber Warning Text",
+        "canonical": "#4d3200",
+        "tonalRamp": ["#120b00", "#261900", "#4d3200", "#704a02", "#946405", "#b88316", "#d9b269", "#f6e6c9"]
+      },
+      "error": {
+        "role": "error",
+        "displayName": "Critical Crimson",
+        "canonical": "#b00020",
+        "tonalRamp": ["#3b000a", "#630012", "#8c0019", "#b00020", "#d62846", "#eb677f", "#f5abb9", "#fdecee"]
+      },
+      "neutral-text": {
+        "role": "neutral",
+        "displayName": "Deep Carbon Text",
+        "canonical": "#1a1a1a",
+        "tonalRamp": ["#000000", "#1a1a1a", "#333333", "#4a4a4a", "#666666", "#888888", "#cccccc", "#ffffff"]
+      },
+      "neutral-muted": {
+        "role": "neutral",
+        "displayName": "Workshop Muted Gray",
+        "canonical": "#4a4a4a",
+        "tonalRamp": ["#0f0f0f", "#262626", "#3a3a3a", "#4a4a4a", "#6b6b6b", "#949494", "#c4c4c4", "#f2f2f2"]
+      },
+      "neutral-surface": {
+        "role": "neutral",
+        "displayName": "Diagnostic Tint Gray",
+        "canonical": "#f8f9fa",
+        "tonalRamp": ["#111213", "#232527", "#484b50", "#71767e", "#a2a8b3", "#d0d5dd", "#e9ecef", "#f8f9fa"]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Industrial Solid Border",
+        "canonical": "#595959",
+        "tonalRamp": ["#121212", "#2b2b2b", "#454545", "#595959", "#7a7a7a", "#a3a3a3", "#cfcfcf", "#f0f0f0"]
+      },
+      "border-light": {
+        "role": "neutral",
+        "displayName": "Surface Divider Gray",
+        "canonical": "#d0d0d0",
+        "tonalRamp": ["#3a3a3a", "#5c5c5c", "#878787", "#aaaaaa", "#c2c2c2", "#d0d0d0", "#e6e6e6", "#f7f7f7"]
+      },
+      "status-budget": {
+        "role": "tertiary",
+        "displayName": "Estimate Ochre",
+        "canonical": "#b45309",
+        "tonalRamp": ["#2f1300", "#521f00", "#7a3000", "#b45309", "#d97520", "#eaa15c", "#f6cfa6", "#fef3e6"]
+      },
+      "status-work-order": {
+        "role": "tertiary",
+        "displayName": "Service Green",
+        "canonical": "#1e7e34",
+        "tonalRamp": ["#04160a", "#0a2b12", "#124a1f", "#1e7e34", "#2fa84a", "#64c97b", "#b0e6bd", "#e6f7ec"]
+      },
+      "status-transfer": {
+        "role": "tertiary",
+        "displayName": "Transfer Deep Purple",
+        "canonical": "#6b21a8",
+        "tonalRamp": ["#1a0729", "#2f0e4a", "#48176f", "#6b21a8", "#8b3fcc", "#b183e0", "#d9c2f2", "#f3e8fd"]
+      },
+      "support-shell": {
+        "role": "dialect",
+        "displayName": "Support Slate Shell",
+        "canonical": "#0f172a",
+        "tonalRamp": ["#000000", "#0b1120", "#0f172a", "#1e293b", "#334155", "#64748b", "#cbd5e1", "#f8fafc"]
+      },
+      "support-accent": {
+        "role": "dialect",
+        "displayName": "Support Action Blue",
+        "canonical": "#1d4ed8",
+        "tonalRamp": ["#081a4d", "#0d2b7a", "#1440b0", "#1d4ed8", "#4b73e4", "#7f9cef", "#b9c9f7", "#eff6ff"]
+      },
+      "admin-link": {
+        "role": "dialect",
+        "displayName": "Admin Link Blue",
+        "canonical": "#0969da",
+        "tonalRamp": ["#031b3a", "#04315f", "#064c9e", "#0969da", "#3d8ce8", "#7cb1f0", "#bcd6fa", "#eff6ff"]
+      },
+      "admin-success": {
+        "role": "dialect",
+        "displayName": "Admin Success Green",
+        "canonical": "#1a7f37",
+        "tonalRamp": ["#03150a", "#06280f", "#0d4d1c", "#1a7f37", "#2fa94f", "#6acb82", "#b3e6c0", "#effaf2"]
+      },
+      "admin-danger": {
+        "role": "dialect",
+        "displayName": "Admin Alarm Red",
+        "canonical": "#cf222e",
+        "tonalRamp": ["#3a0509", "#5f0c13", "#980f1d", "#cf222e", "#e1525d", "#ee8a92", "#f7c2c6", "#fdecee"]
+      },
+      "admin-border": {
+        "role": "dialect",
+        "displayName": "Admin Hairline",
+        "canonical": "#d0d7de",
+        "tonalRamp": ["#2f343a", "#4d545c", "#727a83", "#9aa1a9", "#bcc3ca", "#d0d7de", "#e6e9ec", "#f6f8fa"]
+      },
+      "admin-surface": {
+        "role": "dialect",
+        "displayName": "Admin Table Mist",
+        "canonical": "#f6f8fa",
+        "tonalRamp": ["#101214", "#23262a", "#474c52", "#70767d", "#a2a8af", "#ced3d8", "#e8ebee", "#f6f8fa"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display / Plate",
+        "purpose": "Placas vehiculares ecuatorianas normalizadas en mayúsculas con 0.08em de espaciado."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Títulos de página y campo de búsqueda de placa en bahía."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Títulos de tarjetas, modales y eventos de línea de tiempo."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Valores de formulario, descripciones de evento y texto de lectura."
+      },
+      "body-ui": {
+        "displayName": "Body / UI",
+        "purpose": "Texto dominante de la interfaz: botones, enlaces, filas y ayudas."
+      },
+      "label": {
+        "displayName": "Label / Micro",
+        "purpose": "Badges, etiquetas dt de fichas técnicas y marcas de tiempo."
+      }
+    },
+    "shadows":     [
+      {
+        "name": "flat-rest",
+        "token": "none",
+        "value": "none",
+        "purpose": "Flat por defecto: bordes sólidos de 1px a 2px y fondos tonales en reposo."
+      },
+      {
+        "name": "auth-card-lift",
+        "token": "--shadow-auth-card",
+        "value": "0 4px 16px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.08)",
+        "purpose": "Única elevación de la tarjeta de autenticación sobre el lienzo blanco."
+      },
+      {
+        "name": "dialog-lift",
+        "token": "--shadow-dialog",
+        "value": "0 20px 25px -5px rgba(15, 23, 42, 0.25)",
+        "purpose": "Todo diálogo modal sobre el backdrop al 55%, en el núcleo y en los dialectos."
+      },
+      {
+        "name": "table-hairline",
+        "token": "--shadow-table-hairline",
+        "value": "0 1px 3px rgb(0 0 0 / 5%)",
+        "purpose": "Contenedor de tabla administrativa; separa sin enmarcar."
+      }
+    ],
+    "signals":     [
+      {
+        "name": "live-dot-glow",
+        "token": "--glow-live",
+        "value": "0 0 6px #22c55e",
+        "purpose": "Emisión del punto verde de estado en autenticación. Comunica señal, no altura; queda fuera de los tres lifts."
+      }
+    ],
+    "motion": [
+      {
+        "name": "fast-touch",
+        "value": "150ms ease-in-out",
+        "purpose": "Retroalimentación táctil inmediata en botones, enlaces y cambios de borde."
+      },
+      {
+        "name": "press-nudge",
+        "value": "transform: translateY(1px)",
+        "purpose": "Hundido de 1px al presionar el botón primario de autenticación."
+      },
+      {
+        "name": "smooth-scroll",
+        "value": "scroll-behavior: smooth",
+        "purpose": "Desplazamiento del documento en flujos largos de bahía."
+      }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "360px" },
+      { "name": "compact", "value": "640px" },
+      { "name": "tablet", "value": "768px" },
+      { "name": "auth-split", "value": "960px" },
+      { "name": "desktop", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Acción confirmatoria principal: guardar check-in, iniciar sesión, crear registro.",
+      "html": "<button class=\"ds-btn-primary\">Guardar check-in</button>",
+      "css": ".ds-btn-primary { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; padding: 0 16px; font-family: var(--font-sans, Inter, -apple-system, 'Segoe UI', Roboto, sans-serif); font-size: 0.875rem; font-weight: 600; color: #ffffff; background-color: var(--color-primary, #0b5394); border: 1px solid var(--color-primary, #0b5394); border-radius: 4px; cursor: pointer; transition: background-color 150ms ease-in-out, border-color 150ms ease-in-out; } .ds-btn-primary:hover { background-color: var(--color-primary-hover, #083e6f); border-color: var(--color-primary-hover, #083e6f); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 3px solid var(--color-focus, #f1c232); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.7; cursor: progress; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Acción alternativa o de cancelación: contorno cobalto sobre blanco.",
+      "html": "<button class=\"ds-btn-secondary\">Cancelar</button>",
+      "css": ".ds-btn-secondary { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; padding: 0 16px; font-family: var(--font-sans, Inter, -apple-system, 'Segoe UI', Roboto, sans-serif); font-size: 0.875rem; font-weight: 600; color: var(--color-primary, #0b5394); background-color: var(--color-bg, #ffffff); border: 1px solid var(--color-primary, #0b5394); border-radius: 4px; cursor: pointer; transition: background-color 150ms ease-in-out; } .ds-btn-secondary:hover { background-color: var(--color-primary-light, #eef3f9); } .ds-btn-secondary:focus-visible { outline: 3px solid var(--color-focus, #f1c232); outline-offset: 2px; }"
+    },
+    {
+      "name": "Bay Search Plate Input",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "Campo sobredimensionado de búsqueda de placa: el elemento más grande de la pantalla de bahía.",
+      "html": "<div class=\"ds-search-group\"><label class=\"ds-search-label\" for=\"ds-plate\">Placa del vehículo</label><input id=\"ds-plate\" class=\"ds-search-input\" type=\"text\" value=\"PBA-1234\"></div>",
+      "css": ".ds-search-group { display: flex; flex-direction: column; gap: 4px; max-width: 420px; font-family: var(--font-sans, Inter, -apple-system, 'Segoe UI', Roboto, sans-serif); } .ds-search-label { font-size: 0.875rem; font-weight: 600; color: var(--color-text, #1a1a1a); } .ds-search-input { box-sizing: border-box; width: 100%; min-height: 60px; padding: 0 12px; font-family: inherit; font-size: 1.5rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text, #1a1a1a); background: var(--color-bg, #ffffff); border: 2px solid var(--color-border, #595959); border-radius: 4px; } .ds-search-input:focus-visible { border-color: var(--color-primary, #0b5394); outline: 3px solid var(--color-focus, #f1c232); outline-offset: 2px; }"
+    },
+    {
+      "name": "Plate Chip",
+      "kind": "custom",
+      "refersTo": "plate-chip",
+      "description": "Matrícula vehicular tratada como placa metálica: mayúsculas, 700 y 0.08em sobre Cobalt Wash.",
+      "html": "<span class=\"ds-plate\">PBA-1234</span>",
+      "css": ".ds-plate { display: inline-block; padding: 2px 12px; font-family: var(--font-sans, Inter, -apple-system, 'Segoe UI', Roboto, sans-serif); font-size: 1.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-primary, #0b5394); background-color: var(--color-status-checkin-bg, #e8f4fd); border: 1px solid var(--color-primary, #0b5394); border-radius: 4px; }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-filter",
+      "description": "Filtro tipo píldora para historial clínico y tableros, con contador opcional.",
+      "html": "<div class=\"ds-chip-row\"><button class=\"ds-chip\">Todos <span class=\"ds-chip-count\">14</span></button><button class=\"ds-chip ds-chip-active\">Check-in</button></div>",
+      "css": ".ds-chip-row { display: flex; flex-wrap: wrap; gap: 8px; font-family: var(--font-sans, Inter, -apple-system, 'Segoe UI', Roboto, sans-serif); } .ds-chip { box-sizing: border-box; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; font-family: inherit; font-size: 0.875rem; font-weight: 600; color: var(--color-text, #1a1a1a); background: var(--color-bg, #ffffff); border: 1px solid var(--color-border-light, #d0d0d0); border-radius: 20px; cursor: pointer; transition: background-color 150ms ease-in-out, border-color 150ms ease-in-out; } .ds-chip:hover { background: var(--color-surface, #f8f9fa); border-color: var(--color-border, #595959); } .ds-chip-active { color: #ffffff; background: var(--color-primary, #0b5394); border-color: var(--color-primary, #0b5394); } .ds-chip-count { padding: 1px 6px; font-size: 0.75rem; font-weight: 700; color: var(--color-text, #1a1a1a); background: var(--color-surface, #f8f9fa); border: 1px solid var(--color-border-light, #d0d0d0); border-radius: 20px; } .ds-chip-active .ds-chip-count { color: #ffffff; background: rgba(255, 255, 255, 0.25); border-color: transparent; } .ds-chip:focus-visible { outline: 3px solid var(--color-focus, #f1c232); outline-offset: 2px; }"
+    },
+    {
+      "name": "Semantic Status Badges",
+      "kind": "chip",
+      "refersTo": "badge-checkin",
+      "description": "Cuatro estados técnicos con par cromático fijo que nunca se intercambia.",
+      "html": "<div class=\"ds-badge-row\"><span class=\"ds-badge ds-badge-checkin\">Check-in</span><span class=\"ds-badge ds-badge-budget\">Presupuesto</span><span class=\"ds-badge ds-badge-wo\">Orden de trabajo</span><span class=\"ds-badge ds-badge-transfer\">Transferencia</span></div>",
+      "css": ".ds-badge-row { display: flex; flex-wrap: wrap; gap: 8px; font-family: var(--font-sans, Inter, -apple-system, 'Segoe UI', Roboto, sans-serif); } .ds-badge { display: inline-flex; align-items: center; padding: 3px 8px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 4px; border: 1px solid transparent; } .ds-badge-checkin { color: #0b5394; background: #e8f4fd; border-color: rgba(11, 83, 148, 0.25); } .ds-badge-budget { color: #b45309; background: #fef3e6; border-color: rgba(180, 83, 9, 0.25); } .ds-badge-wo { color: #1e7e34; background: #e6f7ec; border-color: rgba(30, 126, 52, 0.25); } .ds-badge-transfer { color: #6b21a8; background: #f3e8fd; border-color: rgba(107, 33, 168, 0.25); }"
+    },
+    {
+      "name": "Diagnostic Metric Box",
+      "kind": "card",
+      "refersTo": "metric-box",
+      "description": "Métrica técnica con etiqueta micro y valor tabular; se agrupa en grid auto-fit.",
+      "html": "<div class=\"ds-metric\"><span class=\"ds-metric-label\">Kilometraje</span><span class=\"ds-metric-value\">85.420 km</span></div>",
+      "css": ".ds-metric { box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; min-width: 140px; padding: 12px; font-family: var(--font-sans, Inter, -apple-system, 'Segoe UI', Roboto, sans-serif); background: var(--color-surface, #f8f9fa); border: 1px solid var(--color-border-light, #d0d0d0); border-radius: 4px; } .ds-metric-label { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.03em; text-transform: uppercase; color: var(--color-text-muted, #4a4a4a); } .ds-metric-value { font-size: 1.25rem; font-weight: 700; color: var(--color-text, #1a1a1a); font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Timeline Event Card",
+      "kind": "card",
+      "refersTo": "card-container",
+      "description": "Evento del historial clínico: badge semántico, fecha tabular, resumen y enlace.",
+      "html": "<article class=\"ds-event\"><header class=\"ds-event-head\"><span class=\"ds-badge ds-badge-checkin\">Check-in</span><time class=\"ds-event-date\">28 oct 2026 · 09:14</time></header><p class=\"ds-event-summary\">Ingreso por mantenimiento preventivo de 10.000 km. Sin daños reportados.</p><a class=\"ds-event-link\" href=\"#\">Ver check-in</a></article>",
+      "css": ".ds-event { box-sizing: border-box; max-width: 560px; padding: 12px 16px; font-family: var(--font-sans, Inter, -apple-system, 'Segoe UI', Roboto, sans-serif); background: var(--color-bg, #ffffff); border: 1px solid var(--color-border-light, #d0d0d0); border-radius: 6px; transition: background-color 150ms ease-in-out, border-color 150ms ease-in-out; } .ds-event:hover { background: var(--color-surface, #f8f9fa); border-color: var(--color-border, #595959); } .ds-event-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; margin-bottom: 4px; } .ds-badge { padding: 3px 8px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 4px; color: #0b5394; background: #e8f4fd; border: 1px solid rgba(11, 83, 148, 0.25); } .ds-event-date { font-size: 0.875rem; color: var(--color-text-muted, #4a4a4a); font-variant-numeric: tabular-nums; } .ds-event-summary { margin: 0 0 8px; font-size: 0.875rem; line-height: 1.5; color: var(--color-text, #1a1a1a); } .ds-event-link { display: inline-flex; align-items: center; min-height: 44px; font-size: 0.875rem; font-weight: 600; color: var(--color-primary, #0b5394); text-decoration: underline; text-underline-offset: 3px; } .ds-event-link:hover { color: var(--color-primary-hover, #083e6f); } .ds-event-link:focus-visible { outline: 3px solid var(--color-focus, #f1c232); outline-offset: 2px; }"
+    },
+    {
+      "name": "Administrative Data Table",
+      "kind": "custom",
+      "refersTo": "table-header",
+      "description": "Tabla administrativa con scroll horizontal, cabecera tonal y hover de fila.",
+      "html": "<div class=\"ds-table-wrap\"><table class=\"ds-table\"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th></tr></thead><tbody><tr><td>María Andrade</td><td><span class=\"ds-tag ds-tag-role\">Asesor</span></td><td><span class=\"ds-tag ds-tag-ok\">Activo</span></td></tr><tr><td>Carlos Vera</td><td><span class=\"ds-tag ds-tag-role\">Administrador</span></td><td><span class=\"ds-tag ds-tag-off\">Inactivo</span></td></tr></tbody></table></div>",
+      "css": ".ds-table-wrap { overflow-x: auto; font-family: var(--font-sans, Inter, -apple-system, 'Segoe UI', Roboto, sans-serif); background: #ffffff; border: 1px solid #d0d7de; border-radius: 6px; box-shadow: 0 1px 3px rgb(0 0 0 / 5%); } .ds-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem; } .ds-table th { padding: 12px 16px; font-size: 0.8125rem; font-weight: 600; color: var(--color-text-muted, #4a4a4a); background: #f6f8fa; border-bottom: 1px solid #d0d7de; white-space: nowrap; } .ds-table td { padding: 12px 16px; color: var(--color-text, #1a1a1a); border-bottom: 1px solid #eaeef2; vertical-align: middle; } .ds-table tr:last-child td { border-bottom: none; } .ds-table tbody tr:hover td { background: #f9fbfd; } .ds-tag { display: inline-block; padding: 4px 8px; font-size: 0.8rem; font-weight: 600; border-radius: 12px; white-space: nowrap; } .ds-tag-role { color: #0969da; background: #ddf4ff; } .ds-tag-ok { color: #1a7f37; background: #dafbe1; } .ds-tag-off { color: #cf222e; background: #ffebe9; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Precision Workshop",
+    "overview": "MotorSync adopta la estética de un taller automotriz de alta ingeniería: limpio, estructurado, directo y funcionalmente robusto. No es un portal administrativo estático ni un ERP genérico; es una herramienta de campo concebida para asesores de servicio y mecánicos que operan en movimiento sobre tablets en la bahía de recepción e inspección. Cada píxel responde a la necesidad de certeza legal, rapidez diagnóstica y ergonomía táctil bajo condiciones ambientales reales (ruido, iluminación variable y manipulación con dedos o guantes).\n\nLa densidad visual es calculada: generosa en los objetivos de interacción crítica para evitar errores de digitación en la bahía, pero rigurosamente compacta y tabular en la presentación de historiales clínicos, líneas de presupuesto y parámetros técnicos del vehículo. Se descarta cualquier adorno superfluo o efecto cosmético que opaque los datos periciales.\n\nEl sistema se apoya en una sola familia de trabajo, Inter, y una sola idea cromática: un cobalto institucional que marca jerarquía, fondos tonales claros que separan capas, y un ámbar de señalización que pertenece exclusivamente al foco. El resultado debe sentirse como una herramienta calibrada, no como una aplicación de consumo: bordes firmes, placas tipográficas tratadas como matrícula metálica, y evidencia (fotos, firma, daños) enmarcada con la misma solemnidad que un parte pericial.",
+    "keyCharacteristics": [
+      "Ergonomía táctil no negociable (objetivos mínimos de 44 × 44 px en bahía).",
+      "Contraste cromático estricto (cumplimiento integral WCAG 2.1 AA sobre fondos claros).",
+      "Profundidad plana y estructurada: bordes sólidos y fondos tonales; las sombras difusas son la excepción documentada, no la regla.",
+      "Tipografía Inter con cifras tabulares para VIN, kilometraje y valores económicos.",
+      "Indicadores semánticos unívocos por tipo de evento técnico (check-in, presupuesto, orden de trabajo, transferencia).",
+      "Tres dialectos visuales delimitados: el núcleo cobalto, el shell oscuro de Soporte y las tablas administrativas de Usuarios. Ninguno invade el territorio de otro."
+    ],
+    "rules": [
+      {
+        "name": "The Focus Exclusivity Rule",
+        "body": "El ámbar (#f1c232) está reservado estrictamente para el foco accesible de teclado y toque, el logo y el detalle del hero de autenticación. Nunca se usa como fondo de botón, texto de estado ni color decorativo de datos.",
+        "section": "colors"
+      },
+      {
+        "name": "The Semantic State Rule",
+        "body": "Cada estado de la orden o del historial técnico emplea un único par cromático (texto + fondo tonal) que jamás se intercambia entre módulos: check-in cobalto, presupuesto ocre, orden de trabajo verde, transferencia púrpura.",
+        "section": "colors"
+      },
+      {
+        "name": "The Module Dialect Rule",
+        "body": "El cobalto es la norma. El shell slate existe solo bajo /support; la paleta tipo GitHub existe solo en tablas y formularios de /users. Una pantalla nueva no elige dialecto: hereda el núcleo.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Data Rule",
+        "body": "Todo kilometraje, número de VIN, código de repuesto, valor monetario, fecha de evento o desglose de presupuesto aplica font-variant-numeric: tabular-nums para conservar alineación vertical en columnas.",
+        "section": "typography"
+      },
+      {
+        "name": "The Plate Prominence Rule",
+        "body": "Las placas vehiculares se representan normalizadas en mayúsculas, con letter-spacing: 0.08em y peso 700, sobre relleno Cobalt Wash y borde cobalto de 1px, simulando la placa física metálica.",
+        "section": "typography"
+      },
+      {
+        "name": "The Two-Step Body Rule",
+        "body": "La interfaz operativa escribe en 0.875rem; los campos de entrada, los valores de ficha y el texto de lectura suben a 1rem. No se inventan tamaños intermedios (0.9rem, 0.95rem): son deuda heredada.",
+        "section": "typography"
+      },
+      {
+        "name": "The Single-Column First Rule",
+        "body": "Toda pantalla nueva se diseña y se valida primero a 360px de ancho. El layout de escritorio es una ampliación del flujo móvil, nunca una reordenación que oculte acciones de bahía.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "En reposo, tarjetas, listas, fichas, métricas y eventos no llevan sombra difusa. La jerarquía se resuelve con borde 1px #d0d0d0 (pasivo) o #595959 (interactivo) y con el salto de blanco a #f8f9fa.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Three-Lift Rule",
+        "body": "Las únicas elevaciones permitidas son Auth Card Lift, Dialog Lift y Table Hairline. Cualquier sombra nueva debe reemplazar una de las tres, no sumarse.",
+        "section": "elevation"
+      },
+      {
+        "name": "The State Elevation Rule",
+        "body": "El cambio de profundidad en hover se expresa con fondo tonal (#f8f9fa) y borde más oscuro; nunca con sombra.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Four-Pixel Core Rule",
+        "body": "El núcleo cobalto usa 4px y 6px. Si una superficie nueva pide más suavidad, la respuesta es un borde más claro, no un radio mayor.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "Do garantizar que todo elemento interactivo o clicable cumpla como mínimo 44 × 44 px de área de toque, incluidos enlaces dentro de párrafos y acciones de fila.",
+      "Do presentar siempre placas ecuatorianas en mayúsculas, peso 700 y letter-spacing: 0.08em sobre Cobalt Wash.",
+      "Do emplear tabular-nums para kilometrajes, cotizaciones, fechas y códigos técnicos.",
+      "Do usar el outline ámbar de 3px con offset 2px como indicador universal de foco visible.",
+      "Do mantener el fondo blanco o tonal claro con bordes sólidos de alto contraste para visibilidad en bahía.",
+      "Do escribir la interfaz operativa en 0.875rem y reservar 1rem para campos, valores de ficha y lectura.",
+      "Do usar role=\"alert\" para errores de guardado y aria-invalid + mensaje asociado por aria-describedby en cada campo.",
+      "Do confinar el shell slate a /support y la paleta tipo GitHub a tablas y formularios de /users; cualquier pantalla nueva hereda el núcleo cobalto."
+    ],
+    "donts": [
+      "Don't aplicar degradados decorativos, sombras difusas adicionales o glassmorphism; las únicas elevaciones permitidas son Auth Card Lift (--shadow-auth-card), Dialog Lift (--shadow-dialog) y Table Hairline (--shadow-table-hairline).",
+      "Don't usar textos en grises claros que violen el ratio mínimo 4.5:1 (WCAG AA) sobre fondo claro.",
+      "Don't crear botones compactos de escritorio (< 44px) en pantallas operativas de bahía.",
+      "Don't alterar los códigos cromáticos semánticos de check-in, presupuesto, orden de trabajo y transferencia.",
+      "Don't reutilizar el ámbar #f1c232 como color de estado, fondo o texto de datos; su rareza es la señal.",
+      "Don't introducir animaciones lentas o transiciones cosméticas que retarden la captura de información en recepción.",
+      "Don't añadir radios de 8px ni badges de 12px al núcleo cobalto; pertenecen a los dialectos heredados.",
+      "Don't crear una nueva pantalla de bahía con un shell de navegación oscuro: el único shell oscuro es el de Soporte.",
+      "Don't usar la tríada Warning para mensajes informativos ni la informativa cobalto para advertencias: .must-change es advertencia, .session-reason es información.",
+      "Don't escribir valores de box-shadow a mano: usa --shadow-auth-card, --shadow-dialog o --shadow-table-hairline. Un cuarto valor rompe la Three-Lift Rule."
+    ]
+  }
+}

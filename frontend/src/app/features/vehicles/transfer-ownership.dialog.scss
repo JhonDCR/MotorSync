@@ -1,12 +1,12 @@
 @use '../../shared/styles/touch' as touch;
 
 // Mobile-first (FR-025): full screen on phones, a centered card from 48rem.
-$text: #1a1a1a;
-$muted: #4a4a4a;
-$border: #595959;
-$primary: #0b5394;
-$error: #b00020;
-$focus: #f1c232;
+$text: var(--color-text);
+$muted: var(--color-text-muted);
+$border: var(--color-border);
+$primary: var(--color-primary);
+$error: var(--color-error);
+$focus: var(--color-focus);
 
 .backdrop {
   position: fixed;
@@ -25,7 +25,7 @@ $focus: #f1c232;
   overflow-y: auto;
   padding: 1rem;
   color: $text;
-  background: #ffffff;
+  background: var(--color-surface);
 }
 
 h2 {
@@ -68,7 +68,7 @@ textarea {
   width: 100%;
   font: inherit;
   color: $text;
-  background: #ffffff;
+  background: var(--color-surface);
   border: 1px solid $border;
   border-radius: 4px;
 }
@@ -118,7 +118,7 @@ textarea[aria-invalid='true'] {
   font: inherit;
   text-align: left;
   color: $text;
-  background: #ffffff;
+  background: var(--color-surface);
   border: 1px solid $border;
   border-radius: 4px;
   cursor: pointer;
@@ -152,7 +152,7 @@ textarea[aria-invalid='true'] {
 
 .notice-error {
   color: $error;
-  background: #fdecee;
+  background: var(--color-error-light);
   border: 1px solid $error;
 }
 
@@ -202,12 +202,12 @@ textarea[aria-invalid='true'] {
 
 .action {
   color: $primary;
-  background: #ffffff;
+  background: var(--color-surface);
   border: 1px solid $primary;
 }
 
 .primary {
-  color: #ffffff;
+  color: var(--color-on-primary);
   background: $primary;
   border: 0;
 }

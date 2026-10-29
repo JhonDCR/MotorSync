@@ -3,8 +3,13 @@ node_modules/
 dist/
 build/
 .angular/
+.vitest/
 coverage/
 *.tsbuildinfo
+
+# Binarios locales
+*.exe
+**/scripts/bin/
 
 # Entorno
 .env
@@ -26,3 +31,7 @@ Thumbs.db
 # Claude Code: configuración personal (la del equipo va en settings.json)
 .claude/settings.local.json
 opencode.json
+
+# Impeccable: configuración y estado local
+.impeccable/config.local.json
+.impeccable/live/

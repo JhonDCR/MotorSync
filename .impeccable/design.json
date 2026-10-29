@@ -49,8 +49,8 @@
       "warning-border": {
         "role": "secondary",
         "displayName": "Advisory Ochre",
-        "canonical": "#d1a313",
-        "tonalRamp": ["#3d2e00", "#5f4a00", "#8a6c00", "#ab8606", "#d1a313", "#e2bd4c", "#f0d98f", "#fbf0c9"]
+        "canonical": "#8a6d00",
+        "tonalRamp": ["#3d2e00", "#5f4a00", "#8a6d00", "#ab8606", "#d1a313", "#e2bd4c", "#f0d98f", "#fbf0c9"]
       },
       "warning-text": {
         "role": "secondary",
@@ -401,6 +401,7 @@
       "Don't introducir animaciones lentas o transiciones cosméticas que retarden la captura de información en recepción.",
       "Don't añadir radios de 8px ni badges de 12px al núcleo cobalto; pertenecen a los dialectos heredados.",
       "Don't crear una nueva pantalla de bahía con un shell de navegación oscuro: el único shell oscuro es el de Soporte.",
+      "Don't usar la tríada Warning para mensajes informativos ni la informativa cobalto para advertencias: .must-change es advertencia, .session-reason es información.",
       "Don't escribir valores de box-shadow a mano: usa --shadow-auth-card, --shadow-dialog o --shadow-table-hairline. Un cuarto valor rompe la Three-Lift Rule."
     ]
   }

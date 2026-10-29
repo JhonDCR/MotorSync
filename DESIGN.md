@@ -10,7 +10,7 @@ colors:
   focus: "#f1c232"
   warning-text: "#4d3200"
   warning-bg: "#fff4ce"
-  warning-border: "#d1a313"
+  warning-border: "#8a6d00"
   error: "#b00020"
   error-light: "#fdecee"
   neutral-text: "#1a1a1a"
@@ -216,7 +216,7 @@ La paleta equilibra un azul cobalto institucional de alta solidez con acentos fu
 
 ### Secondary
 - **Bay Safety Amber** (`#f1c232`): Acento de alta visibilidad inspirado en la señalética de seguridad de taller. Dedicado en exclusiva al anillo de foco accesible (`outline: 3px solid`) y al punto de marca del logo y del hero de autenticación.
-- **Advisory Ochre** (`#d1a313` / `#fff4ce` / `#4d3200`): Tríada de advertencia no bloqueante (borde, relleno, texto) para avisos de validación suave, como la discrepancia entre placa y RUC. Nunca sustituye al ámbar de foco.
+- **Advisory Ochre** (`#8a6d00` / `#fff4ce` / `#4d3200`): Tríada de advertencia no bloqueante (borde, relleno, texto) para avisos de validación suave, como la discrepancia entre placa y RUC. El borde usa el ocre oscuro porque `#d1a313` sobre Parchment solo alcanza 2.13:1; `#8a6d00` llega a 4.47:1 y mantiene el borde legible con sol directo. Nunca sustituye al ámbar de foco.
 
 ### Neutral
 - **Deep Carbon Text** (`#1a1a1a`): Texto principal, encabezados y trazo de la firma digital. Contraste superior a 12:1 sobre blanco.
@@ -395,7 +395,7 @@ El lenguaje formal comunica solidez industrial con esquinas apenas suavizadas:
 - **Style:** franja de ancho completo, padding `12px 16px`, radio `4px`, texto `0.875rem`–`1rem`.
 - **Info:** texto cobalto, fondo Cobalt Mist Tint, borde cobalto.
 - **Error:** texto Critical Crimson, fondo Crimson Wash, borde Critical Crimson; usa `role="alert"`.
-- **Warning:** texto Umber Warning Text, fondo Parchment Warning, borde Advisory Ochre. Es advertencia, no error.
+- **Warning:** texto Umber Warning Text, fondo Parchment Warning, borde Advisory Ochre oscuro. Es advertencia, no error. Un aviso de cambio obligatorio (`.must-change`) usa esta tríada; nunca la informativa cobalto de `.session-reason`.
 
 ## Do's and Don'ts
 
@@ -418,5 +418,6 @@ El lenguaje formal comunica solidez industrial con esquinas apenas suavizadas:
 - **Don't** introducir animaciones lentas o transiciones cosméticas que retarden la captura de información en recepción.
 - **Don't** añadir radios de `8px` ni badges de `12px` al núcleo cobalto; pertenecen a los dialectos heredados.
 - **Don't** crear una nueva pantalla de bahía con un shell de navegación oscuro: el único shell oscuro es el de Soporte.
+- **Don't** usar la tríada Warning para mensajes informativos ni la informativa cobalto para advertencias: `.must-change` es advertencia, `.session-reason` es información.
 - **Don't** escribir valores de `box-shadow` a mano: usa `--shadow-auth-card`, `--shadow-dialog` o `--shadow-table-hairline`. Un cuarto valor rompe la Three-Lift Rule.
 - **Don't** reutilizar `--glow-live` fuera del punto verde de estado: es señal de "en vivo", no una elevación.

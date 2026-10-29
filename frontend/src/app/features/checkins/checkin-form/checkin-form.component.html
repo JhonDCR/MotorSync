@@ -2,6 +2,9 @@
   <h1>Nuevo check-in</h1>
 
   <form novalidate (submit)="save($event)">
+    <section class="card form-section" aria-labelledby="reception-heading">
+    <h2 id="reception-heading">Recepción</h2>
+    <div class="grid-2">
     <div class="field">
       <label for="mileage">Kilometraje</label>
       <input
@@ -45,6 +48,7 @@
         <p id="error-fuel-level" class="error" data-testid="error-fuel-level">{{ message }}</p>
       }
     </div>
+    </div>
 
     <div class="field">
       <label for="reason">Motivo de ingreso</label>
@@ -78,8 +82,11 @@
       }
     </div>
 
+    </section>
+
     <app-damage-map (damagesChange)="damages.set($event)" />
 
+    <section class="card form-section">
     <div class="field">
       <span id="signature-label"><strong>Firma del cliente</strong></span>
       <app-signature-pad data-testid="signature-pad" aria-labelledby="signature-label" (signed)="onSigned($event)" />
@@ -87,6 +94,7 @@
         <p class="error" data-testid="error-signature">{{ message }}</p>
       }
     </div>
+    </section>
 
     @if (saveError(); as message) {
       <p class="notice-error" role="alert" data-testid="save-error">{{ message }}</p>

@@ -55,19 +55,19 @@
           (input)="setField(line.key, 'unitPrice', $event)"
         />
       </div>
-      <button type="button" class="action" data-testid="remove-line" (click)="removeLine(line.key)">
+      <button type="button" class="action danger" data-testid="remove-line" (click)="removeLine(line.key)">
         Quitar línea {{ i + 1 }}
       </button>
     </fieldset>
   }
 
   <div class="toolbar">
-    <button type="button" class="action" data-testid="add-line" (click)="addLine()">
+    <button type="button" class="action ghost" data-testid="add-line" (click)="addLine()">
       Agregar línea
     </button>
   </div>
 
-  <dl class="facts" aria-live="polite">
+  <dl class="facts totals" aria-live="polite">
     <div>
       <dt>Subtotal</dt>
       <dd data-testid="preview-subtotal">{{ totals().subtotal }}</dd>
@@ -76,7 +76,7 @@
       <dt>IVA 15 %</dt>
       <dd data-testid="preview-tax">{{ totals().tax }}</dd>
     </div>
-    <div>
+    <div class="grand">
       <dt>Total</dt>
       <dd data-testid="preview-total">{{ totals().total }}</dd>
     </div>

@@ -33,7 +33,7 @@
         <dl class="facts">
           <div>
             <dt>Estado</dt>
-            <dd data-testid="budget-status">{{ budget.status }}</dd>
+            <dd><span class="ms-pill" [attr.data-status]="budget.status" data-testid="budget-status">{{ budget.status }}</span></dd>
           </div>
           <div>
             <dt>Fecha</dt>
@@ -60,16 +60,31 @@
 
       <section class="card" aria-labelledby="lines-heading">
         <h2 id="lines-heading">Líneas</h2>
-        <ul class="list">
-          @for (line of budget.lines; track line.id) {
-            <li data-testid="budget-line">
-              {{ kindLabels[line.kind] }}: {{ line.description }} – {{ line.quantity }} ×
-              {{ line.unitPrice }} =
-              {{ line.lineTotal }}
-            </li>
-          }
-        </ul>
-        <dl class="facts">
+        <div class="table-wrap">
+          <table class="lines">
+            <thead>
+              <tr>
+                <th scope="col">Tipo</th>
+                <th scope="col">Descripción</th>
+                <th scope="col" class="num">Cant.</th>
+                <th scope="col" class="num">P. unit.</th>
+                <th scope="col" class="num">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (line of budget.lines; track line.id) {
+                <tr data-testid="budget-line">
+                  <td><span class="ms-pill">{{ kindLabels[line.kind] }}</span></td>
+                  <td>{{ line.description }}</td>
+                  <td class="num">{{ line.quantity }}</td>
+                  <td class="num">{{ line.unitPrice }}</td>
+                  <td class="num strong">{{ line.lineTotal }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <dl class="facts totals">
           <div>
             <dt>Subtotal</dt>
             <dd data-testid="budget-subtotal">{{ budget.subtotal }}</dd>
@@ -78,7 +93,7 @@
             <dt>IVA</dt>
             <dd data-testid="budget-tax">{{ budget.tax }}</dd>
           </div>
-          <div>
+          <div class="grand">
             <dt>Total</dt>
             <dd data-testid="budget-total">{{ budget.total }}</dd>
           </div>
@@ -112,7 +127,7 @@
           </button>
           <button
             type="button"
-            class="action"
+            class="action danger"
             data-testid="reject-budget"
             [disabled]="busy()"
             (click)="run(budget, 'reject')"

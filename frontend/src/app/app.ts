@@ -50,6 +50,8 @@ export class App {
     return role === undefined ? '' : ROLE_LABELS[role];
   });
   protected readonly loggingOut = signal(false);
+  /** Mobile drawer state (< 1024px); purely presentational. */
+  protected readonly navOpen = signal(false);
 
   constructor() {
     this.router.events
@@ -59,7 +61,16 @@ export class App {
       )
       .subscribe((event) => {
         this.currentUrl.set(event.urlAfterRedirects || event.url);
+        this.navOpen.set(false);
       });
+  }
+
+  protected toggleNav(): void {
+    this.navOpen.update((open) => !open);
+  }
+
+  protected closeNav(): void {
+    this.navOpen.set(false);
   }
 
   /**

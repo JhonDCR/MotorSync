@@ -17,19 +17,39 @@ $touch-target: 44px;
   min-height: 100vh;
   padding: var(--space-xl) var(--space-md);
   box-sizing: border-box;
-  background-color: var(--color-bg);
+  background:
+    radial-gradient(70% 50% at 50% 0%, rgb(255 143 0 / 14%), transparent 70%),
+    radial-gradient(50% 40% at 100% 100%, rgb(67 45 191 / 22%), transparent 70%),
+    var(--color-bg);
 }
 
+// Frosted glass panel.
 .auth-page {
+  position: relative;
   box-sizing: border-box;
   width: 100%;
   max-width: 28rem;
   margin: 0 auto;
   padding: var(--space-xl);
-  background-color: #ffffff;
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-md);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 6%), rgb(255 255 255 / 2%)),
+    rgb(21 24 29 / 78%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-auth-card);
+  backdrop-filter: blur(18px) saturate(140%);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 24px;
+    right: 24px;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+    opacity: 0.85;
+  }
 
   &.auth-page--wide {
     max-width: 34rem;
@@ -39,26 +59,26 @@ $touch-target: 44px;
 .auth-brand-badge {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
-  margin-bottom: var(--space-lg);
-  padding: 6px 12px;
-  color: var(--color-primary);
-  background-color: var(--color-primary-light);
-  border: 1px solid rgba(11, 83, 148, 0.2);
-  border-radius: var(--radius-sm);
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xl);
+  padding: 6px 12px 6px 6px;
+  color: var(--color-text);
+  background-color: var(--color-surface-2);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-pill);
 
   .auth-brand-icon {
-    width: 18px;
-    height: 18px;
+    width: 32px;
+    height: 32px;
     flex-shrink: 0;
-    stroke: var(--color-primary);
+    object-fit: contain;
   }
 
   .auth-brand-title {
-    font-size: var(--font-size-xs);
+    font-family: var(--font-display);
+    font-size: var(--font-size-sm);
     font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    letter-spacing: 0.02em;
   }
 }
 
@@ -66,12 +86,13 @@ $touch-target: 44px;
   margin-bottom: var(--space-xl);
 
   h1 {
-    margin: 0 0 var(--space-xs);
-    font-size: var(--font-size-2xl);
+    margin: 0 0 var(--space-sm);
+    font-family: var(--font-display);
+    font-size: var(--font-size-3xl);
     font-weight: 700;
     color: var(--color-text);
-    line-height: 1.25;
-    letter-spacing: -0.01em;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
   }
 
   .intro {
@@ -84,6 +105,7 @@ $touch-target: 44px;
 
 h1 {
   margin: 0 0 var(--space-xs);
+  font-family: var(--font-display);
   font-size: var(--font-size-2xl);
   font-weight: 700;
   color: var(--color-text);
@@ -100,7 +122,7 @@ h1 {
 
   label {
     display: block;
-    margin-bottom: var(--space-xs);
+    margin-bottom: var(--space-sm);
     font-size: var(--font-size-sm);
     font-weight: 600;
     color: var(--color-text);
@@ -110,33 +132,33 @@ h1 {
     @include touch.touch-target;
     box-sizing: border-box;
     width: 100%;
-    min-height: $touch-target;
-    padding: 0 var(--space-md);
+    min-height: 48px;
+    padding: 0 var(--space-lg);
     font-family: var(--font-sans);
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-md);
     color: var(--color-text);
-    background-color: #ffffff;
+    background-color: rgb(13 15 18 / 70%);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 
     &::placeholder {
-      color: #888888;
+      color: #828b98;
     }
 
     &:hover {
-      border-color: var(--color-text-muted);
+      border-color: #8a93a1;
     }
 
     &:focus-visible {
       border-color: var(--color-primary);
-      outline: 3px solid var(--color-focus);
-      outline-offset: 2px;
+      outline: none;
+      box-shadow: 0 0 0 3px rgb(255 143 0 / 28%);
     }
 
     &[aria-invalid='true'] {
       border: 2px solid var(--color-error);
-      background-color: #fffbfa;
+      background-color: var(--color-error-light);
     }
   }
 }
@@ -160,9 +182,9 @@ h1 {
   font-size: var(--font-size-sm);
   font-weight: 500;
   line-height: 1.4;
-  color: var(--color-error);
+  color: #fecaca;
   background-color: var(--color-error-light);
-  border: 1px solid var(--color-error);
+  border: 1px solid rgb(248 113 113 / 45%);
   border-radius: var(--radius-sm);
 }
 
@@ -173,13 +195,12 @@ h1 {
   font-weight: 500;
   line-height: 1.4;
   color: var(--color-text);
-  background-color: var(--color-primary-light);
-  border: 1px solid var(--color-primary);
+  background-color: var(--color-accent-light);
+  border: 1px solid rgb(139 124 246 / 35%);
   border-radius: var(--radius-sm);
 }
 
-// Aviso de cambio obligatorio: es una advertencia, no un error ni un mensaje
-// informativo. Usa la tríada Warning para no confundirse con .session-reason.
+// Mandatory change notice: a warning, not an error nor info.
 .must-change {
   margin: 0 0 var(--space-lg);
   padding: var(--space-md) var(--space-lg);
@@ -200,22 +221,24 @@ h1 {
   @include touch.touch-target;
   box-sizing: border-box;
   width: 100%;
-  min-height: 48px;
+  min-height: 50px;
+  margin-top: var(--space-sm);
   padding: 0 var(--space-xl);
   font-family: inherit;
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-md);
   font-weight: 700;
   letter-spacing: 0.01em;
-  color: #ffffff;
-  background-color: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius-sm);
+  color: var(--color-on-primary);
+  background: linear-gradient(180deg, var(--color-primary-hover), var(--color-primary));
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--glow-primary);
   cursor: pointer;
-  transition: background-color var(--transition-fast), transform var(--transition-fast);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast);
 
-  &:hover {
-    background-color: var(--color-primary-hover);
-    border-color: var(--color-primary-hover);
+  &:hover:not(:disabled) {
+    filter: brightness(1.06);
+    box-shadow: 0 0 0 1px rgb(255 143 0 / 55%), 0 10px 32px -4px rgb(255 143 0 / 70%);
   }
 
   &:active:not(:disabled) {
@@ -229,7 +252,7 @@ h1 {
 
   &:focus-visible {
     outline: 3px solid var(--color-focus);
-    outline-offset: 2px;
+    outline-offset: 3px;
   }
 }
 
@@ -240,7 +263,7 @@ h1 {
 .auth-divider {
   height: 1px;
   margin: var(--space-lg) 0;
-  background-color: var(--color-border-light);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 12%), transparent);
 }
 
 .alternate {
@@ -254,11 +277,11 @@ h1 {
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: var(--space-xs);
-    padding: var(--space-sm) var(--space-md);
-    background-color: var(--color-surface);
+    gap: var(--space-xs) var(--space-sm);
+    padding: var(--space-xs) var(--space-md);
+    background-color: rgb(255 255 255 / 3%);
     border: 1px solid var(--color-border-light);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
   }
 }
 
@@ -269,15 +292,17 @@ h1 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-primary);
+  color: var(--color-accent);
   font-size: var(--font-size-base);
   font-weight: 600;
   text-decoration: underline;
-  text-underline-offset: 3px;
-  transition: color var(--transition-fast);
+  text-decoration-color: rgb(139 124 246 / 40%);
+  text-underline-offset: 4px;
+  transition: color var(--transition-fast), text-decoration-color var(--transition-fast);
 
   &:hover {
-    color: var(--color-primary-hover);
+    color: #67e8f9;
+    text-decoration-color: currentcolor;
   }
 
   &:focus-visible {
@@ -293,6 +318,6 @@ h1 {
   }
 
   .auth-page {
-    padding: var(--space-2xl);
+    padding: var(--space-2xl) 2.5rem;
   }
 }

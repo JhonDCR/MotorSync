@@ -79,7 +79,7 @@ legend,
     font-family: var(--font-sans);
     font-size: var(--font-size-md);
     color: var(--color-text);
-    background-color: #ffffff;
+    background-color: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
     transition: border-color var(--transition-fast);
@@ -142,9 +142,9 @@ legend,
 }
 
 .notice-warning {
-  color: #4d3200;
-  background-color: #fff4ce;
-  border: 1px solid #8a5a00;
+  color: var(--color-warning-text);
+  background-color: var(--color-warning-bg);
+  border: 1px solid var(--color-warning-border);
 }
 
 .action,
@@ -168,7 +168,7 @@ a.action,
 button.action {
   color: var(--color-primary);
   text-decoration: none;
-  background-color: #ffffff;
+  background-color: var(--color-surface);
   border: 1px solid var(--color-primary);
 
   &:hover {
@@ -178,7 +178,7 @@ button.action {
 
 .primary {
   width: 100%;
-  color: #ffffff;
+  color: var(--color-on-primary);
   background-color: var(--color-primary);
   border: 1px solid var(--color-primary);
 

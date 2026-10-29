@@ -102,7 +102,7 @@ h1 {
   }
 
   &.action-print {
-    color: #ffffff;
+    color: var(--color-on-primary);
     background-color: var(--color-primary);
 
     &:hover {
@@ -219,7 +219,7 @@ h2 {
   }
 
   &.active {
-    color: #ffffff;
+    color: var(--color-on-primary);
     background-color: var(--color-primary);
     border-color: var(--color-primary);
   }

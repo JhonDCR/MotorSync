@@ -33,11 +33,11 @@
         <dl class="facts">
           <div>
             <dt>Estado</dt>
-            <dd data-testid="wo-status">{{ order.status }}</dd>
+            <dd><span class="ms-pill" [attr.data-status]="order.status" data-testid="wo-status">{{ order.status }}</span></dd>
           </div>
           <div>
             <dt>Placa</dt>
-            <dd>{{ order.plate }}</dd>
+            <dd><span class="plate">{{ order.plate }}</span></dd>
           </div>
           <div>
             <dt>Responsable</dt>
@@ -91,7 +91,7 @@
         @if (canCancel(order)) {
           <button
             type="button"
-            class="action"
+            class="action danger"
             data-testid="cancel-wo"
             [disabled]="busy()"
             (click)="cancelling.set(true)"
@@ -116,14 +116,14 @@
           <div class="toolbar">
             <button
               type="button"
-              class="action"
+              class="action danger"
               data-testid="confirm-cancel"
               [disabled]="busy() || cancelReason().trim() === ''"
               (click)="confirmCancel(order)"
             >
               Confirmar cancelación
             </button>
-            <button type="button" class="action" (click)="cancelling.set(false)">Volver</button>
+            <button type="button" class="action ghost" (click)="cancelling.set(false)">Volver</button>
           </div>
         </section>
       }

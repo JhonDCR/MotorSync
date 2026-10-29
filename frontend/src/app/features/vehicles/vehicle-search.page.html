@@ -1,7 +1,10 @@
 <section class="vehicle-search" aria-labelledby="vehicle-search-title">
-  <h2 id="vehicle-search-title">Buscar vehículo</h2>
+  <header class="hero">
+    <p class="eyebrow">Recepción en bahía</p>
+    <h2 id="vehicle-search-title">Buscar vehículo</h2>
+  </header>
 
-  <form class="search" role="search" (submit)="$event.preventDefault()">
+  <form class="search ms-card" role="search" (submit)="$event.preventDefault()">
     <label for="vehicle-search-term">Placa o VIN</label>
     <input
       id="vehicle-search-term"
@@ -49,13 +52,14 @@
           <ul class="result-list">
             @for (vehicle of current.items; track vehicle.id) {
               <li>
-                <a class="result" [routerLink]="['/vehicles', vehicle.id]" data-testid="vehicle-result">
+                <a class="result ms-card is-interactive" [routerLink]="['/vehicles', vehicle.id]" data-testid="vehicle-result">
                   <span class="result-plate">{{ vehicle.plate }}</span>
                   <span class="result-vehicle">
                     {{ vehicle.brand }} {{ vehicle.model }} · {{ vehicle.year }} · {{ vehicle.color }} ·
                     {{ bodyTypeLabel(vehicle.bodyType) }}
                   </span>
                   <span class="result-mileage">{{ formatMileage(vehicle.initialMileage) }} km</span>
+                  <span class="result-arrow" aria-hidden="true">→</span>
                   <span class="result-owner">
                     <span class="result-owner-name">{{ vehicle.owner.displayName }}</span>
                     <span>{{ vehicle.owner.documentNumber }}</span>
